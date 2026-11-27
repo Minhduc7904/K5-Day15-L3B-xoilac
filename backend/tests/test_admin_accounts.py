@@ -7,12 +7,13 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models import User, UserSession
+from tests.conftest import new_password
 from tests.test_auth import API, COOKIE, make_admin, register
 
 ACC = f"{API}/admin/accounts"
-# Mật khẩu chỉ dùng trong test.
-PW_A = "admin-a-test-pw"
-PW_B = "admin-b-test-pw"
+# Sinh lúc chạy, không viết cứng (tests/conftest.py).
+PW_A = new_password()
+PW_B = new_password()
 
 
 async def token(client, email, password) -> str:
@@ -74,9 +75,9 @@ async def test_admin_creates_admin(client, db, admin_a):
     assert rows["b@example.com"]["last_login_at"] is not None
 
 
-async def test_create_wrong_current_password(client, db, admin_a):
+async def test_create_wrong_current_password(client, db, admin_a, make_password):
     _, ta = admin_a
-    r = await create_b(client, ta, current_password="sai-mat-khau")
+    r = await create_b(client, ta, current_password=make_password())
     assert r.status_code == 401
     assert r.json() == {"detail": "Mật khẩu xác nhận không đúng", "code": "REAUTH_FAILED"}
     assert await count_users(db) == 1
@@ -104,7 +105,7 @@ async def test_create_with_student_email_does_not_promote(client, db, admin_a):
 
 @pytest.mark.parametrize(
     "over",
-    [{"password": "12345"}, {"password": "x" * 129}, {"email": "khong-phai-email"}, {"current_password": ""}],
+    [{"password": "x" * 5}, {"password": "x" * 129}, {"email": "khong-phai-email"}, {"current_password": ""}],
 )
 async def test_create_validation(client, admin_a, over):
     _, ta = admin_a
@@ -114,7 +115,7 @@ async def test_create_validation(client, admin_a, over):
 # ---- Quyền -----------------------------------------------------------------------
 
 
-async def test_student_forbidden_and_guest_unauthorized(client, db, admin_a):
+async def test_student_forbidden_and_guest_unauthorized(client, db, admin_a, make_password):
     a, _ = admin_a
     await register(client, email="hs01@example.com")
     ts = client.cookies[COOKIE]
@@ -122,8 +123,8 @@ async def test_student_forbidden_and_guest_unauthorized(client, db, admin_a):
 
     calls = [
         ("GET", ACC, None),
-        ("POST", ACC, {"email": "x@example.com", "password": "123456", "current_password": "hs01"}),
-        ("PATCH", f"{ACC}/{a.user_id}/status", {"status": "disabled", "current_password": "hs01"}),
+        ("POST", ACC, {"email": "x@example.com", "password": make_password(), "current_password": make_password()}),
+        ("PATCH", f"{ACC}/{a.user_id}/status", {"status": "disabled", "current_password": make_password()}),
     ]
     for method, url, body in calls:
         r = await client.request(method, url, json=body, headers=bearer(ts))
@@ -157,14 +158,14 @@ async def test_cannot_disable_last_active_admin(client, admin_a):
     assert (await client.get(f"{API}/auth/me", headers=bearer(ta))).status_code == 200
 
 
-async def test_disable_other_admin_revokes_sessions_then_enable(client, db, admin_a):
+async def test_disable_other_admin_revokes_sessions_then_enable(client, db, admin_a, make_password):
     _, ta = admin_a
     b_id = (await create_b(client, ta)).json()["user_id"]
     tb1 = await token(client, "b@example.com", PW_B)
     tb2 = await token(client, "b@example.com", PW_B)
 
     # Sai mật khẩu xác nhận: không đổi gì.
-    r = await set_status(client, ta, b_id, "disabled", "sai-mat-khau")
+    r = await set_status(client, ta, b_id, "disabled", make_password())
     assert r.status_code == 401 and r.json()["code"] == "REAUTH_FAILED"
     assert (await client.get(f"{API}/auth/me", headers=bearer(tb1))).status_code == 200
 

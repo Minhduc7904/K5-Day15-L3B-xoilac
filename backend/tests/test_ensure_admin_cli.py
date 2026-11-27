@@ -17,10 +17,11 @@ from app.repositories.user_repository import UserRepository
 from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
 from app.usecase.auth import AuthUseCase, InvalidCredentials
+from tests.conftest import new_password
 
-# Mật khẩu chỉ dùng trong test.
-PW = "matkhau-admin-mac-dinh"
-PW_OTHER = "mat-khau-khac-hoan-toan"
+# Sinh lúc chạy, không viết cứng (tests/conftest.py).
+PW = new_password()
+PW_OTHER = new_password()
 
 
 @pytest.fixture
@@ -130,7 +131,7 @@ def test_student_email_is_not_promoted(db_url, capsys):
     async def _student():
         async with _session(db_url) as s:
             uc = AuthUseCase(UserRepository(s), SessionRepository(s), PasswordService(), TokenService(), 168)
-            await uc.create_user("hs01@example.com", "hs01-test", "student")
+            await uc.create_user("hs01@example.com", new_password(), "student")
 
     asyncio.run(_student())
     assert _run(db_url, email="HS01@example.com") == 1
@@ -147,7 +148,7 @@ def test_prod_requires_12_chars(db_url, capsys):
     assert len(_users(db_url)) == 1
 
 
-@pytest.mark.parametrize("password", ["12345", "x" * 129])
+@pytest.mark.parametrize("password", ["x" * 5, "x" * 129])
 def test_password_length_rule(db_url, password):
     assert _run(db_url, password=password) == 2
     assert _users(db_url) == []
@@ -161,7 +162,8 @@ def test_invalid_email(db_url):
 def test_output_never_contains_password(db_url, capsys):
     _run(db_url)
     _run(db_url, password=PW_OTHER)
-    _run(db_url, password="short", secure=True)
+    too_short = new_password()[:11]  # < 12 ký tự: lỗi prod, vẫn không được in ra
+    _run(db_url, password=too_short, secure=True)
     out = capsys.readouterr()
-    for secret in (PW, PW_OTHER, "short", "$argon2"):
+    for secret in (PW, PW_OTHER, too_short, "$argon2"):
         assert secret not in out.out + out.err

@@ -11,11 +11,12 @@ from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
 from app.service.token_service import TokenService
 from app.usecase.auth import AuthUseCase
+from tests.conftest import new_password
 
 API = "/api/v1"
 COOKIE = "examind_session"
-# Mật khẩu chỉ dùng trong test.
-PW = "matkhau-test-1"
+# Sinh lúc chạy, không viết cứng (tests/conftest.py).
+PW = new_password()
 
 
 async def register(client, email="hs01@example.com", password=PW, **extra):
@@ -82,7 +83,7 @@ async def test_register_normalizes_email_and_rejects_duplicate_case_insensitive(
 
 @pytest.mark.parametrize(
     ("password", "expected"),
-    [("12345", 422), ("123456", 201), ("x" * 128, 201), ("x" * 129, 422)],
+    [("x" * 5, 422), ("x" * 6, 201), ("x" * 128, 201), ("x" * 129, 422)],
 )
 async def test_register_password_length(client, password, expected):
     r = await register(client, password=password)
@@ -113,10 +114,10 @@ async def test_login_success_sets_cookie_and_last_login(client, db):
         assert (await s.execute(select(User.last_login_at))).scalar_one() is not None
 
 
-async def test_login_wrong_email_and_wrong_password_same_message(client):
+async def test_login_wrong_email_and_wrong_password_same_message(client, make_password):
     await register(client)
     client.cookies.clear()
-    wrong_pw = await login(client, password="sai-mat-khau")
+    wrong_pw = await login(client, password=make_password())
     no_user = await login(client, email="khongco@example.com")
     assert wrong_pw.status_code == no_user.status_code == 401
     assert wrong_pw.json() == no_user.json() == {
@@ -144,7 +145,7 @@ async def test_login_unknown_email_still_verifies_hash(client):
     assert calls == [1]
 
 
-async def test_login_disabled_account(client, db):
+async def test_login_disabled_account(client, db, make_password):
     await register(client)
     client.cookies.clear()
     async with db() as s:
@@ -154,7 +155,7 @@ async def test_login_disabled_account(client, db):
     assert r.status_code == 403
     assert r.json()["code"] == "ACCOUNT_DISABLED"
     # Sai mật khẩu thì vẫn 401 như mọi tài khoản: không lộ việc tài khoản bị khóa.
-    assert (await login(client, password="sai-mat-khau")).status_code == 401
+    assert (await login(client, password=make_password())).status_code == 401
 
 
 # ---- Phiên: /me, logout, hết hạn, thu hồi, khóa -----------------------------

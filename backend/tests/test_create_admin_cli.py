@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.cli.create_admin import main
 from app.models import Base, User
 from app.service.password_service import PasswordService
+from tests.conftest import new_password
 
-PW = "matkhau-admin-test"  # chỉ dùng trong test
+PW = new_password()  # sinh lúc chạy, không viết cứng
 
 
 @pytest.fixture
@@ -72,7 +73,7 @@ def test_create_admin_and_no_duplicate(db_url, monkeypatch, capsys):
 
 
 def test_create_admin_rejects_bad_input(db_url, monkeypatch):
-    monkeypatch.setenv("ADMIN_PASSWORD", "12345")
+    monkeypatch.setenv("ADMIN_PASSWORD", "x" * 5)
     assert main(["--email", "admin@example.com"], session_factory=_factory(db_url)) == 2  # mật khẩu < 6
     monkeypatch.setenv("ADMIN_PASSWORD", PW)
     assert main(["--email", "khong-phai-email"], session_factory=_factory(db_url)) == 2

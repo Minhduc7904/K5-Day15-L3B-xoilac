@@ -1,3 +1,5 @@
+import secrets
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -11,6 +13,20 @@ from app.models import Base
 
 
 TEST_SETTINGS = Settings(_env_file=None, cookie_name="examind_session", cookie_secure=False, session_ttl_hours=168)
+
+
+def new_password() -> str:
+    """Mật khẩu ngẫu nhiên sinh lúc chạy test (19+ ký tự). Không viết cứng mật khẩu trong repo.
+
+    Test độ dài dùng "x" * n; test sai mật khẩu gọi hàm này thêm một lần để có giá trị khác.
+    """
+    return "T-" + secrets.token_urlsafe(16)
+
+
+@pytest.fixture
+def make_password():
+    """Fixture trả về hàm sinh mật khẩu: `pw = make_password()`."""
+    return new_password
 
 
 class FakeStorage:
