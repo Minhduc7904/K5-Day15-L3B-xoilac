@@ -191,4 +191,4 @@ flowchart LR
 
 | Thời điểm | Đổi gì | Vì sao |
 |---|---|---|
-|  |  |  |
+| 28/11/2026 | Hồ sơ học sinh trước tour, Socket.IO theo phiên, credit và job nhắc học | Hoàn tất thiết lập một lần và lưu lịch ôn theo tài khoản. Xem [issue #36](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/36). |

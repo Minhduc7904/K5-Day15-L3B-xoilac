@@ -7,6 +7,8 @@ import { SplashScreen } from '@/components/splash/splash-screen';
 import { ToastProvider } from '@/components/ui/toast';
 import { signedOut } from '@/features/auth/auth-slice';
 import { AuthGuard } from '@/features/auth/route-guard';
+import { RealtimeConnection } from '@/features/realtime/realtime-connection';
+import { StudentAccountProvider } from '@/features/study/profile/student-account-provider';
 import { onSessionLost } from '@/lib/api-client';
 import { makeStore } from './index';
 
@@ -23,11 +25,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   return (
     <Provider store={store}>
+      <RealtimeConnection />
       {/* Tôn trọng cài đặt giảm chuyển động của hệ điều hành cho mọi hoạt ảnh motion. */}
       <MotionConfig reducedMotion="user">
         <ToastProvider>
           <SplashScreen>
-            <AuthGuard>{children}</AuthGuard>
+            <AuthGuard><StudentAccountProvider>{children}</StudentAccountProvider></AuthGuard>
           </SplashScreen>
         </ToastProvider>
       </MotionConfig>

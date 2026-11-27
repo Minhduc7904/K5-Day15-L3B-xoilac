@@ -8,6 +8,8 @@
 | Viết tính năng mới trong backend | [Các lớp backend](architecture/backend-layers.md) |
 | Hiểu đăng nhập, phiên và phân quyền; kiểm quyền cho endpoint mới | [Xác thực và phân quyền backend](architecture/backend-auth.md) |
 | Gọi hoặc mock API đăng ký, đăng nhập, đăng xuất | [API xác thực](api/auth-api.md) |
+| Đọc và lưu hồ sơ, lịch nhắc học, xem credit học sinh | [API hồ sơ học sinh](api/student-profile-api.md) |
+| Nối Socket.IO bằng ticket và tham gia room sau đăng nhập | [API realtime](api/realtime-api.md) |
 | Tạo, khoá, mở khoá tài khoản admin; mock trang quản lý admin | [API quản lý tài khoản admin](api/admin-accounts-api.md) |
 | Viết tính năng mới trong frontend | [Kiến trúc frontend](architecture/frontend-base.md) |
 | Dùng font, thang chữ và token màu chung của giao diện | [Design system frontend](architecture/frontend-design-system.md) |

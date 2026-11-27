@@ -1,5 +1,5 @@
 import { correctAnswer, gradeExam, wrongAnswer } from '../grading';
-import type { Answer, Attempt, Exam, StudentProfile } from '../types';
+import type { Answer, Attempt, Exam } from '../types';
 import { questions } from './questions';
 
 /**
@@ -150,14 +150,3 @@ export const seedAttempts = (exams: Exam[]): Attempt[] =>
 
 /** Ngày có học (làm đề hoặc luyện câu lẻ), tính lùi từ hôm nay. Hôm nay đến 5 ngày trước liên tục. */
 export const seedStudyDays = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 15, 17, 18, 21, 22, 26, 27, 30, 34, 35, 41, 47, 48, 52, 61, 66, 70];
-
-export const seedProfile = (): StudentProfile => ({
-  name: 'Học sinh 01',
-  email: 'hs01@example.com',
-  grade: 12,
-  school: 'THPT Mẫu',
-  goal: 'Đạt 8+ môn Toán kỳ thi tốt nghiệp',
-  weeklyTarget: 4,
-  reminders: true,
-  joinedAt: daysAgo(72, 10),
-});

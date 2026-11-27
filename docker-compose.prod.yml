@@ -54,6 +54,30 @@ services:
       start_period: 15s
     logging: *logging
 
+  student-worker:
+    build: ./backend
+    image: examind-backend:latest
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-examind}
+      PGDATABASE: ${POSTGRES_DB:-examind}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL:-https://examind-frontend.vercel.app}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Examind}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:-}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    logging: *logging
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped

@@ -1,6 +1,6 @@
 # Trang học sinh frontend
 
-Dành cho người phát triển frontend cần sửa hoặc nối API thật cho các trang học sinh: dashboard thống kê, tạo đề với AI, đề của tôi, chi tiết đề, làm bài online, kết quả và hồ sơ. Hiện mọi trang chạy trên dữ liệu mock trong trình duyệt. Chưa có endpoint backend nào cho các trang này.
+Dành cho người phát triển các trang học sinh. Hồ sơ, lịch nhắc và credit đọc từ [API hồ sơ học sinh](../api/student-profile-api.md). Dashboard, streak, đề, lượt làm và ví dụ trong tour hiện dùng dữ liệu mẫu trong trình duyệt.
 
 ## Bối cảnh và ràng buộc
 
@@ -21,7 +21,7 @@ Câu hỏi mock do nhóm tự viết. Repo không chép câu nào từ ngân hà
 | `app/(student)/(app)/dashboard`, `exams`, `exams/new`, `exams/[id]`, `results/[attemptId]`, `profile` | Mỗi route chỉ render page component của feature |
 | `app/(student)/(focus)/exams/[id]/take/page.tsx` | Trang làm bài toàn màn hình với thanh công cụ làm bài riêng |
 | `features/study/types.ts` | Kiểu dữ liệu `Question`, `Exam`, `Attempt`, `StructureProposal` và các kiểu khác. Bám theo schema production (xem mục bên dưới) |
-| `features/study/api.ts` | Điểm nối duy nhất: `studyApi` và `agentApi`. Hiện trỏ vào mock |
+| `features/study/api.ts` | Điểm nối dữ liệu hoạt động: `studyApi` và `agentApi` dùng nguồn mẫu |
 | `features/study/mock.ts` | Kho mock trong `localStorage` key `examind:mock-study`, thống kê theo chương, chuỗi ngày học, agent giả lập `runAgent` |
 | `features/study/fixtures/` | 19 câu hỏi tự viết, danh sách chương lấy từ `data/chapters.csv`, đề và lượt làm mẫu |
 | `features/study/grading.ts` | Chấm điểm theo thang THPT 2025, quy về thang 10 |
@@ -34,7 +34,7 @@ Câu hỏi mock do nhóm tự viết. Repo không chép câu nào từ ngân hà
 | `features/study/exams/` | Danh sách đề có lọc và tìm kiếm, trang chi tiết đề (không lộ đáp án; câu hỏi chia tab theo phần, bấm ảnh để phóng to). `exam-paper.tsx` dựng bản xem đề khổ A4 (chia trang bằng cách đo chiều cao từng câu) và nút "Tải PDF" gọi `window.print()` với CSS in A4 trong `globals.css`; trang chi tiết đề và thẻ "Đề nháp đã sẵn sàng" trong chat tạo đề đều mở bản này |
 | `features/study/take/` | Trang làm bài: hẹn giờ, tự lưu nháp, phím tắt, đánh dấu câu, bảng điều hướng. Đếm giây cho câu đang mở (bỏ qua lúc tab ẩn), lưu trong nháp và gửi kèm khi nộp thành `Attempt.questionSeconds` |
 | `features/study/result/` | Vòng điểm, so với lượt trước, thanh kết quả theo trạng thái, nhịp độ làm bài (`pace.tsx`: biểu đồ cột thời gian từng câu tô màu theo kết quả, đường trung bình, thời gian theo phần, ba câu lâu nhất, nhận xét), phân tích theo phần và chương, xem lại từng câu kèm lời giải và thời gian. Lượt mẫu trong mock có thời gian từng câu tự sinh theo dạng câu và mức độ; lượt cũ không có `questionSeconds` thì hiện thông báo thay biểu đồ |
-| `features/study/profile/` | Hồ sơ kiểu trang cá nhân: ảnh bìa, cột Giới thiệu/Credit/Huy hiệu, ba tab Hoạt động (mục tiêu tuần, lịch 12 tuần), Credit (số dư, lịch sử), Cài đặt (form, khôi phục dữ liệu mẫu). `/profile#credit` và `#settings` mở thẳng tab tương ứng |
+| `features/study/profile/` | Hồ sơ, API hồ sơ và trạng thái credit dùng chung. `/profile/setup` dùng cùng form với tab Cài đặt. `/profile#credit` và `/profile#settings` mở thẳng tab tương ứng |
 | `components/math/math-content.tsx` | `MathContent`: hiển thị văn bản có công thức và hình, dùng chung cho câu hỏi, đáp án và lời giải |
 
 ## Luồng dữ liệu và tích hợp
@@ -51,7 +51,7 @@ Biểu đồ radar hồ sơ học tập quy đổi các chỉ số về 0–100%
 
 Từ 1024px, `StudentHeader` đặt logo bên trái, các mục học tập bằng chữ ở giữa, chuông thông báo và thẻ tài khoản bên phải. Màn hình hẹp mở các mục học tập trong sidebar trượt từ trái bằng nút menu. Cả hai dùng cùng danh sách route và đánh dấu mục hiện tại. Chiều cao header nằm ở `--student-header-height` trong `AppShell` để trang chat phân bổ phần còn lại cho nội dung và ô soạn.
 
-Thẻ tài khoản lấy tên và email từ phiên Redux. Menu mở `/profile` và gọi `useLogout` để xóa phiên rồi chuyển tới trang đăng nhập. Tên hiển thị luôn là của người đăng nhập (`display_name`, thiếu thì dùng email). Menu có thêm mục "Xem lại hướng dẫn" để chạy lại tour. Ô credit cạnh chuông hiện số dư từ `studyApi.getCredits()` và mở `/profile#credit`; dưới 100 credit thì chuyển xám. Mock tính 1 credit cho mỗi đề tạo bằng AI trong tháng, hạn mức 500/tháng *(tự đặt, chưa có nguồn hay endpoint thật)*. Nút chuông mở bảng thông báo với trạng thái rỗng trong lúc chờ nguồn dữ liệu.
+Thẻ tài khoản lấy tên và email từ phiên Redux. Menu mở `/profile` và gọi `useLogout` để xóa phiên rồi chuyển tới trang đăng nhập. Tên hiển thị luôn là của người đăng nhập (`display_name`, thiếu thì dùng email). Menu có thêm mục "Xem lại hướng dẫn" để chạy lại tour. Ô credit cạnh chuông đọc cùng số dư API với tab Credit và mở `/profile#credit`. Số dư ban đầu là 500, cộng tối đa 100 mỗi ngày theo giờ Việt Nam, với trần 500. Nút chuông mở bảng thông báo với trạng thái rỗng trong lúc chờ nguồn dữ liệu.
 
 ### Định dạng nội dung câu hỏi
 
@@ -114,7 +114,7 @@ Lần đầu học sinh vào `/dashboard`, linh vật dẫn một vòng qua ba c
 
 Thay `studyApi` và `agentApi` trong `features/study/api.ts` bằng adapter gọi backend qua `lib/api-client.ts`, giữ nguyên chữ ký hàm. `agentApi.run` cần trả cùng loại sự kiện. Backend có thể dùng SSE, sau đó adapter đổi luồng SSE thành async generator. Lỗi "không tìm thấy" phải ném `NotFoundError` để trang hiện trạng thái phù hợp.
 
-Mọi route học sinh (`/dashboard`, `/exams`, `/results`, `/profile`) yêu cầu đăng nhập, kể cả khi dữ liệu học tập là mock: `AuthGuard` chuyển khách tới `/login`. Mock mode chỉ thay nguồn dữ liệu, không mở thêm quyền xem. Tài khoản thử ở trang đăng nhập (`hs01@example.com`) vào thẳng được các trang này.
+Các route học sinh yêu cầu đăng nhập. Với phiên thật, chốt hồ sơ chuyển học sinh thiếu hồ sơ tới `/profile/setup` trước khi render khu vực học sinh. Khi lưu thành công, vào dashboard và tour có thể bắt đầu. Chế độ auth mẫu cho phép dùng dashboard và tour để demo.
 
 ## Quyết định và cách kiểm chứng
 
@@ -129,7 +129,7 @@ Cách kiểm chứng:
 cd frontend; npm run typecheck; npm run build
 ```
 
-Chạy `npm run dev`, rồi mở `http://localhost:3000/dashboard` (ở chế độ mock không cần đăng nhập). Kiểm tra ở bề rộng 375px và 1280px:
+Chạy `npm run dev`, đăng nhập rồi mở `http://localhost:3000/dashboard`. Kiểm tra ở bề rộng 375px và 1280px:
 
 - Các trang không có thanh cuộn ngang.
 - Trong dashboard, kiểm tra ô tạo đề mở chat với đúng nội dung, chuỗi học đánh dấu hôm nay, điểm trên biểu đồ mở kết quả bằng phím Enter và bộ lọc chương giới hạn đúng lớp.

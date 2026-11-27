@@ -1,11 +1,13 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User
+from app.core.study_time import study_date
+from app.models.user import ROLE_STUDENT, User
+from app.repositories.credits import CreditRepository
 
 
 class DuplicateEmailError(Exception):
@@ -13,7 +15,7 @@ class DuplicateEmailError(Exception):
 
 
 class UserRepository:
-    """Chỉ truy cập bảng users. Không chứa luật nghiệp vụ."""
+    """Lưu tài khoản và khởi tạo ví học sinh trong cùng giao dịch."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -55,6 +57,10 @@ class UserRepository:
                 await self._session.flush()
         except IntegrityError as error:
             raise DuplicateEmailError from error
+        if role == ROLE_STUDENT:
+            await self._session.refresh(user, attribute_names=["created_at"])
+            created_at = user.created_at if user.created_at.tzinfo else user.created_at.replace(tzinfo=UTC)
+            await CreditRepository(self._session).open_account(user.user_id, study_date(created_at))
         if commit:
             await self._session.commit()
         await self._session.refresh(user)

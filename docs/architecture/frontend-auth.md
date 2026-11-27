@@ -34,15 +34,15 @@ Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `sig
 
 ### Chặn route theo vai trò
 
-Web chỉ có hai loại người dùng: học sinh và admin. Không có trang cho khách.
+Web có hai vai trò tài khoản là học sinh và admin. Khách vào được landing và các trang xác thực.
 
 | Người dùng | Được vào | Mở trang khác thì chuyển tới |
 | --- | --- | --- |
-| Chưa đăng nhập | `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`, `/login/google` | `/login` (kèm `?reason=` nếu vừa đăng xuất hoặc hết phiên) |
-| Học sinh | `/` và các trang ngoài `/admin`, cùng `/design-system` | `/` |
+| Chưa đăng nhập | `/`, `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`, `/login/google` | `/login` (kèm `?reason=` nếu vừa đăng xuất hoặc hết phiên) |
+| Học sinh | `/`, khu vực học sinh và `/design-system` | `/dashboard`, có thể chuyển tiếp tới `/profile/setup` |
 | Admin | `/admin/*`, `/design-system` | `/admin` |
 
-Đã đăng nhập mà mở trang auth thì về trang chủ theo vai trò. Đăng xuất dispatch `signedOut('logged-out')`, guard đưa về `/login?reason=logged-out`. Guard chỉ là lớp giao diện, quyền thật do backend kiểm ở từng API. Trang `/` hiện vẫn là nội dung landing (đã bỏ các nút đăng ký) cho tới khi có khu học tập của #4.
+Đã đăng nhập mà mở trang auth thì về trang chủ theo vai trò. Đăng xuất dispatch `signedOut('logged-out')`, guard đưa về `/login?reason=logged-out`. Guard chỉ là lớp giao diện, quyền thật do backend kiểm ở từng API.
 
 ## Luồng dữ liệu và tích hợp
 
@@ -51,7 +51,7 @@ Web chỉ có hai loại người dùng: học sinh và admin. Không có trang 
 1. Form kiểm tra phía client. Có lỗi thì hiện lỗi dưới từng ô và focus ô sai đầu tiên.
 2. Đăng ký gọi `authApi.register` rồi mở bước OTP. Đăng nhập bằng mật khẩu đúng mở phiên ngay.
 3. Khi dùng API thật, cả hai trang có nút Google. Trang `/login/google` dùng verifier của tab để đổi ticket thành phiên. Nếu backend yêu cầu OTP cho email ngoài Google, trang hiển thị bước xác minh. Không đổi được thì trang báo theo nguyên nhân: backend trả `#error=google` (Google từ chối hoặc huỷ), có ticket mà tab không có verifier (bắt đầu ở domain hoặc tab khác, thường do `FRONTEND_URL` của backend khác domain đang mở), hoặc không có ticket (tải lại trang sau khi đã dùng).
-4. Sau khi có phiên, dispatch `signedIn`. Admin chuyển tới `/admin`, học sinh chuyển tới `/`.
+4. Sau khi có phiên, dispatch `signedIn` và mở [socket](../api/realtime-api.md) trong nền. Admin vào `/admin`. Học sinh đi qua chốt hồ sơ rồi vào dashboard.
 5. Lỗi được đổi thành `AuthError` và hiện bằng `Alert`: sai thông tin (`INVALID_CREDENTIALS`), tài khoản bị khoá (`ACCOUNT_DISABLED`), email đã dùng (`EMAIL_TAKEN`, kèm lỗi ở ô email), lỗi mạng (`NETWORK`, có nút "Thử lại").
 
 ### Quên mật khẩu

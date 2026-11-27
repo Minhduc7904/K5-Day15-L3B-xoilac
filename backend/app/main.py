@@ -7,9 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.errors import ApiError, api_error_handler
+from app.api.realtime import RealtimeMiddleware, RealtimeServer
 from app.api.v1.google_auth import callback_router
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.database import get_sessionmaker
 from app.usecase.pdf_imports import ImportErrorDetail
 
 
@@ -49,6 +51,8 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.add_exception_handler(ImportErrorDetail, pdf_import_error)
     app.include_router(callback_router)
+    app.state.realtime = RealtimeServer(settings.cors_origin_list, get_sessionmaker)
+    app.add_middleware(RealtimeMiddleware, realtime=app.state.realtime)
     return app
 
 
