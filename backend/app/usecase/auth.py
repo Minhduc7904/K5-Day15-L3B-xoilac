@@ -168,10 +168,9 @@ class AuthUseCase:
         await self._sessions.touch(row, self._now())
         return CurrentUser(user=user, session_id=row.session_id)
 
-    async def logout(self, token: str | None) -> None:
-        """Thu hồi phiên hiện tại. Phiên phải còn hiệu lực (gọi sau get_current_user)."""
-        row, _ = await self._load_session(token)
-        await self._sessions.revoke(row, self._now())
+    async def logout(self, current: CurrentUser) -> None:
+        """Thu hồi phiên của request hiện tại (đã qua get_current_user). Có hiệu lực ngay."""
+        await self._sessions.revoke(current.session_id, self._now())
 
     async def _load_session(self, token: str | None) -> tuple[UserSession, User]:
         if not token:

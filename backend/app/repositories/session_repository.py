@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.session import UserSession
@@ -33,6 +33,10 @@ class SessionRepository:
         row.last_used_at = at
         await self._session.commit()
 
-    async def revoke(self, row: UserSession, at: datetime) -> None:
-        row.revoked_at = at
+    async def revoke(self, session_id: int, at: datetime) -> None:
+        await self._session.execute(
+            update(UserSession)
+            .where(UserSession.session_id == session_id, UserSession.revoked_at.is_(None))
+            .values(revoked_at=at)
+        )
         await self._session.commit()
