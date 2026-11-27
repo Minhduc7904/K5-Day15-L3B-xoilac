@@ -20,7 +20,7 @@ Dành cho thành viên nhóm cần dựng PostgreSQL, MinIO và backend trên m�
 
 Đổi cổng hoặc mật khẩu bằng biến môi trường (xem đầu `docker-compose.yml`). Backend đọc `backend/.env`, mẫu ở `backend/.env.example`. Giá trị trong `.env` phải khớp compose.
 
-Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). `CORS_ORIGINS` mặc định rỗng; `.env.example` đặt `http://localhost:3000` cho trường hợp frontend dev gọi thẳng backend.
+Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). `CORS_ORIGINS` mặc định rỗng (cả trong `backend/.env.example`); chỉ đặt `http://localhost:3000` khi chạy frontend dev không qua rewrites. Trên prod, các biến này và `ADMIN_*` nằm trong `/opt/examind/prod.env`, xem [deploy-backend-ci-cd.md](deploy-backend-ci-cd.md#biến-trong-prodenv).
 
 ## Các bước thực hiện
 
