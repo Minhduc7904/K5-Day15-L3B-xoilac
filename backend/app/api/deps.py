@@ -14,6 +14,7 @@ from app.repositories.user_repository import UserRepository
 from app.service.password_service import PasswordService
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
+from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
@@ -70,6 +71,19 @@ def get_auth_usecase(
 
 
 AuthUseCaseDep = Annotated[AuthUseCase, Depends(get_auth_usecase)]
+
+
+def get_admin_accounts_usecase(
+    session: SessionDep,
+    auth: AuthUseCaseDep,
+    passwords: Annotated[PasswordService, Depends(get_password_service)],
+) -> AdminAccountsUseCase:
+    return AdminAccountsUseCase(
+        auth=auth, users=UserRepository(session), sessions=SessionRepository(session), passwords=passwords
+    )
+
+
+AdminAccountsUseCaseDep = Annotated[AdminAccountsUseCase, Depends(get_admin_accounts_usecase)]
 
 # auto_error=False: thiếu header không báo lỗi ở đây; cookie vẫn được xét. Hiện nút Authorize trong Swagger.
 _bearer = HTTPBearer(auto_error=False, description="Token phiên (dùng cho curl/Swagger). Cookie được ưu tiên.")
