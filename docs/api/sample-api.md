@@ -7,6 +7,9 @@ Các endpoint mẫu chứng minh backend nối được PostgreSQL và MinIO. D�
 - Base URL local: `http://localhost:8000/api/v1`. Tài liệu tự sinh: `http://localhost:8000/docs`.
 - Các endpoint mẫu không cần đăng nhập. Đăng nhập và phân quyền: [auth-api.md](auth-api.md). Dữ liệu gửi dạng JSON, riêng upload dùng `multipart/form-data`.
 - CORS chỉ bật khi `CORS_ORIGINS` có giá trị (mặc định rỗng từ issue #8; `backend/.env.example` đặt `http://localhost:3000` cho dev).
+- Base URL trên VPS: `http://examind.duckdns.org/api/v1` (chỉ HTTP). Tài liệu tự sinh: `http://examind.duckdns.org/docs`.
+- Chưa có xác thực. Dữ liệu gửi dạng JSON, riêng upload dùng `multipart/form-data`.
+- CORS cho phép origin trong `CORS_ORIGINS` (mặc định `http://localhost:3000`).
 
 ## Endpoint và hợp đồng
 
@@ -19,6 +22,14 @@ Báo trạng thái kết nối. Không cần tham số.
 ```
 
 `status` là `degraded` khi một trong hai là `false`; mã HTTP vẫn là 200.
+
+### GET /health/live
+
+Kiểm tra process còn sống, không chạm PostgreSQL hay MinIO nên luôn nhanh. Dùng để phân biệt "app chết" với "phụ thuộc lỗi" (khi đó `/health` báo `degraded`). Không cần tham số.
+
+```json
+{"status": "ok", "version": "0.1.0"}
+```
 
 ### POST /sample-items
 

@@ -1,12 +1,12 @@
 # Deploy backend lên EC2 bằng GitHub Actions
 
-Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần merge đổi `backend/`, `deploy/` (kể cả cấu hình nginx), `docker-compose*.yml` hoặc hai workflow, GitHub Actions kiểm tra rồi tự deploy lên VPS. Truy cập SSH và thông tin instance nằm ở [deploy-ec2.md](deploy-ec2.md).
+Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần merge đổi `backend/`, `deploy/` (kể cả cấu hình nginx), `docker-compose*.yml` thì GitHub Actions kiểm tra rồi tự deploy lên VPS. Thay đổi hai workflow backend kích hoạt CI trên PR. Nếu cần deploy lại sau khi sửa workflow, chạy workflow Deploy backend thủ công. Truy cập SSH và thông tin instance nằm ở [deploy-ec2.md](deploy-ec2.md).
 
 ## Điều kiện trước khi chạy
 
 - Quyền ghi vào repo để merge. Quyền SSH và khoá `.pem` chỉ cần khi vận hành tay.
 - Cổng **80** (HTTP) mở trong Security Group của instance để truy cập API từ ngoài. Cổng 22 đã mở. Không mở 5432, 9000, 9001, 8000: các dịch vụ này chỉ nghe trên `127.0.0.1` của VPS.
-- Repo secrets đã tạo: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_KNOWN_HOSTS` (host key đã ghim, deploy dùng `StrictHostKeyChecking=yes`). Môi trường GitHub `production` được tạo tự động ở lần deploy đầu.
+- Repo secrets đã tạo: `EC2_HOST` (hiện là Elastic IP `54.79.136.46`), `EC2_USER`, `EC2_SSH_KEY`, `EC2_KNOWN_HOSTS` (host key đã ghim, deploy dùng `StrictHostKeyChecking=yes`). Môi trường GitHub `production` được tạo tự động ở lần deploy đầu. Đặt secret ở **repo** (Settings → Secrets and variables → Actions), không đặt trùng tên trong environment `production`: secret của environment được ưu tiên hơn và dễ gây nhầm.
 
 ## Thông tin môi trường
 
@@ -14,13 +14,14 @@ Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần me
 | --- | --- |
 | Thư mục trên VPS | `/opt/examind/app` (mã nguồn), `/opt/examind/seed` (gói dữ liệu nền), `/opt/examind/prod.env` (mật khẩu, chmod 600, không nằm trong Git) |
 | Dịch vụ | `nginx` (cổng 80) → `backend` (FastAPI, nội bộ) → `postgres`, `minio` |
-| Địa chỉ API | `http://32.236.15.241/api/v1/health` (IP có thể đổi khi dừng/khởi động instance, xem [deploy-ec2.md](deploy-ec2.md)) |
+| Địa chỉ API | `http://examind.duckdns.org/api/v1/health` (DuckDNS trỏ về Elastic IP `54.79.136.46`, IP không đổi khi dừng/khởi động instance, xem [deploy-ec2.md](deploy-ec2.md)) |
+| Kiểm tra sống | `http://examind.duckdns.org/api/v1/health/live` trả `{"status":"ok","version":"0.1.0"}`, không chạm DB và MinIO |
 | Workflow | [.github/workflows/ci.yml](../../.github/workflows/ci.yml), [.github/workflows/deploy.yml](../../.github/workflows/deploy.yml) |
 
 ## Luồng tự động
 
-1. **PR vào `main`**: `ci.yml` chạy `pytest` backend, kiểm cú pháp Compose (dev và prod), build image backend, kiểm cú pháp nginx (`nginx -t`) và `bash -n` các script.
-2. **Merge vào `main`**: `deploy.yml` gọi lại `ci.yml` trên bản vừa merge. CI lỗi thì dừng, không deploy.
+1. **PR vào `main` có thay đổi backend, hạ tầng hoặc workflow backend**: `ci.yml` chạy `pytest` backend, kiểm cú pháp Compose (dev và prod), build image backend, kiểm cú pháp nginx (`nginx -t`) và `bash -n` các script.
+2. **Merge thay đổi backend hoặc hạ tầng vào `main`**: `deploy.yml` gọi lại `ci.yml` trên bản vừa merge. CI lỗi thì dừng, không deploy.
 3. **Deploy** (`deploy/remote-deploy.sh` chạy trên VPS qua SSH):
    1. `git fetch` rồi `git reset --hard` về commit vừa merge.
    2. `docker compose up -d --build`: dựng lại backend, chạy lại `db-init` (Alembic, một lần) và `minio-init`.
@@ -49,6 +50,7 @@ Script cài Docker và Compose, thêm swap 2 GB (VPS chỉ có ~1,9 GB RAM), t�
 
 ```bash
 curl http://<host>/api/v1/health          # {"status":"ok","database":true,"storage":true}
+curl http://<host>/api/v1/health/live     # {"status":"ok","version":"0.1.0"}
 curl -I http://<host>/docs                # 200, tài liệu API tự sinh
 ssh ... 'cd /opt/examind/app && docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml ps'
 ssh ... 'docker system df; df -h /'
@@ -60,7 +62,8 @@ ssh ... 'docker system df; df -h /'
 | --- | --- |
 | CI đỏ, job deploy bị bỏ qua | Đúng thiết kế. Sửa lỗi theo log CI rồi push lại |
 | Bước "Kiểm tra từ bên ngoài" lỗi nhưng deploy trên VPS qua | Cổng 80 chưa mở trong Security Group |
-| `Host key verification failed` | IP hoặc host key đổi. Lấy fingerprint mới từ AWS Console, cập nhật secrets `EC2_HOST` và `EC2_KNOWN_HOSTS` |
+| `Host key verification failed` | IP hoặc host key đổi. Lấy fingerprint mới từ AWS Console, cập nhật secrets `EC2_HOST` và `EC2_KNOWN_HOSTS` (lấy bằng `ssh-keyscan -T 10 <host>`, đối chiếu fingerprint trước khi lưu) |
+| Tên miền không vào được nhưng IP vào được | DuckDNS đang trỏ sai IP. Vào duckdns.org, sửa ô current ip thành Elastic IP rồi bấm update ip |
 | Deploy lỗi ở `health` rồi quay về bản cũ | Xem `compose logs backend` trong log job; sửa rồi merge lại |
 | Build chậm hoặc bị kill (OOM) | Kiểm `free -m` có swap; không chạy hai deploy cùng lúc (workflow đã dùng `concurrency`) |
 | Đầy ổ đĩa | `docker system df`; chạy `docker builder prune -af` và `docker image prune -af`; không xoá volume |

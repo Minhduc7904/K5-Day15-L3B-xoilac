@@ -16,29 +16,30 @@ Dùng runbook này để đăng nhập VPS demo qua SSH và kiểm tra địa ch
 | Vùng AWS | Sydney (`ap-southeast-2`) |
 | Loại instance | `t8i.small` |
 | Hệ điều hành | Ubuntu 26.04.1 LTS |
-| IPv4 công khai | `32.236.15.241` |
-| DNS công khai | `ec2-32-236-15-241.ap-southeast-2.compute.amazonaws.com` |
+| IPv4 công khai (Elastic IP) | `54.79.136.46` |
+| Tên miền | `examind.duckdns.org` (DuckDNS, trỏ về Elastic IP) |
+| DNS công khai của AWS | `ec2-54-79-136-46.ap-southeast-2.compute.amazonaws.com` |
 | SSH | `ubuntu`, cổng `22` |
 
-Đã kiểm tra kết nối và DNS ngày 27/11/2026. IPv4 công khai được cấp tự động và có thể đổi sau khi dừng rồi khởi động lại instance. Lấy địa chỉ mới trong **AWS Console → EC2 → Instances → Examind** khi cần.
+Ngày 27/11/2026 instance được gắn **Elastic IP** `54.79.136.46` (thay cho IP cấp tự động `32.236.15.241`), nên IP không đổi khi dừng rồi khởi động lại. AWS tính phí mọi IPv4 công khai (kể cả Elastic IP đang gắn vào instance; tài khoản free tier được miễn 750 giờ/tháng trong 12 tháng đầu), nên khi không dùng nữa hãy giải phóng (Release) trong **EC2 → Elastic IPs** để khỏi bị tính phí. Tên miền `examind.duckdns.org` cấu hình trên [duckdns.org](https://www.duckdns.org). Nếu Elastic IP đổi, cập nhật ô current ip ở DuckDNS và các secret `EC2_HOST`, `EC2_KNOWN_HOSTS` (xem [deploy-backend-ci-cd.md](deploy-backend-ci-cd.md)).
 
 ## Các bước thực hiện
 
 1. **Kết nối SSH.** Từ thư mục gốc repo, chạy lệnh sau hoặc thay đường dẫn sau `-i` bằng vị trí tệp của bạn.
 
    ```powershell
-   ssh -o IdentitiesOnly=yes -i .\backend-key.pem -p 22 ubuntu@32.236.15.241
+   ssh -o IdentitiesOnly=yes -i .\backend-key.pem -p 22 ubuntu@54.79.136.46
    ```
 
    Trên macOS hoặc Linux, dùng đường dẫn `./backend-key.pem`.
 
-2. **Tra địa chỉ API cho frontend sau khi deploy.** DNS công khai dùng được làm host của `baseURL` khi FastAPI đang phục vụ và Security Group cho phép cổng tương ứng. Ví dụ dưới đây giả sử backend phục vụ HTTP trực tiếp trên cổng `8000`.
+2. **Tra địa chỉ API cho frontend.** Backend được phục vụ qua nginx ở cổng 80 (cổng 8000 chỉ nghe nội bộ trên VPS, không mở ra ngoài). Dùng tên miền làm host của `baseURL`.
 
    ```text
-   http://ec2-32-236-15-241.ap-southeast-2.compute.amazonaws.com:8000
+   http://examind.duckdns.org/api/v1
    ```
 
-   Với frontend dùng HTTPS, cấu hình URL API HTTPS có chứng chỉ hợp lệ. Nếu frontend gọi từ origin khác, cho phép origin đó trong cấu hình CORS của FastAPI.
+   Hiện chỉ có HTTP, chưa có HTTPS. Frontend chạy trên trang HTTPS sẽ bị trình duyệt chặn gọi HTTP (mixed content), cần thêm HTTPS (mở cổng 443 và cấp chứng chỉ trong nginx) trước. Nếu frontend gọi từ origin khác, cho phép origin đó trong `CORS_ORIGINS` của FastAPI.
 
 ## Kiểm tra kết quả
 
@@ -53,7 +54,7 @@ grep ^PRETTY_NAME= /etc/os-release
 
 Kết quả đã xác nhận là user `ubuntu`, hostname `ip-172-31-20-96` và instance ID `i-0931f2a3b4010b6b3`. Lần kiểm tra ngày 27/11/2026 chỉ thấy SSH lắng nghe trên giao diện công khai và chưa tìm thấy lệnh `docker` trong `PATH` của user `ubuntu`.
 
-Từ ngày 27/11/2026, VPS đã cài Docker và chạy backend qua nginx; quy trình tự động nằm ở [Deploy backend CI/CD](deploy-backend-ci-cd.md). Sau khi môi trường triển khai đã sẵn sàng, chạy `docker compose ps` từ thư mục có tệp Compose trên máy chủ và gọi `<baseURL>/api/v1/health` từ máy ngoài EC2 để xác nhận API phản hồi.
+Từ ngày 27/11/2026, VPS đã cài Docker và chạy backend qua nginx; quy trình tự động nằm ở [Deploy backend CI/CD](deploy-backend-ci-cd.md). Sau khi môi trường triển khai đã sẵn sàng, chạy `docker compose ps` từ thư mục có tệp Compose trên máy chủ và gọi `http://examind.duckdns.org/api/v1/health` từ máy ngoài EC2 để xác nhận API phản hồi.
 
 ## Xử lý lỗi
 
