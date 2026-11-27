@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Index, String, Text, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -32,3 +32,7 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Admin đã tạo tài khoản này qua API. NULL: tự đăng ký hoặc do người vận hành tạo (migration 0004).
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id", ondelete="SET NULL", name="fk_users_created_by")
+    )
