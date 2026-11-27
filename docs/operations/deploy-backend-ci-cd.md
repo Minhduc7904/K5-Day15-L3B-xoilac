@@ -52,7 +52,7 @@ Cấu hình local nằm trong [`backend/.env.example`](../../backend/.env.exampl
 | `AUTH_OTP_SECRET` | Chuỗi ngẫu nhiên bí mật, tối thiểu 32 byte. Dùng lệnh sinh trong cấu hình mẫu |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client loại Web Application cho đăng nhập Google |
 | `GOOGLE_CALLBACK_URL` | `https://examind.duckdns.org/api/auth/google/callback` |
-| `FRONTEND_URL` | Origin nhận kết quả. Production dùng `https://examind.vercel.app` |
+| `FRONTEND_URL` | Origin nhận kết quả. Production dùng `https://examind-frontend.vercel.app` |
 
 Đăng ký đúng callback trong **Authorized redirect URIs**. Client đăng nhập dùng `openid email profile`. Client Gmail chỉ gửi thư. Để chạy trọn luồng Google local, cấu hình callback localhost và origin frontend local trong cả app lẫn Google Auth Platform.
 

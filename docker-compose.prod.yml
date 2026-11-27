@@ -34,7 +34,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-}
-      FRONTEND_URL: ${FRONTEND_URL:-https://examind.vercel.app}
+      FRONTEND_URL: ${FRONTEND_URL:-https://examind-frontend.vercel.app}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
