@@ -3,7 +3,7 @@
 > Điền ở guide bước 1.1. Ôn lại: ngày 2 · lab ngày 2.
 > Viết **trước** khi đọc dòng data đầu tiên hay hỏi người đầu tiên, để không sửa cho khớp kết quả. Kết quả ngược giả thuyết vẫn đủ điểm nếu số là thật.
 
-- Ngày giờ viết: 27/11/2026, __:__ *(nhóm điền giờ thật khi commit)*
+- Ngày giờ viết: 27/11/2026, 14:02 *(giờ commit đầu tiên chứa file này, `3d72d89`; chỉnh lời lúc 14:59, commit `1b9b4ad`). Ở cả hai thời điểm repo chưa có bằng chứng nào: khảo sát chưa gửi, phỏng vấn chưa làm, chưa đào data.*
 - Người dùng chính (một vai cụ thể): học sinh THPT (lớp 10, 11, 12) tự ôn môn Toán cho kiểm tra, thi học kỳ hoặc thi tốt nghiệp, đã làm ít nhất một đề.
 - **Mình nghĩ:** học sinh THPT gặp khó khi chọn nội dung ôn Toán sau một đề thử, vì kết quả chỉ cho tổng điểm chứ không chỉ ra chương nào yếu; hậu quả là ôn dàn trải, tốn giờ ở chương đã vững và điểm khó tăng.
 - **Giả thuyết phụ về kỳ thi:** một số học sinh tự ôn chưa biết đối chiếu đề đang làm với lớp, kỳ thi và năm mình nhắm tới. Cần hỏi về một lần thực sự tìm hoặc kiểm tra cấu trúc đề và cách học sinh biết đề phù hợp.

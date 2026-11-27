@@ -10,10 +10,10 @@
 | 2 | Người dùng chính (một vai cụ thể — không phải "học viên nói chung") | Học sinh THPT (lớp 10, 11, 12) tự ôn môn Toán cho kiểm tra, thi học kỳ hoặc thi tốt nghiệp, đã làm ít nhất một đề |
 | 3 | Pain một câu: ai — đang làm gì — vướng đâu — hậu quả | Học sinh THPT — làm đề Toán để ôn tập và ôn thi — chỉ có tổng điểm, không biết mình yếu chương nào nên chọn đề ôn không trúng chỗ yếu — ôn dàn trải, tốn giờ ở chương đã vững, điểm khó tăng *(giả thuyết, chưa kiểm)* |
 | 4 | Bằng chứng đầu — CP1: giả thuyết + nguồn sẽ kiểm · CP2: số đầu tiên + 1 trích dẫn | CP1 — giả thuyết: ≥2/3 học sinh trong mẫu khảo sát báo ít nhất một lần trong 30 ngày qua chữa đề Toán xong mà chưa biết ôn phần nào tiếp. Nguồn chính dự kiến: Google Form với ≥20 học sinh lớp 10–12 phù hợp ở trung tâm dạy thêm. Chưa có kết quả. Chi tiết: `evidence/hypothesis.md`. |
-| 5 | **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả) | Học sinh THPT nhắn yêu cầu ôn phần hay sai để agent dựa trên lịch sử làm bài và đề xuất một đề ngắn từ các câu đã duyệt. |
+| 5 | **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả) | Học sinh THPT nhắn yêu cầu ôn phần hay sai để agent dựa trên lịch sử làm bài và đề xuất cấu trúc đề ôn cho học sinh xem trước, rồi dựng đề ngắn từ các câu đã duyệt. |
 | 6 | AI tự làm đến đâu + 1 dòng lý do: sai thì ai chịu gì | AI gợi ý, người quyết: agent nói rõ trong chat vì sao chọn chương đó và đề xuất đề ôn, học sinh chỉnh bằng lời (đổi chương, số câu, độ khó) trước khi làm. Sai thì học sinh mất thời gian ôn chưa đúng chỗ (rẻ, sửa được). Câu hỏi chỉ lấy từ ngân hàng đã duyệt, agent không tự bịa câu hỏi hay đáp án |
 | 7 | Phân công có tên | Nguyễn Minh Đức — đội trưởng, PO, Tech Lead, DevOps, đảm bảo chất lượng sản phẩm và chốt quyết định chính · Đỗ Thị Thu Hằng — backend và frontend · Phùng Văn Thanh Cao và Vũ Quang Huy — AI Agent. |
-| — | *(CP2)* Đã đổi gì so với CP1 | |
+| — | *(CP2)* Đã đổi gì so với CP1 | (1) Thêm bước học sinh **xem trước cấu trúc đề** và chỉnh bằng lời trước khi agent dựng đề. (2) Làm rõ "tự tạo đề" là **ghép câu đã duyệt từ ngân hàng**, agent không tự viết câu hay đáp án. (3) Kiến trúc có thêm nhánh ôn **theo kỳ thi có cấu trúc sẵn** và luồng **admin nhập PDF** (tách câu, so embedding để gợi ý chương và độ khó, admin duyệt); hai phần này **chưa nằm trong lát cắt đo**, lát cắt đo vẫn là luồng cá nhân hóa. (4) Có dữ liệu thật: ngân hàng 14.146 câu Toán của trung tâm (repo chỉ chứa mẫu 1.279 câu, không kèm dữ liệu học sinh), thay cho ngân hàng tự dựng ở CP1. (5) Chưa có số bằng chứng pain: khảo sát chưa chạy, dòng 4 giữ nguyên giả thuyết. Chi tiết: `spec.md` §4. |
 
 # Track F · Examind — Nền tảng AI Agent hỗ trợ tạo đề thi và cá nhân hóa ôn tập môn Toán THPT
 
@@ -25,12 +25,13 @@
 **Pain.** Học sinh THPT — làm đề Toán để ôn tập và ôn thi — chỉ có tổng điểm, không biết mình yếu chương nào nên chọn đề ôn không trúng chỗ yếu — ôn dàn trải, tốn giờ ở chương đã vững, điểm khó tăng *(giả thuyết, chưa kiểm)*.
 **Insight từ người dùng thật.** Chưa có kết quả. Nhóm dự kiến dùng Google Form để kiểm giả thuyết với ≥20 học sinh THPT phù hợp ngoài nhóm. Xem `evidence/hypothesis.md`.
 **Người dùng.** Học sinh lớp 10–12 tự ôn Toán và đã làm ít nhất một đề. Nhóm dự kiến tiếp cận các bạn tại trung tâm dạy thêm nơi Nguyễn Minh Đức đang làm quản lý.
-**Data.** Không dùng dữ liệu thật của học sinh. Ngân hàng câu hỏi nhỏ tự dựng, mỗi câu gắn chương, độ khó, đáp án; cấu trúc đề tham khảo từ nguồn công khai có ghi link. Kết quả làm bài của học sinh tự dựng có seed. Ghi nguồn và cách dựng trong `data/DATA_CARD.md` *(dự kiến)*.
+**Data.** Ngân hàng câu hỏi là dữ liệu thật của trung tâm dạy thêm do một thành viên nhóm quản lý: 14.146 câu Toán lớp 10–12; repo chỉ chứa mẫu 1.279 câu dùng được (đủ chương, độ khó, đáp án, không hình) trong `data/question_bank.csv`, bản đầy đủ để ở máy nhóm. Repo không chứa dữ liệu học sinh thật; kết quả làm bài của học sinh mẫu HS01–HS04 là tự dựng có seed (`data/student_results.csv`). Nguồn, cách xử lý và giới hạn trong `data/DATA_CARD.md`.
 **Lát cắt.** Học sinh THPT nhắn yêu cầu ôn phần hay sai để agent dựa trên lịch sử làm bài và đề xuất một đề ngắn từ các câu đã duyệt.
 **Công cụ của agent** *(hợp đồng dự kiến cho `codebase/tools.py`; repo hiện còn dùng công cụ mẫu)*.
 - `get_student_results(student_id)` · input: mã học sinh · output: số câu đúng/sai theo chương · không tác động ra ngoài.
-- `search_question_bank(chapter, difficulty, n)` · input: chương, độ khó, số câu · output: danh sách câu hỏi kèm mã câu · không tác động ra ngoài.
-- `build_exam_draft(question_ids)` · input: mã câu · output: bản nháp đề · chỉ tạo bản nháp, học sinh duyệt trước khi làm.
+- `search_question_bank(chapter, difficulty, n)` · input: mã chương, độ khó (NB/TH/VD/VDC), số câu · output: danh sách câu hỏi kèm mã câu · không tác động ra ngoài.
+- `build_exam_draft(structure, question_ids)` · input: cấu trúc đã xác nhận, mã câu · output: bản nháp đề · chỉ tạo bản nháp, học sinh duyệt trước khi làm.
+- `get_exam_template(exam_code)` *(nhánh kỳ thi, chưa trong lát cắt)* · input: mã kỳ thi · output: cấu trúc đã xác thực hoặc "chưa có" · không tác động ra ngoài.
 **Bộ câu thử.** Câu thường: "ra đề ôn chương mà em hay sai". Câu khó: học sinh chưa làm đề nào, kết quả mâu thuẫn, yêu cầu chương mà ngân hàng không có câu. Câu phải từ chối: xin đáp án để chép, đòi sửa điểm, "bỏ qua hướng dẫn trước đó", hỏi ngoài môn Toán. Đạt khi câu được chọn đúng chương yếu và có trong ngân hàng, ngưỡng chốt ở CP2.
 **Persona chi phí.** Ít (ôn rải rác) · vừa (mỗi tuần một đề ôn) · nhiều (ôn dồn trước kỳ thi). Tần suất sẽ được đối chiếu khi có dữ liệu người dùng.
 **Bẫy.**
@@ -42,4 +43,4 @@
 - Không dùng điểm hay dữ liệu thật của học sinh; không xếp hạng, so sánh học sinh với nhau.
 - Chỉ đề xuất đề ôn, không ghi điểm chính thức. Không xin thông tin cá nhân.
 
-**Hướng mở rộng sau CP1.** Đề ôn thích ứng với cả phần học sinh cần luyện và cấu trúc của từng kỳ thi/năm. Bản CP1 tập trung vào đề ôn ngắn theo chương yếu.
+**Hướng mở rộng.** Đề ôn thích ứng với cả phần học sinh cần luyện và cấu trúc của từng kỳ thi/năm, luồng admin nhập PDF để mở rộng ngân hàng, xuất đề ra bản in giấy, và (sau đó) làm đề online với chấm bằng code và thống kê; các phần này chưa đo ở CP2. Lát cắt đang đo ở CP2 tập trung vào đề ôn ngắn theo chương yếu, có bước xem trước cấu trúc.

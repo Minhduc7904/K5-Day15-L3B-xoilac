@@ -1,0 +1,104 @@
+ma_chuong,ten,ma_chuong_cha,cap,lop
+10C1,MỆNH ĐỀ VÀ TẬP HỢP,,0,10
+10C11,Mệnh đề,10C1,1,10
+10C12,Tập hợp và các phép toán trên tập hợp,10C1,1,10
+10C2,BẤT PHƯƠNG TRÌNH VÀ HỆ BẤT PHƯƠNG TRÌNH BẬC NHẤT HAI ẨN,,0,10
+10C21,Bất phương trình bậc nhất hai ẩn,10C2,1,10
+10C22,Hệ bất phương trình bậc nhất hai ẩn,10C2,1,10
+10C3,HỆ THỨC LƯỢNG TRONG TAM GIÁC,,0,10
+10C31,Giá trị lượng giác của một góc từ 0° đến 180°,10C3,1,10
+10C32,Hệ thức lượng trong tam giác,10C3,1,10
+10C4,VECTƠ,,0,10
+10C41,Các khái niệm mở đầu,10C4,1,10
+10C42,Tổng và hiệu của hai vectơ,10C4,1,10
+10C43,Tích của một vectơ với một số,10C4,1,10
+10C44,Vectơ trong mặt phẳng toạ độ,10C4,1,10
+10C45,Tích vô hướng của hai vectơ,10C4,1,10
+10C5,CÁC SỐ ĐẶC TRƯNG CỦA MẪU SỐ LIỆU KHÔNG GHÉP NHÓM,,0,10
+10C51,Số gần đúng và sai số,10C5,1,10
+10C52,Các số đặc trưng đo xu thế trung tâm,10C5,1,10
+10C53,Các số đặc trưng đo độ phân tán,10C5,1,10
+10C6,"HÀM SỐ, ĐỒ THỊ VÀ ỨNG DỤNG",,0,10
+10C61,Hàm số,10C6,1,10
+10C62,Hàm số bậc hai,10C6,1,10
+10C63,Dấu của tam thức bậc hai,10C6,1,10
+10C64,Phương trình quy về phương trình bậc hai,10C6,1,10
+10C7,PHƯƠNG PHÁP TOẠ ĐỘ TRONG MẶT PHẲNG,,0,10
+10C71,Phương trình đường thẳng,10C7,1,10
+10C72,Đường thẳng trong mặt phẳng toạ độ,10C7,1,10
+10C73,Đường tròn trong mặt phẳng toạ độ,10C7,1,10
+10C74,Ba đường conic,10C7,1,10
+10C8,ĐẠI SỐ TỔ HỢP,,0,10
+10C81,Quy tắc đếm,10C8,1,10
+10C82,"Hoán vị, chỉnh hợp và tổ hợp",10C8,1,10
+10C83,Nhị thức Newton,10C8,1,10
+10C9,TÍNH XÁC SUẤT THEO ĐỊNH NGHĨA CỔ ĐIỂN,,0,10
+10C91,Biến cố và định nghĩa cổ điển của xác suất,10C9,1,10
+10C92,Thực hành tính xác suất theo định nghĩa cổ điển,10C9,1,10
+11C1,HÀM SỐ LƯỢNG GIÁC VÀ PHƯƠNG TRÌNH LƯỢNG GIÁC,,0,11
+11C11,Giá trị lượng giác của góc lượng giác,11C1,1,11
+11C12,Công thức lượng giác,11C1,1,11
+11C13,Hàm số lượng giác,11C1,1,11
+11C14,Phương trình lượng giác cơ bản,11C1,1,11
+11C2,DÃY SỐ. CẤP SỐ CỘNG VÀ CẤP SỐ NHÂN,,0,11
+11C21,Dãy số,11C2,1,11
+11C22,Cấp số cộng,11C2,1,11
+11C23,Cấp số nhân,11C2,1,11
+11C3,CÁC SỐ ĐẶC TRƯNG ĐO XU THẾ TRUNG TÂM CỦA MẪU SỐ LIỆU GHÉP NHÓM,,0,11
+11C31,Mẫu số liệu ghép nhóm,11C3,1,11
+11C32,Các số đặc trưng đo xu thế trung tâm,11C3,1,11
+11C4,QUAN HỆ SONG SONG TRONG KHÔNG GIAN,,0,11
+11C41,Đường thẳng và mặt phẳng trong không gian,11C4,1,11
+11C42,Hai đường thẳng song song,11C4,1,11
+11C43,Đường thẳng và mặt phẳng song song,11C4,1,11
+11C44,Hai mặt phẳng song song,11C4,1,11
+11C45,Phép chiếu song song,11C4,1,11
+11C5,GIỚI HẠN. HÀM SỐ LIÊN TỤC,,0,11
+11C51,Giới hạn của dãy số,11C5,1,11
+11C52,Giới hạn của hàm số,11C5,1,11
+11C53,Hàm số liên tục,11C5,1,11
+11C6,HÀM SỐ MŨ VÀ HÀM SỐ LÔGARIT,,0,11
+11C61,Luỹ thừa với số mũ thực,11C6,1,11
+11C62,Lôgarit,11C6,1,11
+11C63,Hàm số mũ và hàm số lôgarit,11C6,1,11
+11C64,"Phương trình, bất phương trình mũ và lôgarit",11C6,1,11
+11C7,QUAN HỆ VUÔNG GÓC TRONG KHÔNG GIAN,,0,11
+11C71,Hai đường thẳng vuông góc,11C7,1,11
+11C72,Đường thẳng vuông góc với mặt phẳng,11C7,1,11
+11C73,Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng,11C7,1,11
+11C74,Hai mặt phẳng vuông góc,11C7,1,11
+11C75,Khoảng cách,11C7,1,11
+11C76,Thể tích,11C7,1,11
+11C8,CÁC QUY TẮC TÍNH XÁC SUẤT,,0,11
+11C81,"Biến cố hợp, biến cố giao, biến cố độc lập",11C8,1,11
+11C82,Công thức cộng xác suất,11C8,1,11
+11C83,Công thức nhân xác suất cho hai biến cố độc lập,11C8,1,11
+11C9,ĐẠO HÀM,,0,11
+11C91,Định nghĩa và ý nghĩa của đạo hàm,11C9,1,11
+11C92,Các quy tắc tính đạo hàm,11C9,1,11
+11C93,Đạo hàm cấp hai,11C9,1,11
+12C1,ỨNG DỤNG ĐẠO HÀM ĐỂ KHẢO SÁT VÀ VẼ ĐỒ THỊ HÀM SỐ,,0,12
+12C11,Tính đơn điệu và cực trị của hàm số,12C1,1,12
+12C12,Giá trị lớn nhất và giá trị nhỏ nhất của hàm số,12C1,1,12
+12C13,Đường tiệm cận của đồ thị hàm số,12C1,1,12
+12C14,Khảo sát sự biến thiên và vẽ đồ thị của hàm số,12C1,1,12
+12C15,Ứng dụng đạo hàm để giải quyết một số vấn đề liên quan đến thực tiễn,12C1,1,12
+12C2,VECTƠ VÀ HỆ TRỤC TOẠ ĐỘ TRONG KHÔNG GIAN,,0,12
+12C21,Vectơ trong không gian,12C2,1,12
+12C22,Hệ trục toạ độ trong không gian,12C2,1,12
+12C23,Biểu thức toạ độ của các phép toán vectơ,12C2,1,12
+12C3,CÁC SỐ ĐẶC TRƯNG ĐO MỨC ĐỘ PHÂN TÁN CỦA MẪU SỐ LIỆU GHÉP NHÓM,,0,12
+12C31,Khoảng biến thiên và khoảng tứ phân vị,12C3,1,12
+12C32,Phương sai và độ lệch chuẩn,12C3,1,12
+12C4,NGUYÊN HÀM VÀ TÍCH PHÂN,,0,12
+12C41,Nguyên hàm,12C4,1,12
+12C42,Tích phân,12C4,1,12
+12C43,Ứng dụng hình học của tích phân,12C4,1,12
+12C5,PHƯƠNG PHÁP TOẠ ĐỘ TRONG KHÔNG GIAN,,0,12
+12C51,Phương trình mặt phẳng,12C5,1,12
+12C52,Phương trình đường thẳng trong không gian,12C5,1,12
+12C53,Công thức tính góc trong không gian,12C5,1,12
+12C54,Phương trình mặt cầu,12C5,1,12
+12C6,XÁC SUẤT CÓ ĐIỀU KIỆN,,0,12
+12C61,Xác suất có điều kiện,12C6,1,12
+12C62,Công thức xác suất toàn phần và công thức Bayes,12C6,1,12
