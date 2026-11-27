@@ -20,6 +20,9 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:?thiếu S3_SECRET_KEY trong prod.env}
       S3_BUCKET: ${S3_BUCKET:-examind}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      # Nhập đề PDF (#3). Thiếu khóa thì chỉ tính năng nhập đề không khả dụng.
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Phiên đăng nhập (#8). nginx có TLS (cổng 443) nên cookie đặt Secure mặc định.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_NAME: ${COOKIE_NAME:-examind_session}
