@@ -6,6 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'Examind',
     start_url: '/',
     display: 'standalone',
+    // Đồng bộ tay với token trong app/globals.css: --color-background và --color-foreground.
     background_color: '#ffffff',
     theme_color: '#03172f',
     icons: [

@@ -4,7 +4,7 @@ export default function Loading() {
   return (
     <div
       role="status"
-      className="grid min-h-[calc(100dvh-4rem)] place-content-center justify-items-center gap-2 px-4 text-sm font-medium"
+      className="grid min-h-dvh place-content-center justify-items-center gap-3 px-4 text-label text-muted-foreground"
     >
       <MascotAnimation motion="running" size={144} />
       <p>Đang tải Examind…</p>

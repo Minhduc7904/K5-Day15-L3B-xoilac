@@ -4,24 +4,35 @@ Dành cho người phát triển bộ khung frontend. Bộ khung dùng App Route
 
 ## Bối cảnh và ràng buộc
 
-Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route có entry point riêng để phát triển giao diện học sinh và quản trị. Cả hai route dùng chung header logo và metadata trình duyệt. Giao diện nghiệp vụ sẽ được phát triển trong từng route.
+Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route có entry point riêng cho học sinh và quản trị, dùng chung metadata trình duyệt, font, token và splash khởi động. Mỗi khu tự đặt header của mình. Giao diện nghiệp vụ sẽ được phát triển trong từng route.
 
 ## Thành phần và trách nhiệm
 
 | Vị trí trong `frontend/src/` | Trách nhiệm |
 | --- | --- |
-| `app/(student)/page.tsx` | Entry point `/` cho học sinh. Route group giữ thư mục riêng và giữ URL gốc |
-| `app/admin/page.tsx` | Entry point `/admin` cho quản trị |
-| `app/layout.tsx` | Layout, logo, favicon và Redux provider dùng chung |
+| `app/(student)/page.tsx` | Entry point `/`. Hiện render landing page cho khách (`features/landing/`). Route group giữ thư mục riêng và giữ URL gốc |
+| `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo |
+| `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password` (đang chạy mock). Xem [Trang xác thực frontend](frontend-auth.md) |
+| `features/auth/` | Lớp API auth (mock hoặc Axios), reducer `auth`, form và validation |
+| `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở dev hoặc chế độ mock |
+| `app/layout.tsx` | Layout gốc: font, favicon, metadata và `AppProvider` |
+| `components/ui/`, `components/layout/`, `components/motion/` | Component dùng chung, xem [Design system frontend](frontend-design-system.md) |
+| `components/splash/`, `lib/bootstrap.ts` | Splash và các bước khởi động app |
+| `app/globals.css` | Token màu, thang chữ và font stack dùng chung. Xem [Design system frontend](frontend-design-system.md) |
 | `app/manifest.ts` | Manifest web với tên, màu và icon ứng dụng |
 | `../public/brand/` | Logo chữ WebP, biểu tượng PNG và các cỡ icon cho trình duyệt |
-| `store/index.ts` | Khởi tạo Redux store và cung cấp hook có kiểu |
+| `store/index.ts` | Khởi tạo Redux store với reducer `auth` và cung cấp hook có kiểu |
+| `store/provider.tsx` | Bọc app bằng Redux, `MotionConfig`, `ToastProvider` và `SplashScreen` |
 | `lib/config.ts` | Cấu hình công khai, gồm base URL và cờ chế độ mock |
 | `lib/api-client.ts` | Axios client dùng chung với base URL và timeout |
 
 ## Luồng dữ liệu và tích hợp
 
 Khi thêm chức năng, đặt component, hook và adapter dữ liệu của từng feature gần nhau. Thành phần hiển thị gọi hook. Adapter của feature dùng Axios khi gọi backend. Đăng ký reducer của feature vào store khi cần chia sẻ trạng thái. Repo có cờ cấu hình để nối mock ở mốc tiếp theo.
+
+## Font, màu và thang chữ
+
+Dùng font Be Vietnam Pro qua `font-sans` và chỉ dùng màu từ token như `bg-primary`, `text-muted-foreground`. Không dùng mã hex hay class màu mặc định của Tailwind. Chi tiết và bảng tương phản ở [Design system frontend](frontend-design-system.md).
 
 ## Logo và icon
 
@@ -48,11 +59,13 @@ import { BookOpen } from 'lucide-react';
 
 ## Quyết định và cách kiểm chứng
 
-Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, cả `/` và `/admin` trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
+Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin`, các trang auth và `/design-system` (khi bật chế độ mock) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
 
 ## Tài liệu liên quan
 
 - [Đặc tả sản phẩm](../../spec.md)
+- [Design system frontend](frontend-design-system.md)
+- [Trang xác thực frontend](frontend-auth.md)
 - [API mẫu](../api/sample-api.md)
 - [Chạy và triển khai frontend](../operations/deploy-frontend-vercel.md)
 - [Issue #9](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/9)
