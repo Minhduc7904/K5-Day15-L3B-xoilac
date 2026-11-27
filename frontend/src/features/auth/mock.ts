@@ -32,17 +32,20 @@ interface MockState {
   resetToken: { email: string; token: string } | null;
 }
 
+/** Mật khẩu mẫu của tài khoản demo lấy từ `mockScenarios`, để chỉ khai báo một chỗ. */
+const demoPassword = (email: string) => mockScenarios.find((s) => s.email === email)?.password ?? '';
+
 const seedAccounts = (): Record<string, MockAccount> => ({
   'hs01@example.com': {
-    password: 'hs01-demo',
+    password: demoPassword('hs01@example.com'),
     user: { user_id: 1, email: 'hs01@example.com', role: 'student', status: 'active', display_name: 'Học sinh 01', created_at: '2026-11-27T15:52:23.845134Z' },
   },
   'admin@example.com': {
-    password: 'admin-demo-123',
+    password: demoPassword('admin@example.com'),
     user: { user_id: 2, email: 'admin@example.com', role: 'admin', status: 'active', display_name: 'Quản trị', created_at: '2026-11-27T15:52:41.085593Z' },
   },
   'khoa@example.com': {
-    password: 'khoa-demo',
+    password: demoPassword('khoa@example.com'),
     user: { user_id: 3, email: 'khoa@example.com', role: 'student', status: 'disabled', display_name: 'Tài khoản bị khoá', created_at: '2026-11-27T16:00:00.000000Z' },
   },
 });
