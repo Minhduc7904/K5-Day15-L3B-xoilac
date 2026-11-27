@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_session
+from app.repositories.exam_template_repository import ExamTemplateRepository
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.service.storage_service import StorageService
+from app.usecase.exam_templates import ExamTemplateUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 
@@ -30,5 +32,10 @@ def get_sample_file_usecase(storage: StorageDep) -> SampleFileUseCase:
     return SampleFileUseCase(storage)
 
 
+def get_exam_template_usecase(session: SessionDep) -> ExamTemplateUseCase:
+    return ExamTemplateUseCase(ExamTemplateRepository(session))
+
+
 SampleItemUseCaseDep = Annotated[SampleItemUseCase, Depends(get_sample_item_usecase)]
 SampleFileUseCaseDep = Annotated[SampleFileUseCase, Depends(get_sample_file_usecase)]
+ExamTemplateUseCaseDep = Annotated[ExamTemplateUseCase, Depends(get_exam_template_usecase)]
