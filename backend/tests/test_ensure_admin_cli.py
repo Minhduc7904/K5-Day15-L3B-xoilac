@@ -127,17 +127,19 @@ def test_existing_admin_new_password_cannot_log_in(db_url):
     assert _login(db_url, "admin@example.com", PW).role == "admin"
 
 
-def test_student_email_is_not_promoted(db_url, capsys):
+def test_student_email_warns_exit_0_and_is_not_promoted(db_url, capsys):
     async def _student():
         async with _session(db_url) as s:
             uc = AuthUseCase(UserRepository(s), SessionRepository(s), PasswordService(), TokenService(), 168)
             await uc.create_user("hs01@example.com", new_password(), "student")
 
     asyncio.run(_student())
-    assert _run(db_url, email="HS01@example.com") == 1
-    assert "Không nâng quyền" in capsys.readouterr().err
+    before = _users(db_url)[0]
+    # Mã 0: db-init không fail. Không đổi vai trò, mật khẩu hay status.
+    assert _run(db_url, email="HS01@example.com") == 0
+    assert "không nâng quyền" in capsys.readouterr().err
     [user] = _users(db_url)
-    assert user.role == "student"
+    assert (user.role, user.status, user.password_hash) == ("student", before.status, before.password_hash)
 
 
 def test_prod_requires_12_chars(db_url, capsys):

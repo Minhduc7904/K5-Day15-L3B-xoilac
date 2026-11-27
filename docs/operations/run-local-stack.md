@@ -42,7 +42,7 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
    docker compose logs db-init
    ```
 
-   Mong đợi: `postgres` và `minio` healthy; `db-init` và `minio-init` ở trạng thái `Exited (0)`. Hai container này chạy một lần rồi thoát, chạy lại không tạo trùng. Lần đầu `db-init` build image backend nên mất vài phút. Log `db-init` có dòng `Đã tạo admin mặc định user_id=1 email=admin@example.com`; các lần sau là `Admin mặc định đã có, không thay đổi`. `db-init` ở trạng thái `Exited (1)` hoặc `Exited (2)` nghĩa là cấu hình admin sai, xem bảng xử lý lỗi.
+   Mong đợi: `postgres` và `minio` healthy; `db-init` và `minio-init` ở trạng thái `Exited (0)`. Hai container này chạy một lần rồi thoát, chạy lại không tạo trùng. Lần đầu `db-init` build image backend nên mất vài phút. Log `db-init` có dòng `Đã tạo admin mặc định user_id=1 email=admin@example.com`; các lần sau là `Admin mặc định đã có, không thay đổi`. `db-init` ở trạng thái `Exited (2)` nghĩa là cấu hình admin sai, xem bảng xử lý lỗi.
 
 3. Cài backend:
 
@@ -112,7 +112,7 @@ Giới hạn xác minh: các bước trên đã chạy trên Windows 11 với Do
 | `health` báo `database: false` | Kiểm `DATABASE_URL`; cổng 5432 có bị chương trình khác chiếm không |
 | `docker compose` không kéo được MinIO | `minio/minio` đã bị gỡ khỏi Docker Hub; compose dùng `bitnamilegacy/minio` |
 | `db-init` lỗi khi cài thư viện (timeout) | Mạng yếu; chạy lại `docker compose build db-init` rồi `docker compose up -d` |
-| `db-init` `Exited (1)`, log `CẢNH BÁO: ... không phải admin` | `ADMIN_EMAIL` đang là tài khoản student. Lệnh không nâng quyền; đổi `ADMIN_EMAIL` sang email khác rồi `docker compose up -d` |
+| `db-init` `Exited (0)` nhưng log có `CẢNH BÁO: ... không phải admin` và không có admin | `ADMIN_EMAIL` đang là tài khoản student. Lệnh không nâng quyền, không đổi gì; đổi `ADMIN_EMAIL` sang email khác rồi `docker compose up -d` |
 | `db-init` `Exited (2)`, log `Lỗi admin mặc định: ...` | Email sai định dạng (`.local`, `.test` cũng bị từ chối) hoặc mật khẩu sai độ dài (prod: ≥ 12 ký tự) |
 | Không đăng nhập được admin mặc định sau khi đổi `ADMIN_PASSWORD` | `ensure_admin` không ghi đè mật khẩu của admin đã có. Dùng mật khẩu cũ, hoặc trên máy dev `docker compose down -v` để dựng lại từ đầu (mất dữ liệu) |
 

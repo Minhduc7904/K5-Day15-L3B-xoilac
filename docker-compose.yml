@@ -54,7 +54,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - ${SEED_DIR:-./data/private/seed}:/seed:ro
-    # ensure_admin lỗi (email đang là student, mật khẩu sai luật) thì db-init lỗi và backend không khởi động.
+    # ensure_admin lỗi (email sai, mật khẩu sai luật; prod < 12 ký tự) thì db-init lỗi và backend không khởi động.
+    # Email đã có (kể cả student): chỉ cảnh báo, mã 0, không đổi gì.
     command: ["sh", "-c", "alembic upgrade head && python -m app.cli.ensure_admin && python scripts/seed_load.py"]
     depends_on:
       postgres:

@@ -11,8 +11,11 @@ có thể chạy cùng lúc.
 | Thiếu ADMIN_EMAIL hoặc ADMIN_PASSWORD | Bỏ qua | 0 |
 | Chưa có tài khoản với email này | Tạo admin active, created_by = NULL | 0 |
 | Email đã là admin | Không đổi gì (không ghi đè mật khẩu, không đổi status) | 0 |
-| Email đang thuộc student | Cảnh báo, không nâng quyền | 1 |
+| Email đang thuộc tài khoản không phải admin (student) | Cảnh báo, không đổi mật khẩu, vai trò hay status | 0 |
 | Email sai định dạng, mật khẩu sai độ dài, prod mà mật khẩu < 12 ký tự | Báo lỗi | 2 |
+
+Email trùng không làm db-init fail (theo review PR #17): người vận hành chỉ cần đổi ADMIN_EMAIL.
+Mật khẩu yếu trên prod thì VẪN fail, để prod không bao giờ chạy với admin mặc định yếu.
 
 Không bao giờ in mật khẩu hay hash.
 """
@@ -32,11 +35,11 @@ async def _ensure(email: str, password: str, name: str | None, settings: Setting
             result, user = await usecase.ensure_default_admin(email, password, name, strict=settings.cookie_secure)
         except EmailBelongsToNonAdmin:
             print(
-                f"CẢNH BÁO: {email} đang là tài khoản không phải admin. Không nâng quyền. "
-                "Đổi ADMIN_EMAIL sang email khác.",
+                f"CẢNH BÁO: {email} đang là tài khoản không phải admin. Bỏ qua tạo admin mặc định: "
+                "không nâng quyền, không đổi mật khẩu hay status. Đổi ADMIN_EMAIL sang email khác.",
                 file=sys.stderr,
             )
-            return 1
+            return 0
         except InvalidInput as e:
             print(f"Lỗi admin mặc định: {e.message}", file=sys.stderr)
             return 2

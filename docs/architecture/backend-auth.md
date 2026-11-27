@@ -232,10 +232,10 @@ Không có đường HTTP công khai nào tạo được admin. Có đúng ba c�
 | Thiếu `ADMIN_EMAIL` hoặc `ADMIN_PASSWORD` | Bỏ qua | 0 |
 | Chưa có email này | Tạo admin active | 0 |
 | Email đã là admin | "Admin mặc định đã có, không thay đổi": không ghi đè mật khẩu, không đổi status | 0 |
-| Email đang thuộc student | Cảnh báo, không nâng quyền | 1 |
+| Email đang thuộc student | Cảnh báo; không nâng quyền, không đổi mật khẩu hay status | 0 |
 | Email sai, mật khẩu ngoài 6–128 ký tự, hoặc `COOKIE_SECURE=true` mà mật khẩu < 12 ký tự | Báo lỗi | 2 |
 
-Mã thoát khác 0 làm `db-init` thất bại, nên backend không khởi động. Trên EC2, `remote-deploy.sh` khi đó quay về commit trước. Đây là chủ ý: cấu hình admin sai phải được phát hiện ngay. `ensure_admin` không chạy trong lifespan của FastAPI, vì nhiều worker có thể chạy cùng lúc và tạo trùng. Trong `docker-compose.prod.yml`, `db-init` nhận `COOKIE_SECURE` mặc định `true` để luật 12 ký tự có hiệu lực.
+Mã thoát khác 0 làm `db-init` thất bại, nên backend không khởi động. Trên EC2, `remote-deploy.sh` khi đó quay về commit trước. Chỉ dữ liệu vào sai mới gây lỗi, trong đó có mật khẩu dưới 12 ký tự trên prod: chủ ý không để prod chạy với admin mặc định yếu. Email trùng (kể cả student) chỉ cảnh báo và thoát mã 0, theo review PR #17, để một cấu hình email lỡ trùng không chặn cả lần deploy. `ensure_admin` không chạy trong lifespan của FastAPI, vì nhiều worker có thể chạy cùng lúc và tạo trùng. Trong `docker-compose.prod.yml`, `db-init` nhận `COOKIE_SECURE` mặc định `true` để luật 12 ký tự có hiệu lực.
 
 Vì `ensure_admin` không ghi đè, đổi `ADMIN_PASSWORD` sau lần chạy đầu **không** đổi mật khẩu của admin đã có. Mật khẩu chỉ có tác dụng ở lần tạo.
 
