@@ -148,7 +148,7 @@ def test_prod_requires_12_chars(db_url, capsys):
     assert len(_users(db_url)) == 1
 
 
-@pytest.mark.parametrize("password", ["x" * 5, "x" * 129])
+@pytest.mark.parametrize("password", ["x" * 7, "x" * 129])
 def test_password_length_rule(db_url, password):
     assert _run(db_url, password=password) == 2
     assert _users(db_url) == []

@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.usecase.auth import PASSWORD_MAX, PASSWORD_MIN
+
 
 class AdminAccountOut(BaseModel):
     """Không bao giờ chứa password_hash hay token."""
@@ -20,7 +22,7 @@ class AdminAccountOut(BaseModel):
 
 class AdminCreateIn(BaseModel):
     email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
     display_name: str | None = Field(default=None, max_length=100)
     current_password: str = Field(min_length=1, max_length=128, description="Mật khẩu của admin đang thao tác")
 

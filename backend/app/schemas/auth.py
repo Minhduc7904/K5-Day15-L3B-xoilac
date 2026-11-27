@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.usecase.auth import PASSWORD_MAX, PASSWORD_MIN
+
 
 def _strip_email(v: Any) -> Any:
     return v.strip() if isinstance(v, str) else v
@@ -12,7 +14,7 @@ class RegisterIn(BaseModel):
     """Trường lạ (vd `role`) bị bỏ qua: đăng ký công khai luôn tạo student."""
 
     email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
     display_name: str | None = Field(default=None, max_length=100)
 
     _strip = field_validator("email", mode="before")(_strip_email)

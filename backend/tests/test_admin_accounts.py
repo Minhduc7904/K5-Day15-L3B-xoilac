@@ -105,7 +105,7 @@ async def test_create_with_student_email_does_not_promote(client, db, admin_a):
 
 @pytest.mark.parametrize(
     "over",
-    [{"password": "x" * 5}, {"password": "x" * 129}, {"email": "khong-phai-email"}, {"current_password": ""}],
+    [{"password": "x" * 7}, {"password": "x" * 129}, {"email": "khong-phai-email"}, {"current_password": ""}],
 )
 async def test_create_validation(client, admin_a, over):
     _, ta = admin_a

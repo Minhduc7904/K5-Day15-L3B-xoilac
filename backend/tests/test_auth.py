@@ -83,7 +83,7 @@ async def test_register_normalizes_email_and_rejects_duplicate_case_insensitive(
 
 @pytest.mark.parametrize(
     ("password", "expected"),
-    [("x" * 5, 422), ("x" * 6, 201), ("x" * 128, 201), ("x" * 129, 422)],
+    [("x" * 7, 422), ("x" * 8, 201), ("x" * 128, 201), ("x" * 129, 422)],
 )
 async def test_register_password_length(client, password, expected):
     r = await register(client, password=password)
@@ -112,6 +112,16 @@ async def test_login_success_sets_cookie_and_last_login(client, db):
     assert COOKIE in client.cookies
     async with db() as s:
         assert (await s.execute(select(User.last_login_at))).scalar_one() is not None
+
+
+@pytest.mark.parametrize("length", [6, 7])
+async def test_legacy_short_password_still_logs_in(client, db, length):
+    """Luật 8 ký tự chỉ áp cho mật khẩu mới. Tài khoản đặt mật khẩu 6–7 ký tự trước đó vẫn đăng nhập được."""
+    legacy = new_password()[:length]
+    async with db() as s:
+        await UserRepository(s).add("cu@example.com", get_password_service().hash_sync(legacy), "student")
+    r = await login(client, email="cu@example.com", password=legacy)
+    assert r.status_code == 200 and r.json()["email"] == "cu@example.com"
 
 
 async def test_login_wrong_email_and_wrong_password_same_message(client, make_password):

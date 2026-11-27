@@ -15,7 +15,9 @@ from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
 
 ROLES = (ROLE_STUDENT, ROLE_ADMIN)
-PASSWORD_MIN = 6
+# Mật khẩu MỚI phải dài 8–128 ký tự (từ review PR #17; trước đó là 6). Đăng nhập không kiểm độ dài,
+# nên tài khoản đã đặt mật khẩu 6–7 ký tự trước khi đổi luật vẫn đăng nhập được.
+PASSWORD_MIN = 8
 PASSWORD_MAX = 128
 
 
