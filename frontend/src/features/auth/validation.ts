@@ -25,7 +25,7 @@ export function validateLoginPassword(password: string): string | undefined {
 
 export function validateNewPassword(password: string): string | undefined {
   if (!password) return 'Bạn đặt mật khẩu nhé.';
-  if (password.length < 6) return 'Mật khẩu cần ít nhất 6 ký tự.';
+  if (password.length < 8) return 'Mật khẩu cần ít nhất 8 ký tự.';
   if (password.length > 128) return 'Mật khẩu dài tối đa 128 ký tự.';
   return undefined;
 }

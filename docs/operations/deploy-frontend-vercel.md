@@ -12,10 +12,10 @@ Dành cho thành viên chạy bộ khung frontend local hoặc cấu hình proje
 
 | Biến | Giá trị |
 | --- | --- |
-| `NEXT_PUBLIC_MOCK_MODE` | Mặc định `true`. Cờ để các feature dùng khi có adapter mock |
-| `NEXT_PUBLIC_API_BASE_URL` | Base URL bao gồm `/api/v1`, mặc định `http://localhost:8000/api/v1`. Trên Vercel dùng `https://examind.duckdns.org/api/v1` |
+| `NEXT_PUBLIC_MOCK_MODE` | Đặt `false` cho Production để dùng API thật. Đặt `true` để thử dữ liệu giả |
+| `EXAMIND_API_ORIGIN` | Origin của backend. Mặc định `http://localhost:8000` trên máy, `https://examind.duckdns.org` trên Vercel |
 
-Backend đã có HTTPS (`https://examind.duckdns.org`) và sẵn đường WebSocket `wss://examind.duckdns.org/api/socket.io/`. Origin của frontend phải nằm trong `CORS_ORIGINS` trên VPS (hiện có `https://examind-frontend.vercel.app`; Preview của Vercel có origin khác, thêm khi cần). Gọi thẳng backend khác origin thì cookie phiên `SameSite=Lax` không được gửi kèm; xem [backend-auth.md](../architecture/backend-auth.md) về phương án rewrites.
+Next.js chuyển tiếp `/api/v1/*` tới backend để trình duyệt nhận cookie theo origin frontend. Google Sign-In trả trình duyệt về `FRONTEND_URL` của môi trường backend. Kiểm tra OAuth trên origin này.
 
 Các biến `NEXT_PUBLIC_*` được đưa vào bundle trình duyệt. Tạo deployment mới sau khi đổi giá trị.
 

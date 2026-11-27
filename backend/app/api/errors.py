@@ -12,6 +12,7 @@ from app.usecase.auth import (
     AccountDisabled,
     AuthError,
     EmailAlreadyRegistered,
+    GoogleAccountConflict,
     InvalidCredentials,
     InvalidInput,
     RoleForbidden,
@@ -21,7 +22,19 @@ from app.usecase.auth import (
     SessionRevoked,
 )
 
+from app.usecase.student_auth import (
+    EmailUnavailable, ExpiredOtp, InvalidChallenge, InvalidGoogleLogin, InvalidOtp, ResendLimited, TooManyAttempts,
+)
+
 _STATUS: dict[type[AuthError], int] = {
+    GoogleAccountConflict: status.HTTP_409_CONFLICT,
+    EmailUnavailable: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ExpiredOtp: status.HTTP_400_BAD_REQUEST,
+    InvalidChallenge: status.HTTP_400_BAD_REQUEST,
+    InvalidGoogleLogin: status.HTTP_400_BAD_REQUEST,
+    InvalidOtp: status.HTTP_400_BAD_REQUEST,
+    ResendLimited: status.HTTP_429_TOO_MANY_REQUESTS,
+    TooManyAttempts: status.HTTP_429_TOO_MANY_REQUESTS,
     EmailAlreadyRegistered: status.HTTP_409_CONFLICT,
     InvalidCredentials: status.HTTP_401_UNAUTHORIZED,
     AccountDisabled: status.HTTP_403_FORBIDDEN,
@@ -63,7 +76,9 @@ def to_api_error(e: AuthError, *, in_session_check: bool = False) -> ApiError:
 
 async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, ApiError)
-    response = JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status_code)
+    response = JSONResponse(
+        {"detail": exc.detail, "code": exc.code}, status_code=exc.status_code, headers={"Cache-Control": "no-store"}
+    )
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
         response.headers["WWW-Authenticate"] = "Bearer"
     if exc.clear_cookie:

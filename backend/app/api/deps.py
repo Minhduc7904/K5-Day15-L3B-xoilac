@@ -8,9 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
+from app.repositories.auth_challenge_repository import AuthChallengeRepository
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
+from app.service.email_service import GmailEmailService
+from app.service.google_identity import GoogleIdentityService
 from app.service.password_service import PasswordService
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
@@ -18,6 +21,7 @@ from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
+from app.usecase.student_auth import StudentAuthUseCase
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -28,6 +32,16 @@ def get_storage() -> StorageService:
     return StorageService(get_settings())
 
 
+def get_email_service(settings: SettingsDep) -> GmailEmailService:
+    return GmailEmailService(settings)
+
+
+def get_google_identity(settings: SettingsDep) -> GoogleIdentityService:
+    return GoogleIdentityService(settings)
+
+
+GoogleIdentityDep = Annotated[GoogleIdentityService, Depends(get_google_identity)]
+EmailServiceDep = Annotated[GmailEmailService, Depends(get_email_service)]
 StorageDep = Annotated[StorageService, Depends(get_storage)]
 
 
@@ -71,6 +85,21 @@ def get_auth_usecase(
 
 
 AuthUseCaseDep = Annotated[AuthUseCase, Depends(get_auth_usecase)]
+
+
+def get_student_auth(
+    session: SessionDep,
+    settings: SettingsDep,
+    auth: AuthUseCaseDep,
+    emails: EmailServiceDep,
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> StudentAuthUseCase:
+    return StudentAuthUseCase(
+        auth, AuthChallengeRepository(session), emails, tokens, settings.auth_otp_secret.get_secret_value()
+    )
+
+
+StudentAuthDep = Annotated[StudentAuthUseCase, Depends(get_student_auth)]
 
 
 def get_admin_accounts_usecase(
