@@ -59,7 +59,7 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
 4. Chạy backend:
 
    ```bash
-   uvicorn app.main:app --reload --port 8000
+   uvicorn app.main:asgi_app --reload --port 8000
    ```
 
 5. Thêm admin khác: đăng nhập bằng admin mặc định rồi gọi `POST /api/v1/admin/accounts` kèm mật khẩu của chính mình ([admin-accounts-api.md](../api/admin-accounts-api.md)). Đổi `ADMIN_PASSWORD` sau lần tạo đầu **không** đổi mật khẩu của admin đã có.

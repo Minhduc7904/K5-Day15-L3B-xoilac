@@ -16,4 +16,7 @@ COPY . .
 
 EXPOSE 8000
 # Sau nginx: tin header X-Forwarded-* để URL chuyển hướng giữ đúng https. Cổng 8000 không mở ra Internet.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# asgi_app = Socket.IO (/api/socket.io) bọc FastAPI (#20).
+# ĐÚNG MỘT worker: presence online và ticket socket nằm trong bộ nhớ tiến trình. Nhiều worker cần Redis
+# (AsyncRedisManager cho Socket.IO + PresenceRegistry/ticket dùng Redis), xem docs/architecture/backend-realtime.md.
+CMD ["uvicorn", "app.main:asgi_app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -24,6 +24,9 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_NAME: ${COOKIE_NAME:-examind_session}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
+      # Socket (#20): ticket nối socket sống bao nhiêu giây. CORS_ORIGINS ở trên cũng là danh sách origin
+      # được nối socket, nên phải có origin của frontend Vercel (vd https://examind-frontend.vercel.app).
+      SOCKET_TICKET_TTL_SECONDS: ${SOCKET_TICKET_TTL_SECONDS:-30}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
