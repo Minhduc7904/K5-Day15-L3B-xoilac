@@ -8,6 +8,10 @@ mc mb --ignore-existing "local/$S3_BUCKET"
 
 MARKER="local/$S3_BUCKET/.init/base-seed"
 if [ ! -d /seed/minio ]; then
+  if [ -d /seed/content ]; then
+    echo "[minio-init] LỖI: có /seed/content nhưng không đọc được /seed/minio (thiếu thư mục hoặc quyền)." >&2
+    exit 1
+  fi
   echo "[minio-init] Không có gói ảnh nền, chỉ tạo bucket."
   exit 0
 fi
