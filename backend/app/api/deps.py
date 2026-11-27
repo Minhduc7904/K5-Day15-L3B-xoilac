@@ -1,25 +1,31 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import to_api_error
+from app.api.socket.server import RealtimeScope, sio
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
-from app.service.noop_notifier import NoopRealtimeNotifier
 from app.service.password_service import PasswordService
+from app.service.presence_service import InMemoryPresenceRegistry, PresenceRegistry
+from app.service.socket_ticket_service import SocketTicketService
+from app.service.socketio_notifier import SocketIONotifier
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
-from app.usecase.ports import RealtimeNotifier
-from app.usecase.user_management import UserManagementUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
+from app.usecase.ports import RealtimeNotifier
+from app.usecase.realtime import RealtimeUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
+from app.usecase.user_management import UserManagementUseCase
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -57,11 +63,34 @@ def get_token_service() -> TokenService:
     return TokenService()
 
 
-def get_auth_usecase(
-    session: SessionDep,
-    settings: SettingsDep,
-    passwords: Annotated[PasswordService, Depends(get_password_service)],
-    tokens: Annotated[TokenService, Depends(get_token_service)],
+# ---- Realtime (#20): tạo MỘT lần cho cả tiến trình (backend chạy một worker) -------------
+
+
+@lru_cache
+def get_presence_registry() -> PresenceRegistry:
+    return InMemoryPresenceRegistry()
+
+
+@lru_cache
+def get_socket_ticket_service() -> SocketTicketService:
+    return SocketTicketService(ttl_seconds=get_settings().socket_ticket_ttl_seconds)
+
+
+@lru_cache
+def get_realtime_notifier() -> RealtimeNotifier:
+    return SocketIONotifier(sio, get_presence_registry())
+
+
+RealtimeNotifierDep = Annotated[RealtimeNotifier, Depends(get_realtime_notifier)]
+PresenceDep = Annotated[PresenceRegistry, Depends(get_presence_registry)]
+
+
+def build_auth_usecase(
+    session: AsyncSession,
+    settings: Settings,
+    notifier: RealtimeNotifier,
+    passwords: PasswordService,
+    tokens: TokenService,
 ) -> AuthUseCase:
     return AuthUseCase(
         users=UserRepository(session),
@@ -69,19 +98,56 @@ def get_auth_usecase(
         passwords=passwords,
         tokens=tokens,
         session_ttl_hours=settings.session_ttl_hours,
+        notifier=notifier,
     )
+
+
+def get_auth_usecase(
+    session: SessionDep,
+    settings: SettingsDep,
+    notifier: RealtimeNotifierDep,
+    passwords: Annotated[PasswordService, Depends(get_password_service)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> AuthUseCase:
+    return build_auth_usecase(session, settings, notifier, passwords, tokens)
 
 
 AuthUseCaseDep = Annotated[AuthUseCase, Depends(get_auth_usecase)]
 
 
-@lru_cache
-def get_realtime_notifier() -> RealtimeNotifier:
-    """Tạm thời không làm gì; phần socket (#20) thay bằng bản cài đặt python-socketio."""
-    return NoopRealtimeNotifier()
+def get_realtime_usecase(
+    auth: AuthUseCaseDep,
+    tickets: Annotated[SocketTicketService, Depends(get_socket_ticket_service)],
+    presence: PresenceDep,
+) -> RealtimeUseCase:
+    return RealtimeUseCase(tickets=tickets, presence=presence, auth=auth)
 
 
-RealtimeNotifierDep = Annotated[RealtimeNotifier, Depends(get_realtime_notifier)]
+RealtimeUseCaseDep = Annotated[RealtimeUseCase, Depends(get_realtime_usecase)]
+
+
+def realtime_scope(app: FastAPI) -> RealtimeScope:
+    """Handler socket không đi qua dependency injection của FastAPI: mỗi sự kiện mở một phiên DB và ghép
+    RealtimeUseCase ở đây. Tôn trọng app.dependency_overrides (test thay get_session, get_settings, notifier)."""
+
+    def resolve(dep):
+        return app.dependency_overrides.get(dep, dep)
+
+    @asynccontextmanager
+    async def scope() -> AsyncIterator[RealtimeUseCase]:
+        async for session in resolve(get_session)():
+            auth = build_auth_usecase(
+                session,
+                resolve(get_settings)(),
+                resolve(get_realtime_notifier)(),
+                resolve(get_password_service)(),
+                resolve(get_token_service)(),
+            )
+            yield RealtimeUseCase(
+                tickets=resolve(get_socket_ticket_service)(), presence=resolve(get_presence_registry)(), auth=auth
+            )
+
+    return scope
 
 
 def get_user_management_usecase(

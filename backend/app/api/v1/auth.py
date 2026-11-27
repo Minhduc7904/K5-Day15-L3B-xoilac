@@ -3,9 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.cookies import clear_session_cookie, set_session_cookie
-from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep, get_session_token
+from app.api.deps import AuthUseCaseDep, CurrentUserDep, RealtimeUseCaseDep, SettingsDep, get_session_token
 from app.api.errors import to_api_error
 from app.schemas.auth import ErrorOut, LoginIn, RegisterIn, UserOut
+from app.schemas.realtime import SocketTicketOut
 from app.usecase.auth import AuthError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -75,3 +76,12 @@ async def logout(
 async def me(current: CurrentUserDep, response: Response):
     _no_store(response)
     return current.user
+
+
+@router.post("/socket-ticket", response_model=SocketTicketOut, responses=_SESSION_ERRORS)
+async def socket_ticket(current: CurrentUserDep, realtime: RealtimeUseCaseDep, response: Response):
+    """Ticket một lần, sống `expires_in` giây, để nối Socket.IO bằng `auth: {ticket}` (#20).
+    Gắn với người dùng và phiên hiện tại: đăng xuất phiên này thì socket mở bằng ticket của nó bị ngắt."""
+    ticket, ttl = realtime.issue_ticket(current)
+    _no_store(response)
+    return SocketTicketOut(ticket=ticket, expires_in=ttl)

@@ -21,10 +21,15 @@ class SessionRepository:
         return row
 
     async def get_with_user(self, token_hash: str) -> tuple[UserSession, User] | None:
+        return await self._one_with_user(UserSession.token_hash == token_hash)
+
+    async def get_by_id_with_user(self, session_id: int) -> tuple[UserSession, User] | None:
+        """Dùng khi đổi ticket socket thành người dùng: ticket gắn với session_id, không giữ token."""
+        return await self._one_with_user(UserSession.session_id == session_id)
+
+    async def _one_with_user(self, condition) -> tuple[UserSession, User] | None:
         result = await self._session.execute(
-            select(UserSession, User)
-            .join(User, User.user_id == UserSession.user_id)
-            .where(UserSession.token_hash == token_hash)
+            select(UserSession, User).join(User, User.user_id == UserSession.user_id).where(condition)
         )
         row = result.first()
         return (row[0], row[1]) if row else None

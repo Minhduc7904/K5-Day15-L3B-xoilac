@@ -1,7 +1,10 @@
+import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.deps import realtime_scope
 from app.api.errors import ApiError, api_error_handler
+from app.api.socket.server import register_handlers, sio
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 
@@ -24,3 +27,8 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+# Socket.IO (#20) gắn trước FastAPI tại /api/socket.io; mọi đường dẫn khác chuyển cho FastAPI.
+# uvicorn chạy `app.main:asgi_app`. `app` (FastAPI) giữ nguyên để test dùng dependency_overrides.
+register_handlers(sio, realtime_scope(app))
+asgi_app = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path="api/socket.io")

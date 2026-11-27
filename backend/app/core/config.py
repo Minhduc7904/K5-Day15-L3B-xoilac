@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     cookie_name: str = "examind_session"
     cookie_secure: bool = False
     session_ttl_hours: int = Field(default=168, ge=1)
+    # Ticket nối socket (#20): sống bao nhiêu giây, dùng một lần.
+    socket_ticket_ttl_seconds: int = Field(default=30, ge=5, le=300)
 
     # Admin mặc định, chỉ lệnh `python -m app.cli.ensure_admin` đọc (chạy trong db-init).
     # SecretStr để mật khẩu không lộ khi in hay log đối tượng Settings.

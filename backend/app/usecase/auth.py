@@ -13,6 +13,7 @@ from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import DuplicateEmailError, UserRepository
 from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
+from app.usecase.ports import RealtimeNotifier
 
 ROLES = (ROLE_STUDENT, ROLE_ADMIN)
 # Mật khẩu MỚI phải dài 8–128 ký tự (từ review PR #17; trước đó là 6). Đăng nhập không kiểm độ dài,
@@ -116,6 +117,7 @@ class AuthUseCase:
         tokens: TokenService,
         session_ttl_hours: int,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        notifier: RealtimeNotifier | None = None,
     ) -> None:
         self._users = users
         self._sessions = sessions
@@ -123,6 +125,8 @@ class AuthUseCase:
         self._tokens = tokens
         self._ttl = timedelta(hours=session_ttl_hours)
         self._now = now
+        # Đăng xuất thì ngắt socket của phiên đó (#20). None: không có socket nào để ngắt (CLI, test).
+        self._notifier = notifier
 
     async def register(
         self, email: str, password: str, display_name: str | None = None, user_agent: str | None = None
@@ -172,7 +176,23 @@ class AuthUseCase:
 
     async def get_current_user(self, token: str | None) -> CurrentUser:
         """Kiểm phiên: tồn tại, chưa thu hồi, chưa hết hạn, user còn active. Cập nhật last_used_at."""
-        row, user = await self._load_session(token)
+        if not token:
+            raise SessionMissing()
+        found = await self._sessions.get_with_user(self._tokens.hash(token))
+        return await self._accept(found)
+
+    async def get_current_user_by_session(self, session_id: int) -> CurrentUser:
+        """Như get_current_user nhưng tra theo session_id (ticket socket gắn với phiên, #20). Cùng luật kiểm."""
+        return await self._accept(await self._sessions.get_by_id_with_user(session_id))
+
+    async def _accept(self, found: tuple[UserSession, User] | None) -> CurrentUser:
+        if found is None:
+            raise SessionInvalid()
+        row, user = found
+        if row.revoked_at is not None:
+            raise SessionRevoked()
+        if _aware(row.expires_at) <= self._now():
+            raise SessionExpired()
         if user.status != STATUS_ACTIVE:
             raise AccountDisabled()
         await self._sessions.touch(row, self._now())
@@ -189,19 +209,9 @@ class AuthUseCase:
         row, _ = found
         if row.revoked_at is None:
             await self._sessions.revoke(row.session_id, self._now())
-
-    async def _load_session(self, token: str | None) -> tuple[UserSession, User]:
-        if not token:
-            raise SessionMissing()
-        found = await self._sessions.get_with_user(self._tokens.hash(token))
-        if found is None:
-            raise SessionInvalid()
-        row, user = found
-        if row.revoked_at is not None:
-            raise SessionRevoked()
-        if _aware(row.expires_at) <= self._now():
-            raise SessionExpired()
-        return row, user
+        # Ngắt socket mở bằng ticket của CHÍNH phiên này; tab của phiên khác giữ nguyên (#20).
+        if self._notifier is not None:
+            await self._notifier.kick_session(row.session_id, "logout")
 
     async def _open_session(self, user: User, user_agent: str | None) -> str:
         token = self._tokens.generate()
