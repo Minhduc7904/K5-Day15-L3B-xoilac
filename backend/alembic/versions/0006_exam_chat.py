@@ -1,6 +1,6 @@
 """bảng phiên chat tạo đề, tin nhắn, bản xem trước, đề nháp (issue #4)
 
-Nối sau 0005_exam_templates (#5), vốn nối sau 0004_users_created_by (auth #8). PR #4 phải merge sau PR #5.
+Nối sau 0005_exam_templates (#5), vốn nối sau 0005_student_auth (#25) và 0004 (auth #8). PR #4 phải merge sau PR #5.
 Nếu trước lúc merge main có thêm migration khác, đổi down_revision trỏ vào migration mới nhất trên main, nếu không
 Alembic có hai head và `alembic upgrade head` báo lỗi khi deploy.
 

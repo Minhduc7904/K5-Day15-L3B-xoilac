@@ -90,8 +90,12 @@ export function VerifyOtpForm() {
         title: 'Đã gửi mã mới',
         description: mockMode ? `Mock: mã của bạn là ${MOCK_OTP}.` : `Mã mới đã gửi tới ${maskEmail(flow.email)}.`,
       });
-    } catch {
-      setProblem({ kind: 'network' });
+    } catch (error) {
+      const authError = toAuthError(error);
+      // Gửi lại quá sớm hoặc quá nhiều lần: báo nội dung từ máy chủ thay vì lỗi mạng.
+      if (authError.code === 'OTP_RESEND_LIMIT' || authError.code === 'EMAIL_UNAVAILABLE') {
+        toast({ tone: 'danger', title: 'Chưa gửi được mã mới', description: authError.message });
+      } else setProblem({ kind: 'network' });
     } finally {
       setResending(false);
     }

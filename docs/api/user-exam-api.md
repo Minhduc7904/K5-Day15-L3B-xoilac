@@ -228,7 +228,7 @@ Ca trọn luồng tiêu biểu:
 4. "Em xác nhận, tạo đề nháp" → dùng bản đã sửa qua API, đề nháp 3 câu 12C4 và `shortages` báo thiếu 1 câu; không có đáp án.
 5. "Em muốn ôn thi cuối kỳ 1 lớp 12" → bản xem trước theo mẫu (3 phần). "giảm còn 8 câu" bị từ chối, version giữ nguyên. "xác nhận" → đề nháp theo từng phần, đúng loại câu, báo thiếu ở phần trả lời ngắn.
 
-Chưa kiểm với PostgreSQL thật và dữ liệu nền. Đã kiểm SQL của migration bằng `alembic upgrade 0004:0006_exam_chat --sql` (chuỗi `0004_users_created_by → 0005_exam_templates → 0006_exam_chat`).
+Chưa kiểm với PostgreSQL thật và dữ liệu nền. Đã kiểm SQL của migration bằng `alembic upgrade 0004:0006_exam_chat --sql` (chuỗi `0004 → 0005_student_auth → 0005_exam_templates → 0006_exam_chat`).
 
 ## Phần còn chờ
 

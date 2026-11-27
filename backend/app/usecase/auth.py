@@ -11,6 +11,7 @@ from app.models.session import UserSession
 from app.models.user import ROLE_ADMIN, ROLE_STUDENT, STATUS_ACTIVE, User
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import DuplicateEmailError, UserRepository
+from app.service.google_identity import GoogleIdentity
 from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
 
@@ -34,6 +35,11 @@ class AuthError(Exception):
 class EmailAlreadyRegistered(AuthError):
     code = "EMAIL_TAKEN"
     message = "Email này đã được đăng ký"
+
+
+class GoogleAccountConflict(AuthError):
+    code = "GOOGLE_ACCOUNT_CONFLICT"
+    message = "Email này không thể liên kết với tài khoản Google này"
 
 
 class InvalidCredentials(AuthError):
@@ -124,13 +130,21 @@ class AuthUseCase:
         self._ttl = timedelta(hours=session_ttl_hours)
         self._now = now
 
-    async def register(
-        self, email: str, password: str, display_name: str | None = None, user_agent: str | None = None
+    async def prepare_registration(self, email: str, password: str) -> str:
+        if await self._users.get_by_email(email) is not None:
+            raise EmailAlreadyRegistered()
+        return await self._passwords.hash(password)
+
+    async def register_verified(
+        self, email: str, password_hash: str, display_name: str | None, user_agent: str | None
     ) -> tuple[User, str]:
-        """Đăng ký công khai: luôn tạo student và mở phiên. Trả (user, token)."""
-        user = await self.create_user(email, password, ROLE_STUDENT, display_name)
-        token = await self._open_session(user, user_agent)
-        return user, token
+        try:
+            user = await self._users.add(
+                email, password_hash, ROLE_STUDENT, display_name, verified_at=self._now(), commit=False
+            )
+        except DuplicateEmailError:
+            raise EmailAlreadyRegistered() from None
+        return user, await self._open_session(user, user_agent)
 
     async def create_user(
         self,
@@ -140,7 +154,7 @@ class AuthUseCase:
         display_name: str | None = None,
         created_by: int | None = None,
     ) -> User:
-        """Tạo tài khoản. Chỉ được gọi từ: register (student), CLI create_admin / ensure_admin (admin,
+        """Tạo tài khoản. Được dùng bởi CLI create_admin / ensure_admin (admin,
         created_by=None) và AdminAccountsUseCase.create_admin (admin, created_by = admin đang thao tác)."""
         if role not in ROLES:
             raise InvalidInput(f"Vai trò không hợp lệ: {role}")
@@ -157,8 +171,8 @@ class AuthUseCase:
             raise EmailAlreadyRegistered() from None
 
     async def login(self, email: str, password: str, user_agent: str | None = None) -> tuple[User, str]:
-        user = await self._users.get_by_email(normalize_email(email))
-        if user is None:
+        user = await self._users.get_by_email(normalize_email(email), lock=True)
+        if user is None or user.password_hash is None:
             await self._passwords.verify_dummy(password)
             raise InvalidCredentials()
         if not await self._passwords.verify(user.password_hash, password):
@@ -166,9 +180,65 @@ class AuthUseCase:
         # Chỉ báo khóa khi mật khẩu đúng, để người ngoài không dò được tài khoản nào bị khóa.
         if user.status != STATUS_ACTIVE:
             raise AccountDisabled()
-        await self._users.set_last_login(user, self._now())
+        user.last_login_at = self._now()
         token = await self._open_session(user, user_agent)
         return user, token
+
+    async def has_google_account(self, subject: str) -> bool:
+        return await self._users.get_by_google_subject(subject) is not None
+
+    async def google_login(self, identity: GoogleIdentity, user_agent: str | None) -> tuple[User, str]:
+        user = await self._users.get_by_google_subject(identity.subject, lock=True)
+        if user is None:
+            user = await self._users.get_by_email(identity.email, lock=True)
+        if user is None:
+            try:
+                user = await self._users.add(
+                    identity.email, None, ROLE_STUDENT, identity.name,
+                    verified_at=self._now(), google_subject=identity.subject, commit=False,
+                )
+            except DuplicateEmailError:
+                user = await self._users.get_by_google_subject(identity.subject, lock=True)
+                if user is None:
+                    user = await self._users.get_by_email(identity.email, lock=True)
+                if user is None:
+                    raise GoogleAccountConflict() from None
+
+        if user.role != ROLE_STUDENT or user.google_subject not in (None, identity.subject):
+            raise GoogleAccountConflict()
+        if user.status != STATUS_ACTIVE:
+            raise AccountDisabled()
+        if user.google_subject is None:
+            if user.email_verified_at is None:
+                # A legacy password may have been set by someone who never owned the address.
+                await self._sessions.revoke_all_for_user(user.user_id, self._now())
+            try:
+                await self._users.link_google(user, identity.subject, self._now())
+            except DuplicateEmailError:
+                raise GoogleAccountConflict() from None
+        user.last_login_at = self._now()
+        return user, await self._open_session(user, user_agent)
+
+    async def password_reset_candidate(self, email: str) -> User | None:
+        """Tài khoản được tự đặt lại mật khẩu qua email: học sinh đang hoạt động. Admin dùng CLI."""
+        user = await self._users.get_by_email(normalize_email(email))
+        if user is None or user.role != ROLE_STUDENT or user.status != STATUS_ACTIVE:
+            return None
+        return user
+
+    async def set_password(self, user_id: int, password: str) -> bool:
+        """Đặt mật khẩu mới, thu hồi mọi phiên cũ rồi commit. Trả False nếu tài khoản không còn hợp lệ."""
+        if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
+            raise InvalidInput(f"Mật khẩu phải dài {PASSWORD_MIN}–{PASSWORD_MAX} ký tự")
+        user = await self._users.get(user_id)
+        if user is None or user.role != ROLE_STUDENT or user.status != STATUS_ACTIVE:
+            return False
+        user.password_hash = await self._passwords.hash(password)
+        if user.email_verified_at is None:
+            user.email_verified_at = self._now()
+        await self._sessions.revoke_all_for_user(user.user_id, self._now())
+        await self._users.commit()
+        return True
 
     async def get_current_user(self, token: str | None) -> CurrentUser:
         """Kiểm phiên: tồn tại, chưa thu hồi, chưa hết hạn, user còn active. Cập nhật last_used_at."""

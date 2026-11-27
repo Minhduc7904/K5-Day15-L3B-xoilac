@@ -34,6 +34,8 @@ Ví dụ `POST /api/v1/sample-items`: `api/v1/sample_items.py` nhận body đã 
 
 Ví dụ `POST /api/v1/sample-files`: router đọc tệp (tối đa 5 MB) → `SampleFileUseCase.upload` sinh khoá `samples/<uuid>` → `StorageService.put` gọi MinIO. `boto3` là đồng bộ nên được gọi trong threadpool.
 
+Backend có thể lấy `GmailEmailService` qua `get_email_service()` trong `app/api/deps.py`. Usecase có bước duyệt gửi gọi `await email_service.send(to=..., subject=..., text=...)` và nhận mã thư Gmail. Service báo `EmailConfigurationError` khi cấu hình thiếu hoặc bị tắt và `EmailDeliveryError` khi Google không xác nhận yêu cầu. Cấu hình nằm trong [runbook triển khai backend](../operations/deploy-backend-ci-cd.md#cấu-hình-otp-và-google).
+
 ## Quyết định và cách kiểm chứng
 
 Thêm tính năng mới:

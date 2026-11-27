@@ -3,7 +3,7 @@
  * Trạng thái lưu ở sessionStorage để giữ đăng nhập khi tải lại trang trong cùng tab.
  * Chỉ dùng tài khoản và mật khẩu mẫu, không dùng dữ liệu thật.
  */
-import { AuthError, type LoginInput, type RegisterInput, type User } from './types';
+import { AuthError, type LoginInput, type OtpPurpose, type PendingOtp, type RegisterInput, type User } from './types';
 import { normalizeEmail } from './validation';
 
 export const MOCK_OTP = '123456';
@@ -28,6 +28,7 @@ interface MockAccount {
 interface MockState {
   accounts: Record<string, MockAccount>;
   currentEmail: string | null;
+  pendingRegistration?: { input: RegisterInput; challenge: string; attempts: number };
   otp: { email: string; code: string; expiresAt: number; attempts: number } | null;
   resetToken: { email: string; token: string } | null;
 }
@@ -93,12 +94,41 @@ export const mockAuthApi = {
     return account.user;
   },
 
-  async register({ email, password, display_name }: RegisterInput): Promise<User> {
+  async register(input: RegisterInput): Promise<PendingOtp> {
     await delay(900);
-    failIfNetwork(email);
+    failIfNetwork(input.email);
     const state = load();
-    const key = normalizeEmail(email);
-    if (state.accounts[key]) throw new AuthError('EMAIL_TAKEN', 'Email này đã được đăng ký', 409);
+    const email = normalizeEmail(input.email);
+    if (state.accounts[email]) throw new AuthError('EMAIL_TAKEN', 'Email này đã được đăng ký', 409);
+    const challenge = crypto.randomUUID();
+    state.pendingRegistration = { input: { ...input, email }, challenge, attempts: 0 };
+    save(state);
+    return { challenge, email, expires_in: 300, resend_after: 60 };
+  },
+
+  async resendOtp(_purpose: OtpPurpose, challenge: string): Promise<PendingOtp> {
+    const state = load();
+    const pending = state.pendingRegistration;
+    if (!pending || pending.challenge !== challenge) throw new AuthError('INVALID_CHALLENGE', 'Hãy bắt đầu lại.');
+    pending.attempts = 0;
+    save(state);
+    return { challenge, email: pending.input.email, expires_in: 300, resend_after: 60 };
+  },
+
+  async completeOtp(_purpose: OtpPurpose, challenge: string, otp: string): Promise<User> {
+    await delay();
+    const state = load();
+    const pending = state.pendingRegistration;
+    if (!pending || pending.challenge !== challenge) throw new AuthError('INVALID_CHALLENGE', 'Hãy bắt đầu lại.');
+    if (pending.attempts >= OTP_MAX_ATTEMPTS) throw new AuthError('TOO_MANY_ATTEMPTS', 'Hãy gửi lại mã mới.');
+    if (otp === MOCK_OTP_EXPIRED) throw new AuthError('OTP_EXPIRED', 'Mã đã hết hạn.');
+    if (otp !== MOCK_OTP) {
+      pending.attempts += 1;
+      save(state);
+      throw new AuthError('OTP_INVALID', 'Mã xác minh chưa đúng.');
+    }
+    const { email: key, password, display_name } = pending.input;
+    delete state.pendingRegistration;
     const user: User = {
       user_id: Object.keys(state.accounts).length + 1,
       email: key,

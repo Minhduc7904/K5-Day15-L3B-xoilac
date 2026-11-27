@@ -37,6 +37,33 @@ Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần me
 
 Log Docker của mỗi container giới hạn 3 file × 10 MB.
 
+## Cấu hình OTP và Google
+
+Cấu hình local nằm trong [`backend/.env.example`](../../backend/.env.example). Trên EC2, lưu các biến bên dưới trong `/opt/examind/prod.env` với quyền `600`. Compose truyền các biến này cho container backend khi triển khai.
+
+| Biến | Giá trị |
+| --- | --- |
+| `EMAIL_PROVIDER` | `gmail` để bật, để trống để tắt |
+| `EMAIL_FROM` | Địa chỉ Gmail đã cấp quyền gửi, ví dụ `examind.app@gmail.com` |
+| `EMAIL_FROM_NAME` | Tên hiển thị, mặc định `Examind` |
+| `GMAIL_CLIENT_ID` | Client ID của Google OAuth |
+| `GMAIL_CLIENT_SECRET` | Client secret của Google OAuth |
+| `GMAIL_REFRESH_TOKEN` | Refresh token của tài khoản gửi với scope `https://www.googleapis.com/auth/gmail.send` |
+| `AUTH_OTP_SECRET` | Chuỗi ngẫu nhiên bí mật, tối thiểu 32 byte. Dùng lệnh sinh trong cấu hình mẫu |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client loại Web Application cho đăng nhập Google |
+| `GOOGLE_CALLBACK_URL` | `https://examind.duckdns.org/api/auth/google/callback` |
+| `FRONTEND_URL` | Origin nhận kết quả. Production dùng `https://examind-frontend.vercel.app` |
+
+Đăng ký đúng callback trong **Authorized redirect URIs**. Client đăng nhập dùng `openid email profile`. Client Gmail chỉ gửi thư. Để chạy trọn luồng Google local, cấu hình callback localhost và origin frontend local trong cả app lẫn Google Auth Platform.
+
+Sau khi cập nhật `prod.env`, chạy lệnh sau từ `/opt/examind/app` để kiểm cú pháp mà không in cấu hình. Lần deploy backend tiếp theo sẽ nạp biến vào container.
+
+```bash
+docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+```
+
+Test backend dùng HTTP giả lập. Để kiểm tra thông tin OAuth trên VPS, đổi refresh token lấy access token qua endpoint OAuth của Google. Bước này không gửi thư. Nếu Google trả `invalid_grant`, kiểm tra xem token đã bị thu hồi hay hết hạn. Refresh token của ứng dụng OAuth External ở trạng thái Testing với scope Gmail thường hết hạn sau 7 ngày. [Tài liệu Google OAuth](https://developers.google.com/identity/protocols/oauth2#expiration).
+
 ## Sửa cấu hình nginx
 
 1. Sửa `deploy/nginx/conf.d/` (`default.conf` cho khối server, `locations.inc` cho các location dùng chung cổng 80 và 443, `proxy.inc` cho header proxy) trên nhánh, mở PR. CI chạy `nginx -t` với chứng chỉ tự ký tạm.

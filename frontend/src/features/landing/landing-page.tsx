@@ -1,14 +1,14 @@
 import { Footer } from '@/components/layout/footer';
 import { Navbar } from '@/components/layout/navbar';
-import { NavAuthActions } from './auth-actions';
+import { UserMenu } from '@/features/auth/components/user-menu';
 import { landingLinks } from './content';
 import { Hero } from './hero';
-import { ChapterMarquee, Faq, Features, FinalCta, HowItWorks, Problems, Promises } from './sections';
+import { ChapterMarquee, Faq, Features, HowItWorks, Problems, Promises } from './sections';
 
 export function LandingPage() {
   return (
     <>
-      <Navbar links={landingLinks} actions={<NavAuthActions />} />
+      <Navbar links={landingLinks} actions={<UserMenu />} />
       <main id="noi-dung">
         <Hero />
         <ChapterMarquee />
@@ -17,7 +17,6 @@ export function LandingPage() {
         <Features />
         <Promises />
         <Faq />
-        <FinalCta />
       </main>
       <Footer links={landingLinks} />
     </>

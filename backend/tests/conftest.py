@@ -5,14 +5,17 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.api.deps import get_storage
+from app.api.deps import get_email_service, get_storage
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.main import app
 from app.models import Base
 
 
-TEST_SETTINGS = Settings(_env_file=None, cookie_name="examind_session", cookie_secure=False, session_ttl_hours=168)
+TEST_SETTINGS = Settings(
+    _env_file=None, cookie_name="examind_session", cookie_secure=False, session_ttl_hours=168,
+    auth_otp_secret=secrets.token_urlsafe(32),
+)
 
 
 def new_password() -> str:
@@ -55,9 +58,23 @@ async def db():
     await engine.dispose()
 
 
+TEST_OTP = "112233"
+
+
+class FakeEmail:
+    def __init__(self):
+        self.outbox = []
+
+    async def send(self, **message):
+        self.outbox.append(message)
+        return "fake-message-id"
+
+
 @pytest.fixture
-async def client(db):
+async def client(db, monkeypatch):
     storage = FakeStorage()
+    monkeypatch.setattr("app.usecase.student_auth.secrets.randbelow", lambda _: int(TEST_OTP))
+    app.dependency_overrides[get_email_service] = FakeEmail
 
     async def _session():
         async with db() as s:

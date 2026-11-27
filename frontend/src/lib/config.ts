@@ -1,2 +1,4 @@
-export const mockMode = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
-export const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+export const mockMode = process.env.NEXT_PUBLIC_MOCK_MODE === 'true'
+  || (process.env.NEXT_PUBLIC_MOCK_MODE !== 'false' && process.env.NODE_ENV === 'development');
+
+export const apiBaseUrl = '/api/v1';
