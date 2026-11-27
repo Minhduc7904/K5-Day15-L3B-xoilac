@@ -95,9 +95,11 @@ class PdfImportModels:
         ]
         return data.get("model") or self.settings.ocr_model, sorted(pages, key=lambda p: p.index)
 
-    async def extract(self, pages: list[dict]) -> tuple[str, Extraction]:
+    async def extract(
+        self, pages: list[dict], *, source_solution_keys: list[tuple[str, str]] | None = None,
+    ) -> tuple[str, Extraction]:
         try:
-            return await self._extract_pages(pages)
+            return await self._extract_pages(pages, source_solution_keys=source_solution_keys)
         except ExtractionTooLong:
             if len(pages) == 1:
                 raise
@@ -113,13 +115,16 @@ class PdfImportModels:
         for start in range(0, len(pages), 4):
             end = min(start + 4, len(pages))
             owned = {page["page"] for page in pages[start:end]}
-            model, batch = await self._extract_pages(pages[max(start - 1, 0):end + 1], owned, headings)
+            model, batch = await self._extract_pages(
+                pages[max(start - 1, 0):end + 1], owned, headings, source_solution_keys=source_solution_keys,
+            )
             questions.extend(q for q in batch.questions if q.pages and min(q.pages) in owned)
             answers.extend(a for a in batch.answers if a.page in owned)
         return model, Extraction(questions=questions, answers=answers)
 
     async def _extract_pages(
-        self, pages: list[dict], owned: set[int] | None = None, headings: str = ""
+        self, pages: list[dict], owned: set[int] | None = None, headings: str = "",
+        *, source_solution_keys: list[tuple[str, str]] | None = None,
     ) -> tuple[str, Extraction]:
         key = self.settings.openai_api_key
         if not key:
@@ -128,6 +133,13 @@ class PdfImportModels:
             f"[[Trang {page['page']}]]\n{order_image_options(page['normalized'])}" for page in pages
         )
         instructions = EXTRACTION_INSTRUCTIONS
+        if source_solution_keys:
+            keys = ", ".join(f"{section}/{number}" for section, number in source_solution_keys)
+            instructions += (
+                f"\nOriginal solution text is already captured for these section/number pairs: {keys}. "
+                "For these pairs set solution to null. Still return an excerpt and explicit printed "
+                "answer in the solution evidence to check against the answer key."
+            )
         if owned:
             instructions += (
                 f"\nOnly emit questions and evidence that begin on pages {sorted(owned)}. "

@@ -61,7 +61,9 @@ Lượt kiểm phát hiện OCR đưa nhãn A–D xuống sau ảnh, model đưa
 
 Tổng lượt kiểm gồm 30 trang Mistral, 29.967 token đầu vào và 26.337 token đầu ra khi tách câu, cùng 12.315 token embedding. Chi phí ước tính theo biểu giá chuẩn là **0,2612 USD**. Con số gồm các lượt kiểm và chạy lại sau sửa. Hai trang scan từ lượt kiểm ban đầu được ghép lại theo thứ tự khi chạy đề đủ. Các lượt kiểm sau tái sử dụng kết quả OCR đã lưu. [Giá Mistral OCR](https://docs.mistral.ai/models/ocr-4-1) · [Giá GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini) · [Giá embedding](https://developers.openai.com/api/docs/models/text-embedding-3-small)
 
-Các đề được đối chiếu theo bảng đáp án in trên tài liệu. Trích xuất lời giải chưa đầy đủ và admin cần kiểm lại với PDF gốc. Gợi ý nhãn đôi khi sai chương dù có điểm tương đồng cao, nên vẫn cần admin xác nhận. Bản scan là bản raster hóa cùng đề. Chất lượng trên bản chụp giấy và ngân hàng chương rộng hơn cần kiểm thêm.
+Các đề được đối chiếu theo bảng đáp án in trên tài liệu. Sau lượt live trên, lượt kiểm lại bằng OCR và kết quả trích xuất đã lưu giữ được **22/22 lời giải cho mỗi PDF**. Backend chép Markdown theo tiêu đề lời giải, phần và số câu, ghi đủ các trang qua `solutionPages` và gắn cờ `solution_review` khi thiếu căn cứ. Với khối đã chép, OpenAI chỉ cần trích dẫn đoạn ngắn và kết quả đã in để đối chiếu đáp án. Lượt kiểm lại không gọi API.
+
+Gợi ý nhãn đôi khi sai chương dù có điểm tương đồng cao, nên vẫn cần admin xác nhận. Bản scan là bản raster hóa cùng đề. Chất lượng trên bản chụp giấy, bố cục lời giải khác và ngân hàng chương rộng hơn cần kiểm thêm.
 
 ## Tài liệu liên quan
 

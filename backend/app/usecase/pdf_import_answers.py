@@ -1,6 +1,7 @@
 import re
 
 from app.schemas.pdf_import import AnswerEvidence, ExtractedQuestion, Extraction
+from app.usecase.pdf_import_solutions import solution_excerpt_page, solution_key, worked_solutions
 
 CHOICE_TYPES = {"SINGLE_CHOICE", "MULTIPLE_CHOICE"}
 STATEMENT_TYPES = CHOICE_TYPES | {"TRUE_FALSE"}
@@ -94,6 +95,7 @@ def anchor_evidence(
 
 def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
     page_map = {page["page"]: page["normalized"] for page in pages}
+    has_worked_heading, source_solutions = worked_solutions(page_map)
     normalized_pages = {number: " ".join(markdown.split()) for number, markdown in page_map.items()}
     table_pages: dict[tuple[str, ...], set[int]] = {}
     for number, markdown in page_map.items():
@@ -101,10 +103,14 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             cells = table_cells(line)
             if cells and cells[0].isdigit():
                 table_pages.setdefault(cells, set()).add(number)
-    answers = [
-        anchored for item in extraction.answers
-        if (anchored := anchor_evidence(item, normalized_pages, table_pages)) is not None
-    ]
+    answers = []
+    for item in extraction.answers:
+        if has_worked_heading and item.source == "solution":
+            source = source_solutions.get(solution_key(item.section, item.number)) if item.section else None
+            if source and (page := solution_excerpt_page(source, item.excerpt)) is not None:
+                answers.append(item.model_copy(update={"page": page, "solution": None}))
+        elif anchored := anchor_evidence(item, normalized_pages, table_pages):
+            answers.append(anchored)
     source_media = {number: media_ids(value) for number, value in page_map.items()}
     keys = [(q.section, q.number) for q in extraction.questions]
     if len(set(keys)) != len(keys):
@@ -128,8 +134,18 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             matching.append(item)
         values = [answer_value(question, item) for item in matching]
         known = [value for value in values if value is not None]
-        solutions = [item.solution for item in matching if item.source == "solution" and item.solution]
-        solution = "\n\n".join(dict.fromkeys(solutions)) or None
+        source_solution = source_solutions.get(solution_key(question.section, question.number))
+        if source_solution:
+            solution = source_solution.markdown
+            solution_pages = source_solution.pages
+            source_excerpts.append(AnswerEvidence(
+                section=question.section, number=question.number, page=solution_pages[0], source="solution",
+                excerpt=source_solution.heading, choices=None, truth_values=None, answer=None, solution=None,
+            ))
+        else:
+            extractions = [item for item in matching if item.source == "solution" and item.solution]
+            solution = "\n\n".join(dict.fromkeys(item.solution for item in extractions)) or None
+            solution_pages = sorted({item.page for item in extractions})
         value = known[0] if known else None
         if question.type == "TRUE_FALSE" and known:
             candidates = [{value for value in column if value is not None} for column in zip(*known)]
@@ -146,9 +162,11 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
         elif value is None or (question.type == "TRUE_FALSE" and None in value):
             state = "missing"
         flags = [] if state == "resolved" else [f"answer_{state}"]
+        if solution is None:
+            flags.append("solution_review")
         if question.image_dependent:
             flags.append("image_review")
-        source_pages = set(question.pages) | {item.page for item in matching if item.source == "solution"}
+        source_pages = set(question.pages) | set(solution_pages)
         content_fields = [question.content, *question.statements, solution or ""]
         source_ids = set().union(*(source_media[number] for number in source_pages))
         if media_ids(*content_fields) - source_ids:
@@ -167,6 +185,7 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             "section": question.section, "number": question.number, "sourcePages": sorted(set(question.pages)),
             "type": question.type, "content": question.content, "statements": options,
             "correctAnswer": value if isinstance(value, str) else None, "solution": solution,
+            "solutionPages": solution_pages,
             "answerState": state, "evidence": [item.model_dump() for item in source_excerpts],
             "flags": flags, "imageDependent": question.image_dependent, "imageReviewed": False,
             "chapterCodes": [], "difficulty": None, "suggestions": None,

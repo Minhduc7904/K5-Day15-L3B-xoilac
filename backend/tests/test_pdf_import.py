@@ -299,10 +299,11 @@ async def test_extraction_retries_truncated_output_with_page_ownership(monkeypat
 
     models = PdfImportModels(Settings(openai_api_key="fixture"))
     monkeypatch.setattr(models, "_post", post)
-    _, result = await models.extract(pages)
+    _, result = await models.extract(pages, source_solution_keys=[("I", "4")])
     assert [question.number for question in result.questions] == ["1", "4", "5", "6"]
     assert "pages [1, 2, 3, 4]" in requests[1]
     assert "pages [5, 6]" in requests[2]
+    assert all("pairs: I/4" in prompt and "set solution to null" in prompt for prompt in requests)
 
 
 async def test_ocr_failure_leaves_a_failed_session_without_drafts(pdf_api, monkeypatch):

@@ -100,6 +100,67 @@ def test_matches_unlabeled_choices_to_the_complete_source_option_block():
     assert "Choose:" in result["content"]
 
 
+def test_copies_worked_solutions_by_section_and_keeps_continuation_page():
+    pages = [
+        {"page": 1, "normalized": "PHẦN I.\nCâu 1. Dòng nằm trong đề\n![media:10](media:10)"},
+        {"page": 2, "normalized": "PHẦN II.\nCâu 1. Câu hỏi khác"},
+        {"page": 3, "normalized": "# **ĐÁP ÁN VÀ LỜI GIẢI THAM KHẢO**\n"
+         "# PHẦN I.\n| Câu | Đáp án |\n| 1 | B |\n"
+         "# PHẦN I.\n## Câu 1. Chọn A.\nGiữ $x^2$."},
+        {"page": 4, "normalized": "Tiếp theo **chọn A**.\n![media:13](media:13)\n"
+         "# **PHẦN II.**\n**Câu 1.** Đáp số: 4\nGiải riêng của phần II.\n--- HẾT ---\nGhi chú"},
+    ]
+    answers = [
+        evidence("I", "key", "| 1 | B |", choices=[2]),
+        evidence("I", "solution", "Tiếp theo chọn A.", choices=[1], solution="Không dùng lại văn bản model."),
+        evidence("II", "solution", "Giải riêng của phần II.", answer="4", solution="Không dùng lại văn bản model."),
+    ]
+    one, two = build_drafts(Extraction(
+        questions=[question("I", "SINGLE_CHOICE", ["one", "two"]), question("II", "SHORT_ANSWER")],
+        answers=answers,
+    ), pages)
+    assert one["solution"] == ("## Câu 1. Chọn A.\nGiữ $x^2$.\n\n"
+                               "Tiếp theo **chọn A**.\n![media:13](media:13)")
+    assert one["solutionPages"] == [3, 4]
+    assert "image_source_mismatch" not in one["flags"]
+    assert one["answerState"] == "conflict"
+    assert one["evidence"][1]["page"] == 4
+    assert two["solution"] == "**Câu 1.** Đáp số: 4\nGiải riêng của phần II."
+    assert two["solutionPages"] == [4] and two["correctAnswer"] == "4"
+
+
+def test_duplicate_worked_solution_numbers_are_flagged_without_guessing():
+    pages = [
+        *PAGES,
+        {"page": 4, "normalized": "# LỜI GIẢI CHI TIẾT\n# PHẦN I.\nCâu 1.\nGiải thứ nhất.\n"
+         "Câu 1.\nGiải thứ hai."},
+    ]
+    candidate = evidence("I", "solution", "Giải thứ nhất.", answer="10", solution="Giải thứ nhất.")
+    candidate = candidate.model_copy(update={"page": 4})
+    draft, = build_drafts(Extraction(questions=[question("I", "SHORT_ANSWER")], answers=[candidate]), pages)
+    assert draft["solution"] is None and draft["solutionPages"] == []
+    assert draft["correctAnswer"] is None and "solution_review" in draft["flags"]
+
+
+def test_solution_evidence_from_the_question_page_stays_unresolved():
+    pages = [
+        {"page": 1, "normalized": "PHẦN I.\nCâu 1. Dòng trong đề."},
+        {"page": 2, "normalized": "# LỜI GIẢI\n# PHẦN I.\nCâu 1.\nDòng trong lời giải."},
+    ]
+    candidate = evidence("I", "solution", "Dòng trong đề.", answer="4", solution="Đoán")
+    candidate = candidate.model_copy(update={"page": 1})
+    draft, = build_drafts(Extraction(questions=[question("I", "SHORT_ANSWER")], answers=[candidate]), pages)
+    assert draft["solution"] == "Câu 1.\nDòng trong lời giải."
+    assert draft["correctAnswer"] is None and draft["answerState"] == "missing"
+
+
+def test_solution_without_an_explicit_section_is_flagged():
+    pages = [*PAGES, {"page": 4, "normalized": "# LỜI GIẢI\nCâu 1.\nGiải đây."}]
+    data = Extraction(questions=[question("I", "SHORT_ANSWER"), question("II", "SHORT_ANSWER")], answers=[])
+    assert all("solution_review" in draft["flags"] and draft["solution"] is None
+               for draft in build_drafts(data, pages))
+
+
 @pytest.mark.parametrize("repeated", [False, True])
 def test_reanchors_key_row_only_if_one_page_matches(repeated):
     key = evidence("III", "key", "|1|2,41|", answer="2,41").model_copy(update={"page": 12})

@@ -14,6 +14,7 @@ from app.service.pdf_import_models import MAX_IMAGE_BYTES, OcrPage, PdfImportMod
 from app.service.storage_service import StorageService
 from app.usecase.pdf_import_answers import STATEMENT_TYPES, build_drafts, media_ids
 from app.usecase.pdf_import_classification import classify_drafts
+from app.usecase.pdf_import_solutions import worked_solutions
 
 MAX_PDF_BYTES = 20 * 1024 * 1024
 MAX_PAGES = 30
@@ -139,7 +140,9 @@ class PdfImportUseCase:
             row.pages, row.warnings = normalized, warnings
             stage = row.stage = "extract"
             await session.commit()
-            row.extraction_model, extraction = await self.models.extract(normalized)
+            _, solutions = worked_solutions({page["page"]: page["normalized"] for page in normalized})
+            source_keys = [key for key, block in solutions.items() if block is not None]
+            row.extraction_model, extraction = await self.models.extract(normalized, source_solution_keys=source_keys)
             drafts = build_drafts(extraction, normalized)
             if not drafts:
                 raise ValueError("Không tìm thấy câu hỏi có nguồn.")

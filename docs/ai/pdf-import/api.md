@@ -14,7 +14,7 @@ Base URL local là `http://localhost:8000/api/v1`. Các thao tác nhập và duy
 | `GET /admin/pdf-imports` | Danh sách phiên với `offset` và `limit`. |
 | `GET /admin/pdf-imports/{import_id}` | Trạng thái, bước lỗi, cảnh báo, mã PDF gốc và số câu nháp. |
 | `GET /admin/pdf-imports/{import_id}/drafts` | Danh sách bản nháp theo thứ tự nguồn. |
-| `GET /admin/pdf-imports/{import_id}/drafts/{draft_id}` | Nội dung, đáp án, lời giải, nguồn, hình và nhãn gợi ý. |
+| `GET /admin/pdf-imports/{import_id}/drafts/{draft_id}` | Nội dung, đáp án, lời giải, nguồn, hình và nhãn gợi ý. `solutionPages` liệt kê trang gốc của lời giải theo thứ tự. |
 | `PATCH /admin/pdf-imports/{import_id}/drafts/{draft_id}` | Lưu các trường admin đã sửa và trả bản nháp hiện tại. |
 | `POST /admin/pdf-imports/{import_id}/drafts/{draft_id}/approve` | Xuất bản một lần, trả `questionId`. |
 | `POST /admin/pdf-imports/{import_id}/drafts/{draft_id}/reject` | Ghi trạng thái bỏ bản nháp. |
@@ -42,6 +42,8 @@ Ví dụ phản hồi tải lên
 Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa xác định hoặc hình bắt buộc bị thiếu cần được sửa trước khi duyệt. `suggestions` chứa nhãn đề xuất và danh sách `neighbors` gồm `questionId`, mã chương, độ khó và điểm cosine. Frontend gửi chương và độ khó đã xác nhận qua PATCH.
 
 ## Luồng kiểm thử
+
+Cờ `solution_review` báo chưa xác định được lời giải có nguồn. Nếu tài liệu đánh số lại giữa các phần, backend ghép theo cả mã phần và số câu. Các vị trí trùng trong cùng phần cần admin đối chiếu.
 
 Chạy PostgreSQL và MinIO local theo runbook. Cấu hình `MISTRAL_API_KEY`, `OPENAI_API_KEY` và `PDF_IMPORT_ADMIN_TOKEN` trong `backend/.env`. Giữ `OCR_PROVIDER=mistral` và chọn `OCR_MODEL` nếu cần thử model khác. Dùng bearer token admin khi gọi API hoặc chọn Authorize trong Swagger `/docs`. Chỉ tải PDF và dữ liệu tham chiếu được phép gửi cho nhà cung cấp.
 
