@@ -26,6 +26,12 @@ class UserRepository:
     async def get(self, user_id: int) -> User | None:
         return await self._session.get(User, user_id)
 
+    async def get_many(self, user_ids: Sequence[int]) -> Sequence[User]:
+        if not user_ids:
+            return []
+        result = await self._session.execute(select(User).where(User.user_id.in_(list(user_ids))))
+        return result.scalars().all()
+
     async def get_by_email(self, email: str) -> User | None:
         result = await self._session.execute(select(User).where(func.lower(User.email) == email.lower()))
         return result.scalar_one_or_none()

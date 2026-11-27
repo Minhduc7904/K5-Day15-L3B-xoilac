@@ -8,6 +8,7 @@ import asyncio
 import socket
 import threading
 import time
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -62,7 +63,7 @@ def live_server(tmp_path):
     while not server.started and time.time() < deadline:
         time.sleep(0.05)
     assert server.started, "uvicorn không khởi động"
-    yield f"http://127.0.0.1:{port}"
+    yield SimpleNamespace(base=f"http://127.0.0.1:{port}", db_url=url)
     server.should_exit = True
     thread.join(timeout=10)
     app.dependency_overrides.clear()
@@ -123,22 +124,23 @@ async def _wait_for(predicate, timeout: float = 5.0) -> bool:
 
 async def test_ticket_connect_rooms_reuse_and_logout(live_server):
     presence = get_presence_registry()
-    async with httpx.AsyncClient(base_url=live_server) as http:
+    base = live_server.base
+    async with httpx.AsyncClient(base_url=base) as http:
         token = await _register(http, "hs01@example.com", new_password())
         ticket = await _ticket(http, token)
 
         conn = Conn()
-        assert await conn.open(live_server, ticket)
+        assert await conn.open(base, ticket)
         rooms = set(sio.rooms(conn.client.get_sid()))
         assert "role:student" in rooms and len({r for r in rooms if r.startswith("user:")}) == 1
         assert "role:admin" not in rooms
         assert await presence.count_online_students() == (1, 1)
 
         reused = Conn()
-        assert not await reused.open(live_server, ticket)  # ticket dùng lần hai
+        assert not await reused.open(base, ticket)  # ticket dùng lần hai
         assert reused.refused == [{"message": "Ticket socket không hợp lệ, đã dùng hoặc đã hết hạn", "data": {"code": "TICKET_INVALID"}}]
         missing = Conn()
-        assert not await missing.open(live_server, None)
+        assert not await missing.open(base, None)
         assert missing.refused[0]["data"] == {"code": "TICKET_MISSING"}
         assert await presence.count_online_students() == (1, 1)
 
@@ -153,12 +155,13 @@ async def test_ticket_connect_rooms_reuse_and_logout(live_server):
 async def test_logout_kicks_only_that_session(live_server):
     """Cùng một học sinh, hai phiên (hai thiết bị). Đăng xuất phiên 1 chỉ ngắt socket của phiên 1."""
     password = new_password()
-    async with httpx.AsyncClient(base_url=live_server) as http:
+    base = live_server.base
+    async with httpx.AsyncClient(base_url=base) as http:
         token_1 = await _register(http, "hs02@example.com", password)
         token_2 = await _login(http, "hs02@example.com", password)
         one, two = Conn(), Conn()
-        assert await one.open(live_server, await _ticket(http, token_1))
-        assert await two.open(live_server, await _ticket(http, token_2))
+        assert await one.open(base, await _ticket(http, token_1))
+        assert await two.open(base, await _ticket(http, token_2))
         assert await get_presence_registry().count_online_students() == (1, 2)
 
         await http.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token_1}"})
@@ -168,3 +171,53 @@ async def test_logout_kicks_only_that_session(live_server):
         assert two.client.connected and two.revoked == []
         assert await get_presence_registry().count_online_students() == (1, 1)
         await two.client.disconnect()
+
+
+async def _make_admin(db_url: str, email: str, password: str) -> None:
+    """Tạo admin thẳng trong DB của server (engine riêng, NullPool)."""
+    from app.repositories.session_repository import SessionRepository
+    from app.repositories.user_repository import UserRepository
+    from app.service.password_service import PasswordService
+    from app.service.token_service import TokenService
+    from app.usecase.auth import AuthUseCase
+
+    engine = create_async_engine(db_url, poolclass=NullPool)
+    async with async_sessionmaker(engine, expire_on_commit=False)() as s:
+        await AuthUseCase(UserRepository(s), SessionRepository(s), PasswordService(), TokenService(), 168).create_user(
+            email, password, "admin"
+        )
+    await engine.dispose()
+
+
+async def test_two_tabs_stats_and_disable_kicks(live_server):
+    """Kịch bản nghiệm thu: A mở 2 tab, B mở 1 → 2 học sinh, 3 kết nối; đóng tab của A → 1, 1;
+    admin khoá B → B nhận session:revoked {reason: disabled}, bị ngắt, thống kê về 0."""
+    base, admin_pw = live_server.base, new_password()
+    await _make_admin(live_server.db_url, "admin@example.com", admin_pw)
+    async with httpx.AsyncClient(base_url=base) as http:
+        token_a = await _register(http, "a@example.com", new_password())
+        token_b = await _register(http, "b@example.com", new_password())
+        admin = {"Authorization": f"Bearer {await _login(http, 'admin@example.com', admin_pw)}"}
+
+        async def stats():
+            r = await http.get("/api/v1/admin/stats/online-students", headers=admin)
+            assert r.status_code == 200, r.text
+            return r.json()["online_students"], r.json()["connections"]
+
+        a1, a2, b1 = Conn(), Conn(), Conn()
+        assert await a1.open(base, await _ticket(http, token_a))
+        assert await a2.open(base, await _ticket(http, token_a))
+        assert await b1.open(base, await _ticket(http, token_b))
+        assert await stats() == (2, 3)
+
+        await a1.client.disconnect()
+        await a2.client.disconnect()
+        assert await _wait_for(lambda: True, 0.3)
+        assert await stats() == (1, 1)
+
+        me_b = await http.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+        r = await http.patch(f"/api/v1/admin/users/{me_b.json()['user_id']}", json={"status": "disabled"}, headers=admin)
+        assert r.status_code == 200
+        assert await _wait_for(lambda: b1.revoked == [{"reason": "disabled"}], 3)
+        assert await _wait_for(lambda: not b1.client.connected, 3)
+        assert await stats() == (0, 0)

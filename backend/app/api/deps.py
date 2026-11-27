@@ -21,6 +21,7 @@ from app.service.socketio_notifier import SocketIONotifier
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
+from app.usecase.online_stats import OnlineStatsUseCase
 from app.usecase.ports import RealtimeNotifier
 from app.usecase.realtime import RealtimeUseCase
 from app.usecase.sample_files import SampleFileUseCase
@@ -124,6 +125,13 @@ def get_realtime_usecase(
 
 
 RealtimeUseCaseDep = Annotated[RealtimeUseCase, Depends(get_realtime_usecase)]
+
+
+def get_online_stats_usecase(session: SessionDep, presence: PresenceDep) -> OnlineStatsUseCase:
+    return OnlineStatsUseCase(presence=presence, users=UserRepository(session))
+
+
+OnlineStatsUseCaseDep = Annotated[OnlineStatsUseCase, Depends(get_online_stats_usecase)]
 
 
 def realtime_scope(app: FastAPI) -> RealtimeScope:
