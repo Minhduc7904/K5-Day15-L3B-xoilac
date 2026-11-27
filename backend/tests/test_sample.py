@@ -4,6 +4,12 @@ async def test_health(client):
     assert r.json() == {"status": "ok", "database": True, "storage": True}
 
 
+async def test_health_live(client):
+    r = await client.get("/api/v1/health/live")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok", "version": "0.1.0"}
+
+
 async def test_sample_item_roundtrip(client):
     created = await client.post("/api/v1/sample-items", json={"name": "  đề mẫu  "})
     assert created.status_code == 201

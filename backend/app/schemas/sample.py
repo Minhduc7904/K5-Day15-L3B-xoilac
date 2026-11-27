@@ -25,3 +25,8 @@ class HealthOut(BaseModel):
     status: str
     database: bool
     storage: bool
+
+
+class LiveOut(BaseModel):
+    status: str
+    version: str
