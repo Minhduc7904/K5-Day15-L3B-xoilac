@@ -32,6 +32,9 @@ export const authSlice = createSlice({
       state.user = action.payload;
       state.status = action.payload ? 'authenticated' : 'guest';
     },
+    studentDisplayNameChanged(state, action: PayloadAction<{ userId: number; name: string | null }>) {
+      if (state.user?.user_id === action.payload.userId) state.user.display_name = action.payload.name;
+    },
     signedOut(state, action: PayloadAction<SignOutReason | undefined>) {
       state.user = null;
       state.status = 'guest';
@@ -40,4 +43,4 @@ export const authSlice = createSlice({
   },
 });
 
-export const { sessionChecked, signedIn, signedOut } = authSlice.actions;
+export const { sessionChecked, signedIn, signedOut, studentDisplayNameChanged } = authSlice.actions;

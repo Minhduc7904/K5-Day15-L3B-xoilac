@@ -114,35 +114,3 @@ export interface StructureProposal {
   durationMinutes: number;
   rows: StructureRow[];
 }
-
-export interface StudentProfile {
-  name: string;
-  email: string;
-  grade: 10 | 11 | 12;
-  school: string;
-  goal: string;
-  weeklyTarget: number;
-  reminders: boolean;
-  joinedAt: string;
-}
-
-/**
- * Credit dùng để tạo đề với AI: mỗi lần agent dựng đề trừ 1 credit, đầu mỗi tháng được cộng lại hạn mức.
- * Bản mock tính số dư từ các đề AI đã tạo trong tháng; backend thật sẽ trả về từ bảng giao dịch.
- */
-export interface CreditLedgerEntry {
-  id: string;
-  date: string;
-  label: string;
-  /** Dương là cộng, âm là trừ. */
-  amount: number;
-}
-
-export interface CreditSummary {
-  balance: number;
-  monthlyQuota: number;
-  usedThisMonth: number;
-  /** Ngày hạn mức được làm mới. */
-  resetsAt: string;
-  history: CreditLedgerEntry[];
-}

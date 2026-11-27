@@ -12,7 +12,6 @@ import {
   Pencil,
   Plus,
   RotateCcw,
-  Save,
   School,
   Star,
   Target,
@@ -20,21 +19,20 @@ import {
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import Image from 'next/image';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/feedback';
-import { FormField } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { mockMode } from '@/lib/config';
 import { studyApi } from '../api';
 import { Flame } from '../components/flame';
 import { ErrorState, PageContainer } from '../components/page-states';
-import { formatDuration, longDate, relativeDay } from '../format';
+import { formatDuration, longDate } from '../format';
 import { formatScore } from '../grading';
-import type { CreditSummary, DashboardData, StudentProfile } from '../types';
+import type { DashboardData } from '../types';
+import { ProfileForm } from './profile-form';
+import { EXAM_PERIODS, studentAccountApi, type CreditEntry, type CreditSummary, type StudentProfile } from './student-account-api';
+import { useStudentAccount } from './student-account-provider';
 import { useResource } from '../use-resource';
 
 const TABS = [
@@ -48,8 +46,18 @@ const hashTab: Record<string, Tab> = { '#credit': 'credit', '#settings': 'settin
 const card = 'rounded-2xl bg-background p-5 shadow-soft';
 
 export function ProfilePage() {
-  const res = useResource(() => studyApi.getProfile(), 'profile');
-  const credits = useResource(() => studyApi.getCredits(), 'profile-credits');
+  const account = useStudentAccount();
+  const res = useResource(() => studyApi.getDashboard(), 'profile-dashboard');
+  const profile = account?.status?.profile;
+  if (mockMode) {
+    return (
+      <PageContainer className="grid gap-5 pt-6">
+        <h1 className="text-h1">Hồ sơ</h1>
+        <p className="text-body text-muted-foreground">Dùng chế độ kết nối API để xem hồ sơ và credit.</p>
+        <ResetMock />
+      </PageContainer>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100dvh-var(--student-header-height))] bg-surface">
@@ -64,16 +72,14 @@ export function ProfilePage() {
           </div>
         )}
         {res.status === 'error' && <ErrorState onRetry={res.reload} />}
-        {res.status === 'ready' && (
-          <Profile initial={res.data.profile} dashboard={res.data.dashboard} credits={credits.status === 'ready' ? credits.data : null} />
-        )}
+        {res.status === 'ready' && profile && <Profile profile={profile} dashboard={res.data} />}
       </PageContainer>
     </div>
   );
 }
 
-function Profile({ initial, dashboard, credits }: { initial: StudentProfile; dashboard: DashboardData; credits: CreditSummary | null }) {
-  const [profile, setProfile] = useState(initial);
+function Profile({ profile, dashboard }: { profile: StudentProfile; dashboard: DashboardData }) {
+  const credits = useStudentAccount()?.credits ?? null;
   const [tab, setTab] = useState<Tab>('activity');
 
   // Mở thẳng tab theo #credit / #settings (vd bấm số credit trên thanh đầu trang).
@@ -106,18 +112,13 @@ function Profile({ initial, dashboard, credits }: { initial: StudentProfile; das
         <div id="profile-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="grid grid-cols-[minmax(0,1fr)] gap-5">
           {tab === 'activity' && (
             <>
-              <WeeklyGoal days={dashboard.streak.days} target={profile.weeklyTarget} />
+              <WeeklyGoal days={dashboard.streak.days} target={profile.study_days.length} />
               <Heatmap days={dashboard.streak.days} current={dashboard.streak.current} best={dashboard.streak.best} />
               <Totals dashboard={dashboard} />
             </>
           )}
-          {tab === 'credit' && <CreditPanel credits={credits} />}
-          {tab === 'settings' && (
-            <>
-              <ProfileForm profile={profile} onSaved={setProfile} />
-              {mockMode && <ResetMock />}
-            </>
-          )}
+          {tab === 'credit' && <CreditPanel />}
+          {tab === 'settings' && <ProfileForm profile={profile} />}
         </div>
       </div>
     </>
@@ -134,7 +135,8 @@ function Cover({ profile, dashboard, credits, tab, onTab }: {
   onTab: (t: Tab) => void;
 }) {
   const reduce = useReducedMotion();
-  const initial = profile.name.trim().charAt(0).toLocaleUpperCase('vi') || '?';
+  const name = profile.display_name || profile.email;
+  const initial = name.trim().charAt(0).toLocaleUpperCase('vi') || '?';
 
   return (
     <section aria-labelledby="profile-name-title" className="overflow-hidden rounded-3xl bg-background shadow-soft">
@@ -161,7 +163,7 @@ function Cover({ profile, dashboard, credits, tab, onTab }: {
             {initial}
           </span>
           <div className="grid min-w-0 flex-1 gap-1 sm:min-w-[16rem] sm:pb-3">
-            <h1 id="profile-name-title" className="text-h1 break-words text-foreground">{profile.name}</h1>
+            <h1 id="profile-name-title" className="text-h1 break-words text-foreground">{name}</h1>
             <p className="flex flex-wrap gap-x-3 gap-y-1 text-label text-muted-foreground">
               <span><b className="font-semibold text-foreground tabular-nums">{dashboard.totals.exams}</b> đề đã làm</span>
               <span><b className="font-semibold text-foreground tabular-nums">{dashboard.streak.current}</b> ngày liên tiếp</span>
@@ -207,11 +209,11 @@ function Cover({ profile, dashboard, credits, tab, onTab }: {
 
 function Intro({ profile, onEdit }: { profile: StudentProfile; onEdit: () => void }) {
   const rows: Array<{ Icon: typeof Target; text: ReactNode }> = [
-    { Icon: Target, text: <>Mục tiêu: <b className="font-semibold text-foreground">{profile.goal || 'chưa đặt'}</b></> },
-    { Icon: School, text: <>Học tại <b className="font-semibold text-foreground">{profile.school || 'chưa nhập trường'}</b></> },
+    { Icon: Target, text: <>Mục tiêu <b className="font-semibold text-foreground">{profile.target_score}+ · {EXAM_PERIODS[profile.exam_period]}</b></> },
+    { Icon: School, text: <>Học tại <b className="font-semibold text-foreground">{profile.school_name}</b></> },
     { Icon: GraduationCap, text: <>Lớp <b className="font-semibold text-foreground">{profile.grade}</b></> },
     { Icon: Mail, text: <span className="break-all">{profile.email}</span> },
-    { Icon: CalendarDays, text: <>Tham gia {longDate(profile.joinedAt)}</> },
+    { Icon: CalendarDays, text: <>Tham gia {longDate(profile.joined_at)}</> },
   ];
   return (
     <section aria-labelledby="intro-title" className={card}>
@@ -233,7 +235,7 @@ function Intro({ profile, onEdit }: { profile: StudentProfile; onEdit: () => voi
 
 function CreditMini({ credits, onOpen }: { credits: CreditSummary | null; onOpen: () => void }) {
   if (!credits) return <Skeleton className="h-32 rounded-2xl" />;
-  const ratio = credits.balance / credits.monthlyQuota;
+  const ratio = credits.balance / credits.limit;
   return (
     <section aria-labelledby="credit-mini-title" className={card}>
       <div className="flex items-center justify-between gap-3">
@@ -245,10 +247,10 @@ function CreditMini({ credits, onOpen }: { credits: CreditSummary | null; onOpen
       <p className="mt-2 flex items-baseline gap-1.5">
         <Coins className="size-5 self-center text-warning" aria-hidden="true" />
         <b className="text-h2 font-bold text-foreground tabular-nums">{credits.balance}</b>
-        <span className="text-label text-muted-foreground">/ {credits.monthlyQuota} còn lại</span>
+        <span className="text-label text-muted-foreground">/ {credits.limit} còn lại</span>
       </p>
       <Meter ratio={ratio} low={credits.balance < 100} className="mt-2" label="Credit còn lại" />
-      <p className="mt-2 text-caption text-muted-foreground">Làm mới ngày {new Date(credits.resetsAt).toLocaleDateString('vi-VN')}</p>
+      <p className="mt-2 text-caption text-muted-foreground">Cộng tối đa {credits.daily_grant} credit mỗi ngày.</p>
     </section>
   );
 }
@@ -391,62 +393,93 @@ function Totals({ dashboard }: { dashboard: DashboardData }) {
 
 /* ---------------- Tab Credit ---------------- */
 
-function CreditPanel({ credits }: { credits: CreditSummary | null }) {
-  if (!credits) return <Skeleton className="h-80 rounded-2xl" />;
-  const reset = new Date(credits.resetsAt).toLocaleDateString('vi-VN');
+const creditDate = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' });
+const creditReason: Record<string, string> = {
+  initial_grant: 'Credit khởi tạo',
+  daily_grant: 'Credit hằng ngày',
+};
+
+function CreditPanel() {
+  const account = useStudentAccount();
+  const credits = account?.credits;
+  const [older, setOlder] = useState<{ entries: CreditEntry[]; next: number | null }>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  if (!credits) {
+    return account?.creditsError
+      ? <ErrorState onRetry={account.loadCredits} />
+      : <Skeleton className="h-80 rounded-2xl" />;
+  }
+  const cursor = older ? older.next : credits.next_before_id;
+  const latestPage = credits.history;
+  const history = [...new Map([...latestPage, ...(older?.entries ?? [])].map((row) => [row.id, row])).values()]
+    .sort((a, b) => b.id - a.id);
+
+  async function loadOlder() {
+    if (cursor == null || loading) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const result = await studentAccountApi.getCredits(cursor);
+      setOlder((previous) => ({
+        entries: [...(previous?.entries ?? latestPage), ...result.history],
+        next: result.next_before_id,
+      }));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <>
       <section id="credit" aria-labelledby="credit-title" className={cn(card, 'grid gap-4 sm:p-6')}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 id="credit-title" className="text-h3 text-foreground">Credit tạo đề</h2>
-            <p className="text-caption text-muted-foreground">Mỗi lần agent dựng một đề trừ 1 credit. Làm bài, làm lại đề cũ không tốn credit.</p>
+            <h2 id="credit-title" className="text-h3">Credit</h2>
+            <p className="text-caption text-muted-foreground">
+              Cộng tối đa {credits.daily_grant} credit mỗi ngày từ 00:00 giờ Việt Nam, đến khi đủ {credits.limit}.
+            </p>
           </div>
           <p className="flex items-baseline gap-1.5">
             <Coins className="size-6 self-center text-warning" aria-hidden="true" />
             <b className="text-display leading-none font-bold text-foreground tabular-nums">{credits.balance}</b>
-            <span className="text-body text-muted-foreground">/ {credits.monthlyQuota}</span>
+            <span className="text-body text-muted-foreground">/ {credits.limit}</span>
           </p>
         </div>
-        <Meter ratio={credits.balance / credits.monthlyQuota} low={credits.balance < 100} label="Credit còn lại" thick />
-        <dl className="grid grid-cols-3 gap-3 text-center">
-          {[
-            { k: 'Hạn mức tháng', v: credits.monthlyQuota },
-            { k: 'Đã dùng tháng này', v: credits.usedThisMonth },
-            { k: 'Làm mới', v: reset },
-          ].map(({ k, v }) => (
-            <div key={k} className="rounded-xl bg-surface px-2 py-3">
-              <dt className="text-caption text-muted-foreground">{k}</dt>
-              <dd className="text-body-lg font-bold text-foreground tabular-nums">{v}</dd>
-            </div>
-          ))}
-        </dl>
-        {mockMode && <p className="text-caption text-muted-foreground">Bản mock: số dư tính từ các đề AI bạn đã tạo trong tháng, hạn mức 500 là số tự đặt.</p>}
+        <Meter ratio={credits.balance / credits.limit} low={credits.balance < 100} label="Credit còn lại" thick />
       </section>
 
       <section aria-labelledby="ledger-title" className={card}>
-        <h2 id="ledger-title" className="mb-2 text-h3 text-foreground">Lịch sử credit</h2>
+        <h2 id="ledger-title" className="mb-2 text-h3">Lịch sử credit</h2>
+        {history.length === 0 && <p className="text-label text-muted-foreground">Chưa có giao dịch.</p>}
         <ol className="divide-y divide-border">
-          {credits.history.map((h) => (
-            <li key={h.id} className="flex items-center gap-3 py-2.5">
-              <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', h.amount > 0 ? 'bg-success-subtle text-success' : 'bg-surface text-muted-foreground')}>
-                {h.amount > 0 ? <Plus className="size-4" aria-hidden="true" /> : <Coins className="size-4" aria-hidden="true" />}
+          {history.map((entry) => (
+            <li key={entry.id} className="flex items-center gap-3 py-2.5">
+              <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', entry.delta > 0 ? 'bg-success-subtle text-success' : 'bg-surface text-muted-foreground')}>
+                {entry.delta > 0 ? <Plus className="size-4" aria-hidden="true" /> : <Coins className="size-4" aria-hidden="true" />}
               </span>
               <span className="grid min-w-0 flex-1">
-                <span className="truncate text-label font-medium text-foreground">{h.label}</span>
-                <span className="text-caption text-muted-foreground">{relativeDay(h.date)}</span>
+                <span className="truncate text-label font-medium">{creditReason[entry.reason] ?? 'Điều chỉnh credit'}</span>
+                <span className="text-caption text-muted-foreground">{creditDate.format(new Date(entry.created_at))} · Số dư {entry.balance_after}</span>
               </span>
-              <span className={cn('text-label font-bold tabular-nums', h.amount > 0 ? 'text-success' : 'text-foreground')}>
-                {h.amount > 0 ? `+${h.amount}` : h.amount}
+              <span className={cn('text-label font-bold tabular-nums', entry.delta > 0 && 'text-success')}>
+                {entry.delta > 0 ? '+' : ''}{entry.delta}
               </span>
             </li>
           ))}
         </ol>
+        {error && <p role="alert" className="text-label text-danger">Chưa tải được lịch sử.</p>}
+        {cursor != null && (
+          <Button variant="outline" className="mt-3" loading={loading} onClick={loadOlder}>
+            {error ? 'Thử lại' : 'Xem thêm giao dịch'}
+          </Button>
+        )}
       </section>
     </>
   );
 }
-
 function Meter({ ratio, label, className, thick, low }: { ratio: number; label: string; className?: string; thick?: boolean; low?: boolean }) {
   const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
   return (
@@ -468,113 +501,13 @@ function Meter({ ratio, label, className, thick, low }: { ratio: number; label: 
   );
 }
 
-/* ---------------- Tab Cài đặt ---------------- */
-
-function ProfileForm({ profile, onSaved }: { profile: StudentProfile; onSaved: (p: StudentProfile) => void }) {
-  const [values, setValues] = useState(profile);
-  const [errors, setErrors] = useState<{ name?: string }>({});
-  const [saving, setSaving] = useState(false);
-  const toast = useToast();
-  const dirty = JSON.stringify(values) !== JSON.stringify(profile);
-
-  useEffect(() => setValues(profile), [profile]);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!values.name.trim()) {
-      setErrors({ name: 'Nhập tên hiển thị của bạn.' });
-      document.getElementById('profile-name')?.focus();
-      return;
-    }
-    setErrors({});
-    setSaving(true);
-    try {
-      const saved = await studyApi.updateProfile({ ...values, name: values.name.trim() });
-      onSaved(saved);
-      toast({ tone: 'success', title: 'Đã lưu hồ sơ' });
-    } catch {
-      toast({ tone: 'danger', title: 'Chưa lưu được', description: 'Thử lại sau nhé.' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} noValidate aria-labelledby="form-title" className={cn(card, 'grid gap-5 sm:p-6')}>
-      <h2 id="form-title" className="text-h3 text-foreground">Thông tin & cài đặt</h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Tên hiển thị" required error={errors.name} id="profile-name">
-          {(field) => <Input {...field} autoComplete="nickname" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />}
-        </FormField>
-        <FormField label="Lớp">
-          {({ id, 'aria-describedby': describedBy }) => (
-            <select
-              id={id}
-              aria-describedby={describedBy}
-              value={values.grade}
-              onChange={(e) => setValues({ ...values, grade: Number(e.target.value) as StudentProfile['grade'] })}
-              className="h-11 w-full rounded-xl border border-input bg-background px-3 text-body text-foreground outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/20"
-            >
-              {[10, 11, 12].map((g) => (
-                <option key={g} value={g}>Lớp {g}</option>
-              ))}
-            </select>
-          )}
-        </FormField>
-        <FormField label="Trường">
-          {(field) => <Input {...field} autoComplete="organization" value={values.school} onChange={(e) => setValues({ ...values, school: e.target.value })} />}
-        </FormField>
-        <FormField label="Mục tiêu">
-          {(field) => <Input {...field} value={values.goal} placeholder="Vd: Đạt 8+ môn Toán" onChange={(e) => setValues({ ...values, goal: e.target.value })} />}
-        </FormField>
-      </div>
-
-      <fieldset className="grid gap-2">
-        <legend className="mb-2 text-label font-semibold text-foreground">Số ngày học mỗi tuần</legend>
-        <div className="flex flex-wrap gap-1.5">
-          {[2, 3, 4, 5, 6, 7].map((n) => (
-            <label
-              key={n}
-              className={cn(
-                'flex size-11 cursor-pointer items-center justify-center rounded-xl border text-label font-bold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring',
-                values.weeklyTarget === n ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary/50',
-              )}
-            >
-              <input type="radio" name="weekly" className="sr-only" checked={values.weeklyTarget === n} onChange={() => setValues({ ...values, weeklyTarget: n })} />
-              {n}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <Switch
-        label="Nhắc học mỗi tối"
-        description="Gửi lời nhắc lúc 20:00 nếu hôm đó bạn chưa học (chưa gửi thật ở bản mock)."
-        checked={values.reminders}
-        onCheckedChange={(v) => setValues({ ...values, reminders: v })}
-      />
-
-      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-        <Button type="submit" loading={saving} disabled={!dirty} leftIcon={<Save aria-hidden="true" />}>
-          {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
-        </Button>
-        {dirty && (
-          <Button variant="ghost" onClick={() => setValues(profile)} disabled={saving}>
-            Huỷ
-          </Button>
-        )}
-      </div>
-    </form>
-  );
-}
-
 function ResetMock() {
   const [asking, setAsking] = useState(false);
   return (
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-border p-5">
       <div className="grid gap-0.5">
         <h2 className="text-label font-semibold text-foreground">Dữ liệu mẫu (chế độ mock)</h2>
-        <p className="text-caption text-muted-foreground">Xoá các đề, lượt làm bài và hồ sơ bạn tạo thêm, quay về dữ liệu ban đầu để demo lại.</p>
+        <p className="text-caption text-muted-foreground">Xoá các đề và lượt làm bài bạn tạo thêm, quay về dữ liệu ban đầu để demo lại.</p>
       </div>
       {asking ? (
         <div className="flex gap-2">

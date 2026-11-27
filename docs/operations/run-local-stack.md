@@ -20,7 +20,7 @@ Dành cho thành viên nhóm cần dựng PostgreSQL, MinIO và backend trên m�
 
 Đổi cổng hoặc mật khẩu bằng biến môi trường (xem đầu `docker-compose.yml`). Backend đọc `backend/.env`, mẫu ở `backend/.env.example`. Giá trị trong `.env` phải khớp compose.
 
-Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). `CORS_ORIGINS` mặc định rỗng (cả trong `backend/.env.example`); chỉ đặt `http://localhost:3000` khi chạy frontend dev không qua rewrites. Trên prod, các biến này và `ADMIN_*` nằm trong `/opt/examind/prod.env`, xem [deploy-backend-ci-cd.md](deploy-backend-ci-cd.md#biến-trong-prodenv).
+Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). Đặt `CORS_ORIGINS=http://localhost:3000` để frontend nối Socket.IO trực tiếp, kể cả khi REST đi qua rewrite. Trên prod, các biến này và `ADMIN_*` nằm trong `/opt/examind/prod.env`, xem [deploy-backend-ci-cd.md](deploy-backend-ci-cd.md#biến-trong-prodenv).
 
 ## Các bước thực hiện
 
@@ -103,6 +103,18 @@ curl http://localhost:8000/api/v1/sample-files/<key trả về ở lệnh trên>
 Test tự động không cần Docker (dùng SQLite và MinIO giả): `cd backend && pytest`.
 
 Giới hạn xác minh: các bước trên đã chạy trên Windows 11 với Docker 29.3 ngày 2026-11-27; phần admin mặc định (bước 1–2, 5–6) chạy với Docker 28.4 ngày 2026-11-28. Chưa thử macOS/Linux.
+
+## Chạy worker học sinh
+
+Sau khi PostgreSQL đã chạy migration, mở terminal riêng trong `backend/` và kích hoạt venv như khi chạy API.
+
+```bash
+python -m app.worker
+python -m app.worker --once --job daily-credit
+python -m app.worker --once --job study-reminders
+```
+
+`--once` chạy một lượt đến hạn rồi thoát. `daily-credit` xử lý theo ngày Việt Nam. `study-reminders` chỉ chạy khi `EMAIL_PROVIDER=gmail`. Khi thử gửi thật, dùng tài khoản và hộp thư bạn kiểm soát, bật nhắc và chọn giờ đã đến trong ngày hiện tại. Nếu chạy UI thật, giữ `NEXT_PUBLIC_MOCK_MODE=false` và đặt `NEXT_PUBLIC_SOCKET_URL=http://localhost:8000`.
 
 ## Xử lý lỗi
 

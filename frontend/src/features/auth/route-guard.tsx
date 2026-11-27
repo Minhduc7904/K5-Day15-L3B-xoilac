@@ -11,6 +11,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppSelector } from '@/store';
+import { mockMode } from '@/lib/config';
 import type { AuthState } from './auth-slice';
 import type { User } from './types';
 
@@ -20,7 +21,7 @@ const SHARED_PATHS = ['/design-system'];
 
 const under = (path: string, base: string) => path === base || path.startsWith(`${base}/`);
 
-export const homeFor = (user: Pick<User, 'role'>) => (user.role === 'admin' ? '/admin' : '/');
+export const homeFor = (user: Pick<User, 'role'>) => (user.role === 'admin' ? '/admin' : '/dashboard');
 
 const isAuthPage = (path: string) => AUTH_PATHS.some((base) => under(path, base));
 /**
@@ -39,7 +40,7 @@ export function guardRedirect(path: string, auth: AuthState): string | null | un
   if (SHARED_PATHS.some((base) => under(path, base))) return null;
   const inAdmin = under(path, '/admin');
   if (user.role === 'admin' && !inAdmin) return '/admin';
-  if (user.role !== 'admin' && inAdmin) return '/';
+  if (user.role === 'student' && (inAdmin || (mockMode && path === '/profile/setup'))) return homeFor(user);
   return null;
 }
 
@@ -50,7 +51,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const target = guardRedirect(path, auth);
   const firstPath = useRef(true);
 
-  // Sang trang khác (vd đăng nhập xong về `/`) thì luôn bắt đầu từ đầu trang, không giữ vị trí cuộn của
+  // Sang trang khác (vd đăng nhập xong về `/dashboard`) thì luôn bắt đầu từ đầu trang, không giữ vị trí cuộn của
   // trang trước. Bỏ qua lần đầu để không phá việc trình duyệt nhảy tới `#neo` khi mở thẳng link.
   useEffect(() => {
     if (firstPath.current) {

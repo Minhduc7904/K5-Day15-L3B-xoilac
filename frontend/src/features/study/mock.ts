@@ -1,12 +1,12 @@
 /**
- * API giả lập cho phần học sinh, chạy trong trình duyệt. Dữ liệu người dùng tạo thêm (đề, lượt làm,
- * hồ sơ) lưu ở localStorage key `examind:mock-study`, gộp với dữ liệu mẫu trong `fixtures/`.
+ * Đề và lượt làm mẫu chạy trong trình duyệt. Dữ liệu tạo thêm lưu ở localStorage
+ * key `examind:mock-study`, gộp với fixture trong `fixtures/`.
  * Xoá bằng `resetMockData()` (nút "Khôi phục dữ liệu mẫu" ở trang hồ sơ).
  */
 import { allocate, defaultPlan, parentOf, planFromRows, planTotal, rescaleChapters, rescaleTypes, MAX_QUESTIONS, type ExamPlan } from './create/plan';
 import { chapterOf } from './fixtures/chapters';
 import { questions } from './fixtures/questions';
-import { seedAttempts, seedExams, seedProfile, seedStudyDays } from './fixtures/seed';
+import { seedAttempts, seedExams, seedStudyDays } from './fixtures/seed';
 import { gradeExam } from './grading';
 import type {
   Answer,
@@ -17,30 +17,27 @@ import type {
   ExamSection,
   ExamSummary,
   PublicQuestion,
-  CreditLedgerEntry,
-  CreditSummary,
   Question,
   StructureProposal,
-  StudentProfile,
 } from './types';
 
 const STORAGE_KEY = 'examind:mock-study';
-const MONTHLY_CREDITS = 500;
 const DAY = 24 * 60 * 60 * 1000;
 
 interface Store {
   exams: Exam[];
   attempts: Attempt[];
-  profile: StudentProfile | null;
 }
 
-const empty = (): Store => ({ exams: [], attempts: [], profile: null });
+const empty = (): Store => ({ exams: [], attempts: [] });
 
 function load(): Store {
   if (typeof window === 'undefined') return empty();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...empty(), ...(JSON.parse(raw) as Store) } : empty();
+    if (!raw) return empty();
+    const { exams = [], attempts = [] } = JSON.parse(raw) as Partial<Store>;
+    return { exams, attempts };
   } catch {
     return empty();
   }
@@ -433,35 +430,6 @@ export const mockStudyApi = {
     if (!exam) throw new NotFoundError('đề thi');
     const previous = allAttempts(exams).filter((a) => a.examId === exam.id && a.submittedAt < attempt.submittedAt).at(-1) ?? null;
     return { attempt, exam, graded: gradeExam(exam, questionsById, attempt.answers), previous };
-  },
-
-  async getProfile(): Promise<{ profile: StudentProfile; dashboard: DashboardData }> {
-    const [dashboard] = await Promise.all([mockStudyApi.getDashboard()]);
-    return { profile: load().profile ?? seedProfile(), dashboard };
-  },
-
-  async updateProfile(profile: StudentProfile): Promise<StudentProfile> {
-    await delay(700);
-    const store = load();
-    store.profile = profile;
-    save(store);
-    return profile;
-  },
-
-  /** Mỗi đề AI tạo trong tháng trừ 1 credit, hạn mức 30 credit/tháng (số tự đặt cho bản mock). */
-  async getCredits(): Promise<CreditSummary> {
-    await delay(200);
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const resetsAt = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-    const used = allExams()
-      .filter((e) => e.source === 'ai' && Date.parse(e.createdAt) >= monthStart.getTime())
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    const history: CreditLedgerEntry[] = [
-      ...used.map((e) => ({ id: `use-${e.id}`, date: e.createdAt, label: `Tạo đề “${e.title}”`, amount: -1 })),
-      { id: `grant-${monthStart.toISOString()}`, date: monthStart.toISOString(), label: `Hạn mức tháng ${now.getMonth() + 1}`, amount: MONTHLY_CREDITS },
-    ];
-    return { balance: Math.max(0, MONTHLY_CREDITS - used.length), monthlyQuota: MONTHLY_CREDITS, usedThisMonth: used.length, resetsAt, history };
   },
 
   resetMockData() {

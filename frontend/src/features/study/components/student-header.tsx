@@ -14,8 +14,7 @@ import { cn } from '@/lib/cn';
 import { mockMode } from '@/lib/config';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useAppSelector } from '@/store';
-import { studyApi } from '../api';
-import { useResource } from '../use-resource';
+import { useStudentAccount } from '../profile/student-account-provider';
 import styles from './student-header.module.css';
 
 const navigation = [
@@ -256,17 +255,22 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
 
 /** Số credit tạo đề còn lại. Bấm để xem chi tiết ở trang hồ sơ. */
 function CreditPill() {
-  const res = useResource(() => studyApi.getCredits(), 'credits');
-  if (res.status !== 'ready') return <Skeleton className="h-9 w-16 rounded-full" />;
-  const { balance, monthlyQuota, resetsAt } = res.data;
-  // Dưới 100 credit (kể cả hết) thì chuyển xám để báo sắp cạn.
+  const account = useStudentAccount();
+  if (!account) return null;
+  if (!account.credits) {
+    return account.creditsError ? (
+      <button type="button" className={cn('px-2 text-label text-muted-foreground', focusRing)} onClick={account.loadCredits}>
+        Tải lại credit
+      </button>
+    ) : <Skeleton className="h-9 w-16 rounded-full" />;
+  }
+  const { balance, limit } = account.credits;
   const low = balance < 100;
-  const reset = new Date(resetsAt).toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
   return (
     <Link
       href="/profile#credit"
-      title={`Còn ${balance}/${monthlyQuota} credit tạo đề, làm mới ngày ${reset}`}
-      aria-label={`Còn ${balance} trên ${monthlyQuota} credit tạo đề. Xem chi tiết`}
+      title={`Còn ${balance}/${limit} credit`}
+      aria-label={`Còn ${balance} trên ${limit} credit. Xem chi tiết`}
       className={cn(
         'mr-1 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-label font-bold tabular-nums transition-colors',
         low ? 'border-border bg-surface-muted text-muted-foreground hover:border-muted-foreground/50' : 'border-ember/50 bg-warning-subtle text-warning hover:border-warning/60',

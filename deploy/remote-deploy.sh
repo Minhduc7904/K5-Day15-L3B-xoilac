@@ -105,7 +105,7 @@ fi
 
 echo "== Deploy lỗi, in log rồi quay lại $(git rev-parse --short "$PREV")"
 compose ps || true
-compose logs --tail=60 backend nginx db-init minio-init || true
+compose logs --tail=60 backend student-worker nginx db-init minio-init || true
 git reset --hard "$PREV"
 apply || true
 healthy && echo "== Đã quay lại bản trước, dịch vụ chạy lại" || echo "== Bản trước cũng không khoẻ, cần kiểm tay"

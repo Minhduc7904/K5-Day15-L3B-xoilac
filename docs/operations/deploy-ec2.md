@@ -37,7 +37,7 @@ Ngày 27/11/2026 instance được gắn **Elastic IP** `54.79.136.46` (thay cho
 
    ```text
    API:    https://examind.duckdns.org/api/v1
-   Socket: wss://examind.duckdns.org   (đường dẫn /api/socket.io, issue #20)
+   Socket: wss://examind.duckdns.org   (đường dẫn /api/socket.io, issue #36)
    ```
 
    Chứng chỉ Let's Encrypt do `deploy/remote-deploy.sh` xin ở lần deploy đầu và container `certbot` tự gia hạn. Cần cả cổng **80** (xác minh tên miền) và **443** mở trong Security Group. Cổng 80 vẫn phục vụ API qua HTTP để kiểm sức khoẻ. Frontend gọi từ origin khác thì cho phép origin đó trong `CORS_ORIGINS` của `/opt/examind/prod.env` trên VPS (nhiều origin phân tách bằng dấu phẩy).

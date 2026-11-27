@@ -10,6 +10,8 @@ from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session, get_sessionmaker
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
+from app.repositories.credits import CreditRepository
+from app.repositories.student_profiles import StudentProfileRepository
 from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.exam_template_repository import ExamTemplateRepository
 from app.repositories.pdf_imports import PdfImportRepository
@@ -39,6 +41,7 @@ from app.usecase.pdf_imports import PdfImportUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 from app.usecase.student_auth import StudentAuthUseCase
+from app.usecase.student_profile import StudentProfileUseCase
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -92,6 +95,7 @@ def get_token_service() -> TokenService:
 
 
 def get_auth_usecase(
+    request: Request,
     session: SessionDep,
     settings: SettingsDep,
     passwords: Annotated[PasswordService, Depends(get_password_service)],
@@ -103,6 +107,7 @@ def get_auth_usecase(
         passwords=passwords,
         tokens=tokens,
         session_ttl_hours=settings.session_ttl_hours,
+        realtime=request.app.state.realtime,
     )
 
 
@@ -187,6 +192,13 @@ def require_role(*roles: str):
 
 AdminDep = Annotated[CurrentUser, Depends(require_role("admin"))]
 StudentDep = Annotated[CurrentUser, Depends(require_role("student"))]
+
+
+def get_student_profile(session: SessionDep) -> StudentProfileUseCase:
+    return StudentProfileUseCase(StudentProfileRepository(session), CreditRepository(session))
+
+
+StudentProfileDep = Annotated[StudentProfileUseCase, Depends(get_student_profile)]
 
 
 @lru_cache

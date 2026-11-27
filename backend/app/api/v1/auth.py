@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from app.api.cookies import clear_session_cookie, set_session_cookie
 from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep, StudentAuthDep, get_session_token
 from app.api.errors import to_api_error
+from app.service.socket_tickets import TICKET_TTL_SECONDS
 from app.schemas.auth import (
     ErrorOut,
     LoginIn,
@@ -104,6 +105,15 @@ async def logout(
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookie(response, settings)
     return response
+
+
+@router.post("/socket-ticket", responses=_SESSION_ERRORS)
+async def socket_ticket(current: CurrentUserDep, request: Request, response: Response):
+    _no_store(response)
+    return {
+        "ticket": request.app.state.realtime.tickets.issue(current.session_id),
+        "expires_in": TICKET_TTL_SECONDS,
+    }
 
 
 @router.get("/me", response_model=UserOut, responses=_SESSION_ERRORS)

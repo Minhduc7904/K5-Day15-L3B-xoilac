@@ -12,12 +12,13 @@ Dành cho thành viên chạy bộ khung frontend local hoặc cấu hình proje
 
 | Biến | Giá trị |
 | --- | --- |
+| `NEXT_PUBLIC_SOCKET_URL` | Origin WSS của backend. Đặt `https://examind.duckdns.org` cho Production, `http://localhost:8000` cho local |
 | `NEXT_PUBLIC_MOCK_MODE` | Đặt `false` cho Production để dùng API thật. Đặt `true` để thử dữ liệu giả |
 | `EXAMIND_API_ORIGIN` | Origin của backend. Mặc định `http://localhost:8000` trên máy, `https://examind.duckdns.org` trên Vercel |
 
 Next.js chuyển tiếp `/api/v1/*` tới backend để trình duyệt nhận cookie theo origin frontend. Google Sign-In trả trình duyệt về `FRONTEND_URL` của môi trường backend. Kiểm tra OAuth trên origin này.
 
-Các biến `NEXT_PUBLIC_*` được đưa vào bundle trình duyệt. Tạo deployment mới sau khi đổi giá trị.
+Socket nối trực tiếp tới backend. Thêm domain deploy Vercel vào `CORS_ORIGINS` của backend trước khi kiểm tra. Các biến `NEXT_PUBLIC_*` được đưa vào bundle trình duyệt. Tạo deployment mới sau khi đổi giá trị.
 
 ## Các bước thực hiện
 
