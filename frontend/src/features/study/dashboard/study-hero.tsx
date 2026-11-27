@@ -132,7 +132,7 @@ function QuickCreate({ weakest }: { weakest?: string }) {
   }
 
   return (
-    <div className="grid min-w-0 gap-3">
+    <div data-tour="quick-create" className="grid min-w-0 gap-3">
       <h2 className="text-h3 text-primary-foreground">
         Hôm nay ôn gì?
         {weakest && (

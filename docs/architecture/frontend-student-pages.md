@@ -28,6 +28,7 @@ Câu hỏi mock do nhóm tự viết. Repo không chép câu nào từ ngân hà
 | `features/study/use-resource.ts` | Hook tải dữ liệu, trả về `loading`, `ready` hoặc `error` cùng hàm `reload` |
 | `features/study/format.ts` | Định dạng ngày, thời lượng, điểm và màu theo mức điểm |
 | `features/study/components/` | `AppShell`, `StudentHeader`, `Flame`, `QuestionContent`, `PageHeader`, `EmptyState`, `ErrorState` |
+| `features/onboarding/` | Tour hướng dẫn người mới: `steps.ts` (toàn bộ kịch bản và lời thoại), `tour-provider.tsx` (trạng thái, tự bật, chuyển trang), `tour-overlay.tsx` (lớp tối khoét sáng, định vị thẻ, bàn phím), `tour-mascot.tsx`, `tour-bubble.tsx`, `tour-progress.tsx`, `use-tour-target.ts`, `storage.ts`. Xem mục "Tour hướng dẫn" bên dưới |
 | `features/study/dashboard/` | Lối tắt tạo đề và chuỗi học trong cùng một khối, dải số liệu, biểu đồ điểm Recharts, lịch sử đề và thống kê theo chương |
 | `features/study/create/` | Trang chat với agent: cột trái quản lý đoạn chat (`sessions.ts`, lưu localStorage), bảng cấu trúc đề nổi trên khung chat (`structure-preview.tsx`), thanh kéo nhiều vạch (`segment-slider.tsx`), popup ma trận nâng cao (`matrix-dialog.tsx`), logic kế hoạch ↔ ma trận (`plan.ts`) |
 | `features/study/exams/` | Danh sách đề có lọc và tìm kiếm, trang chi tiết đề (không lộ đáp án; câu hỏi chia tab theo phần, bấm ảnh để phóng to). `exam-paper.tsx` dựng bản xem đề khổ A4 (chia trang bằng cách đo chiều cao từng câu) và nút "Tải PDF" gọi `window.print()` với CSS in A4 trong `globals.css`; trang chi tiết đề và thẻ "Đề nháp đã sẵn sàng" trong chat tạo đề đều mở bản này |
@@ -50,7 +51,7 @@ Biểu đồ radar hồ sơ học tập quy đổi các chỉ số về 0–100%
 
 Từ 1024px, `StudentHeader` đặt logo bên trái, các mục học tập bằng chữ ở giữa, chuông thông báo và thẻ tài khoản bên phải. Màn hình hẹp mở các mục học tập trong sidebar trượt từ trái bằng nút menu. Cả hai dùng cùng danh sách route và đánh dấu mục hiện tại. Chiều cao header nằm ở `--student-header-height` trong `AppShell` để trang chat phân bổ phần còn lại cho nội dung và ô soạn.
 
-Thẻ tài khoản lấy tên và email từ phiên Redux. Menu mở `/profile` và gọi `useLogout` để xóa phiên rồi chuyển tới trang đăng nhập. Khách ở chế độ mock có thể mở hồ sơ mẫu hoặc đăng nhập. Ô credit cạnh chuông hiện số dư từ `studyApi.getCredits()` và mở `/profile#credit`; dưới 100 credit thì chuyển xám. Mock tính 1 credit cho mỗi đề tạo bằng AI trong tháng, hạn mức 500/tháng *(tự đặt, chưa có nguồn hay endpoint thật)*. Nút chuông mở bảng thông báo với trạng thái rỗng trong lúc chờ nguồn dữ liệu.
+Thẻ tài khoản lấy tên và email từ phiên Redux. Menu mở `/profile` và gọi `useLogout` để xóa phiên rồi chuyển tới trang đăng nhập. Tên hiển thị luôn là của người đăng nhập (`display_name`, thiếu thì dùng email). Menu có thêm mục "Xem lại hướng dẫn" để chạy lại tour. Ô credit cạnh chuông hiện số dư từ `studyApi.getCredits()` và mở `/profile#credit`; dưới 100 credit thì chuyển xám. Mock tính 1 credit cho mỗi đề tạo bằng AI trong tháng, hạn mức 500/tháng *(tự đặt, chưa có nguồn hay endpoint thật)*. Nút chuông mở bảng thông báo với trạng thái rỗng trong lúc chờ nguồn dữ liệu.
 
 ### Định dạng nội dung câu hỏi
 
@@ -97,11 +98,23 @@ Trên màn hình nhỏ, bảng xem trước mở dưới dạng bottom sheet.
 
 Bài đang làm được lưu nháp vào `localStorage` key `examind:attempt-draft:<examId>` sau mỗi thay đổi. Mở lại đề sẽ có nút "Làm tiếp". Hết giờ thì bài tự nộp. Nộp bài xong chuyển tới `/results/<attemptId>`.
 
+### Tour hướng dẫn
+
+Lần đầu học sinh vào `/dashboard`, linh vật dẫn một vòng qua ba chặng: Tổng quan, Tạo đề, Kết quả (10 bước, đúng chỗ khai báo trong `features/onboarding/steps.ts`). Nền tối khoét sáng phần tử đang giới thiệu, linh vật chạy tới đó và nói. Tour tự chuyển trang `/dashboard` → `/exams/new` → `/results/<lượt mới nhất>`. Chặng Kết quả lấy lượt đầu của `studyApi.getDashboard().recent`, nên không phụ thuộc id mock; tài khoản chưa có lượt nào thì chặng này bị bỏ.
+
+- **Điều khiển.** Mỗi bước có "Tiếp tục", "Quay lại" và "Bỏ qua hướng dẫn" (`Esc` cũng bỏ qua; `←`/`→` đi lùi/tiến). Bước chào có "Bắt đầu" và "Bỏ qua, mình tự khám phá"; bước cuối có "Tạo đề đầu tiên" và "Về Tổng quan". Trong lúc chạy, trang phía sau bị `inert` và khoá cuộn để trạng thái không lệch.
+- **Tự bật.** `TourProvider` bọc `AppShell` trong `app/(student)/(app)/layout.tsx`, nên sống sót qua các lần đổi trang. Nó chỉ tự bật khi đứng ở `/dashboard`, splash đã tắt, ô tạo nhanh đã hiện và tài khoản chưa có cờ. Mở lại bằng menu tài khoản, mục "Xem lại hướng dẫn".
+- **Cờ đã xem.** `localStorage` key `examind:onboarding:v1:<user_id>` với giá trị `completed` hoặc `skipped`. Đổi `VERSION` trong `storage.ts` khi nội dung tour thay đổi đủ nhiều. "Khôi phục dữ liệu mẫu" trong hồ sơ không xoá cờ này.
+- **Đích của từng bước** là thuộc tính `data-tour="…"` trên phần tử có sẵn: `quick-create`, `dash-chart`, `dash-chapters`, `nav-create`, `nav-menu` (header, dưới 1024px), `chat-starters`, `chat-composer`, `result-score`, `result-review`. Đổi cấu trúc trang thì giữ các thuộc tính này; thiếu đích quá 5 giây thì bước đó tự bị bỏ qua.
+- **Thêm hoặc sửa bước.** Chỉ cần sửa `steps.ts` và gắn `data-tour` vào phần tử mới. Mỗi chặng nên giữ dưới 4 bước.
+- **Điện thoại.** Dưới 1024px header không có thanh điều hướng chữ nên bước "Sang khu tạo đề" trỏ vào nút menu và không mở ngăn kéo (`<dialog>` native nằm top-layer, không phủ được bằng z-index). Từ 640px trở xuống thẻ nói chiếm bề ngang, đặt ở nửa đối diện với phần tử được chỉ. Lớp tối dùng `z-[80]`: trên hộp thoại `z-50`, dưới toast `z-[90]`.
+- **Giảm chuyển động.** Khi hệ điều hành bật `prefers-reduced-motion`, linh vật và khung khoét đổi chỗ ngay, không dùng dáng chạy.
+
 ### Nối API thật
 
 Thay `studyApi` và `agentApi` trong `features/study/api.ts` bằng adapter gọi backend qua `lib/api-client.ts`, giữ nguyên chữ ký hàm. `agentApi.run` cần trả cùng loại sự kiện. Backend có thể dùng SSE, sau đó adapter đổi luồng SSE thành async generator. Lỗi "không tìm thấy" phải ném `NotFoundError` để trang hiện trạng thái phù hợp.
 
-`AuthGuard` mở các route `/dashboard`, `/exams`, `/results` và `/profile` cho khách khi đang ở chế độ mock (`MOCK_OPEN_PATHS` trong `features/auth/route-guard.tsx`). Khi tắt mock, các route này lại yêu cầu đăng nhập.
+Mọi route học sinh (`/dashboard`, `/exams`, `/results`, `/profile`) yêu cầu đăng nhập, kể cả khi dữ liệu học tập là mock: `AuthGuard` chuyển khách tới `/login`. Mock mode chỉ thay nguồn dữ liệu, không mở thêm quyền xem. Tài khoản thử ở trang đăng nhập (`hs01@example.com`) vào thẳng được các trang này.
 
 ## Quyết định và cách kiểm chứng
 
