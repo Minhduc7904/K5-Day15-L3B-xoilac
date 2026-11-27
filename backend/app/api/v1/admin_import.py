@@ -1,36 +1,18 @@
 import hmac
 import time
+from secrets import token_bytes
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, UploadFile
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from app.api.deps import PdfImportRunnerDep, PdfImportUseCaseDep
-from app.core.config import get_settings
+from app.api.deps import PdfImportRunnerDep, PdfImportUseCaseDep, require_role
 from app.models.pdf_import import PdfDraft, PdfImport
 from app.schemas.pdf_import import DraftEdit
 from app.usecase.pdf_imports import MAX_PDF_BYTES
 
 router = APIRouter(prefix="/admin/pdf-imports", tags=["pdf-import"])
-bearer = HTTPBearer(auto_error=False)
 MEDIA_TTL_SECONDS = 300
-
-
-def admin_secret() -> bytes:
-    configured = get_settings().pdf_import_admin_token
-    if not configured or not configured.get_secret_value():
-        raise HTTPException(503, "Chưa cấu hình quyền nhập PDF.")
-    return configured.get_secret_value().encode()
-
-
-def require_admin(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]):
-    secret = admin_secret()
-    if not credentials or not hmac.compare_digest(secret, credentials.credentials.encode()):
-        raise HTTPException(401, "Cần token admin.", headers={"WWW-Authenticate": "Bearer"})
-    return secret
-
-
-Admin = Annotated[bytes, Depends(require_admin)]
+MEDIA_SIGNING_KEY = token_bytes(32)
+require_admin = require_role("admin")
 
 
 def import_response(row: PdfImport, request: Request) -> dict:
@@ -47,8 +29,8 @@ def draft_response(row: PdfDraft) -> dict:
     return {**row.payload, "id": row.id, "position": row.position, "status": row.status, "questionId": row.question_id}
 
 
-def media_signature(secret: bytes, import_id: int, media_id: int, exp: int) -> str:
-    return hmac.digest(secret, f"pdf-media:{import_id}:{media_id}:{exp}".encode(), "sha256").hex()
+def media_signature(import_id: int, media_id: int, exp: int) -> str:
+    return hmac.digest(MEDIA_SIGNING_KEY, f"pdf-media:{import_id}:{media_id}:{exp}".encode(), "sha256").hex()
 
 
 @router.post("", status_code=202, dependencies=[Depends(require_admin)])
@@ -103,11 +85,11 @@ async def reject_draft(import_id: int, draft_id: int, usecase: PdfImportUseCaseD
     return draft_response(await usecase.decide(import_id, draft_id, approve=False))
 
 
-@router.get("/{import_id}/media/{media_id}/url")
-async def get_media_url(import_id: int, media_id: int, request: Request, usecase: PdfImportUseCaseDep, admin: Admin):
+@router.get("/{import_id}/media/{media_id}/url", dependencies=[Depends(require_admin)])
+async def get_media_url(import_id: int, media_id: int, request: Request, usecase: PdfImportUseCaseDep):
     await usecase.get_asset(import_id, media_id)
     expiry = int(time.time()) + MEDIA_TTL_SECONDS
-    signature = media_signature(admin, import_id, media_id, expiry)
+    signature = media_signature(import_id, media_id, expiry)
     path = request.app.url_path_for("download_pdf_import_media", import_id=import_id, media_id=media_id)
     return {"url": f"{path}?expires={expiry}&signature={signature}", "expiresAt": expiry}
 
@@ -116,7 +98,7 @@ async def get_media_url(import_id: int, media_id: int, request: Request, usecase
 async def download_pdf_import_media(
     import_id: int, media_id: int, expires: int, signature: str, usecase: PdfImportUseCaseDep
 ):
-    expected = media_signature(admin_secret(), import_id, media_id, expires)
+    expected = media_signature(import_id, media_id, expires)
     if expires <= time.time() or not hmac.compare_digest(signature.encode(), expected.encode()):
         raise HTTPException(403, "URL xem tệp không hợp lệ hoặc đã hết hạn.")
     data, mime = await usecase.download(import_id, media_id)

@@ -4,7 +4,7 @@ Hợp đồng dự kiến cho backend, frontend admin và kiểm thử Issue #3.
 
 ## Điều kiện gọi
 
-Base URL local là `http://localhost:8000/api/v1`. Các thao tác nhập và duyệt yêu cầu quyền admin. MVP dùng bearer token cấu hình riêng trong backend cho đến khi có hợp đồng Auth chung. Khi thiếu cấu hình, API admin đóng. URL xem đối tượng đã ký hết hạn tự động.
+Base URL local là `http://localhost:8000/api/v1`. Các thao tác nhập và duyệt dùng phiên có vai trò admin theo API Auth của backend. URL xem đối tượng đã ký hết hạn sau 5 phút hoặc khi backend khởi động lại.
 
 ## Endpoint và hợp đồng
 
@@ -30,13 +30,14 @@ Ví dụ phản hồi tải lên
 
 | Mã | Điều kiện |
 | --- | --- |
-| 401 | Thiếu hoặc sai token admin. |
+| 401 | Thiếu phiên hoặc phiên không còn hợp lệ. |
+| 403 | Tài khoản thiếu quyền admin hoặc URL xem tệp hết hạn. |
 | 404 | Phiên, câu hoặc hình không tồn tại trong phạm vi yêu cầu. |
 | 409 | Bản nháp đã có quyết định hoặc phiên chưa sẵn sàng. |
 | 413 | PDF vượt giới hạn. |
 | 415 | Đầu vào không phải PDF. |
 | 422 | PDF không đọc được hoặc câu chưa đạt điều kiện duyệt. |
-| 503 | Backend chưa cấu hình nhà cung cấp hoặc quyền admin. |
+| 503 | Backend chưa cấu hình nhà cung cấp. |
 
 Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa xác định hoặc hình bắt buộc bị thiếu cần được sửa trước khi duyệt.
 

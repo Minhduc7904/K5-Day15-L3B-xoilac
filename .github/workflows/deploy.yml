@@ -10,8 +10,6 @@ on:
       - "deploy/**"
       - "docker-compose.yml"
       - "docker-compose.prod.yml"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 concurrency:

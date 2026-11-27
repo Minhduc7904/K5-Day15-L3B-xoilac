@@ -20,8 +20,8 @@ from app.models import Base
 from app.repositories.pdf_imports import PdfImportRepository, questions
 from app.service.pdf_import_models import PdfImportModels
 from tests.conftest import FakeStorage
+from tests.test_auth import login, make_admin
 
-ADMIN = {"Authorization": "Bearer test-import"}
 ROOT = "/api/v1/admin/pdf-imports"
 FIGURE = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XufkAAAAASUVORK5CYII="
@@ -93,7 +93,6 @@ class FixtureModels(PdfImportModels):
 
 @pytest.fixture
 async def pdf_api(tmp_path, monkeypatch):
-    monkeypatch.setenv("PDF_IMPORT_ADMIN_TOKEN", "test-import")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral")
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
     get_settings.cache_clear()
@@ -123,6 +122,7 @@ async def pdf_api(tmp_path, monkeypatch):
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_pdf_import_models] = lambda: FixtureModels(get_settings())
     try:
+        await make_admin(maker)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield client, maker, storage
     finally:
@@ -137,18 +137,19 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
     data = fixture_pdf(scanned=scanned)
     assert bool(PdfReader(BytesIO(data)).pages[0].extract_text()) is not scanned
     assert (await client.get(ROOT)).status_code == 401
-    upload = await client.post(ROOT, headers=ADMIN, files={"file": ("exam.pdf", data, "application/pdf")})
+    assert (await login(client, email="admin@example.com")).status_code == 200
+    upload = await client.post(ROOT, files={"file": ("exam.pdf", data, "application/pdf")})
     assert upload.status_code == 202, upload.text
     assert upload.json()["status"] == "queued"
     path = upload.json()["statusUrl"]
-    imported = (await client.get(path, headers=ADMIN)).json()
+    imported = (await client.get(path)).json()
     assert imported["status"] == "ready_for_review", imported
     assert imported["draftCount"] == 1
-    draft, = (await client.get(f"{path}/drafts", headers=ADMIN)).json()
+    draft, = (await client.get(f"{path}/drafts")).json()
     assert [option["isCorrect"] for option in draft["statements"]] == [False, False, False, True]
     assert draft["sourcePages"] == [1]
     media_id = re.search(r"media:(\d+)", draft["statements"][3]["content"])[1]
-    signed = (await client.get(f"{path}/media/{media_id}/url", headers=ADMIN)).json()["url"]
+    signed = (await client.get(f"{path}/media/{media_id}/url")).json()["url"]
     image = await client.get(signed)
     assert image.content == base64.b64decode(FIGURE)
     assert image.headers["content-type"] == "image/png"
@@ -157,15 +158,15 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
         assert (await db.execute(select(questions))).all() == []
 
     review = f"{path}/drafts/{draft['id']}"
-    assert (await client.post(f"{review}/approve", headers=ADMIN)).status_code == 422
+    assert (await client.post(f"{review}/approve")).status_code == 422
     saved = await client.patch(review, json={
         "chapterCodes": ["12C1"], "difficulty": "TH", "imageReviewed": True,
-    }, headers=ADMIN)
+    })
     assert saved.status_code == 200, saved.text
-    approved = await client.post(f"{review}/approve", headers=ADMIN)
+    approved = await client.post(f"{review}/approve")
     assert approved.status_code == 200, approved.text
     question_id = approved.json()["questionId"]
-    assert (await client.post(f"{review}/approve", headers=ADMIN)).json()["questionId"] == question_id
+    assert (await client.post(f"{review}/approve")).json()["questionId"] == question_id
     async with sessions() as db:
         question = await PdfImportRepository(db).read_published_question(question_id)
     assert question["content"] == "Chọn đồ thị $y=x$."

@@ -4,9 +4,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_storage
+from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.main import app
 from app.models import Base
+
+
+TEST_SETTINGS = Settings(_env_file=None, cookie_name="examind_session", cookie_secure=False, session_ttl_hours=168)
 
 
 class FakeStorage:
@@ -26,20 +30,27 @@ class FakeStorage:
 
 
 @pytest.fixture
-async def client():
+async def db():
+    """Session maker trỏ vào SQLite trong bộ nhớ; test dùng để đọc/sửa DB trực tiếp."""
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    maker = async_sessionmaker(engine, expire_on_commit=False)
+    yield async_sessionmaker(engine, expire_on_commit=False)
+    await engine.dispose()
+
+
+@pytest.fixture
+async def client(db):
     storage = FakeStorage()
 
     async def _session():
-        async with maker() as s:
+        async with db() as s:
             yield s
 
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_storage] = lambda: storage
+    # Cấu hình cố định cho test, không phụ thuộc backend/.env trên máy.
+    app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
-    await engine.dispose()

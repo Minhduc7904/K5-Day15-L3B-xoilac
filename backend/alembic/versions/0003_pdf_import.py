@@ -1,13 +1,13 @@
 """Phiên nhập PDF và bản nháp của Issue #3.
 
 Revision ID: 0003_pdf_import
-Revises: 0002
+Revises: 0003
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0003_pdf_import"
-down_revision = "0002"
+down_revision = "0003"
 branch_labels = None
 depends_on = None
 
