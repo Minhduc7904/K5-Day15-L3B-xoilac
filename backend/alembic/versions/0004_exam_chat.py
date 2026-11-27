@@ -1,0 +1,80 @@
+"""bảng phiên chat tạo đề, tin nhắn, bản xem trước, đề nháp (issue #4)
+
+Lưu ý thứ tự migration: nhánh #5 thêm 0003 (exam_templates), cũng nối sau 0002. Migration này tạm nối sau 0002
+để nhánh #4 chạy độc lập. PR nào merge sau phải đổi down_revision cho nối tiếp PR trước (ví dụ "0003"), nếu không
+Alembic sẽ có hai head và `alembic upgrade head` báo lỗi khi deploy.
+
+Revision ID: 0004
+Revises: 0002
+Create Date: 2026-11-28
+"""
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
+
+revision = "0004"
+down_revision = "0002"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "exam_chat_sessions",
+        sa.Column("session_id", sa.Integer(), primary_key=True),
+        sa.Column("student_ref", sa.String(64), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+    op.create_index("ix_exam_chat_sessions_student_ref", "exam_chat_sessions", ["student_ref"])
+
+    op.create_table(
+        "exam_chat_messages",
+        sa.Column("message_id", sa.Integer(), primary_key=True),
+        sa.Column("session_id", sa.Integer(),
+                  sa.ForeignKey("exam_chat_sessions.session_id", ondelete="CASCADE"), nullable=False),
+        sa.Column("role", sa.String(10), nullable=False),
+        sa.Column("content", sa.Text(), nullable=False),
+        sa.Column("preview_version", sa.Integer(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.CheckConstraint("role IN ('student','assistant')", name="ck_exam_chat_messages_role"),
+    )
+    op.create_index("ix_exam_chat_messages_session_id", "exam_chat_messages", ["session_id"])
+
+    op.create_table(
+        "exam_previews",
+        sa.Column("session_id", sa.Integer(),
+                  sa.ForeignKey("exam_chat_sessions.session_id", ondelete="CASCADE"), primary_key=True),
+        sa.Column("mode", sa.String(20), nullable=False, server_default="CHAPTER"),
+        sa.Column("structure", postgresql.JSONB(), nullable=False),
+        sa.Column("status", sa.String(10), nullable=False, server_default="PROPOSED"),
+        sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
+        sa.Column("reason", sa.Text(), nullable=True),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.CheckConstraint("status IN ('PROPOSED','EDITED','CONFIRMED','BUILT')", name="ck_exam_previews_status"),
+        sa.CheckConstraint("mode IN ('CHAPTER','EXAM_TEMPLATE')", name="ck_exam_previews_mode"),
+    )
+
+    op.create_table(
+        "exam_drafts",
+        sa.Column("draft_id", sa.Integer(), primary_key=True),
+        sa.Column("session_id", sa.Integer(),
+                  sa.ForeignKey("exam_chat_sessions.session_id", ondelete="CASCADE"), nullable=False),
+        sa.Column("preview_version", sa.Integer(), nullable=False),
+        sa.Column("title", sa.String(255), nullable=False),
+        sa.Column("structure", postgresql.JSONB(), nullable=False),
+        sa.Column("items", postgresql.JSONB(), nullable=False),
+        sa.Column("shortages", postgresql.JSONB(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+    op.create_index("ix_exam_drafts_session_id", "exam_drafts", ["session_id"])
+
+
+def downgrade() -> None:
+    op.drop_index("ix_exam_drafts_session_id", table_name="exam_drafts")
+    op.drop_table("exam_drafts")
+    op.drop_table("exam_previews")
+    op.drop_index("ix_exam_chat_messages_session_id", table_name="exam_chat_messages")
+    op.drop_table("exam_chat_messages")
+    op.drop_index("ix_exam_chat_sessions_student_ref", table_name="exam_chat_sessions")
+    op.drop_table("exam_chat_sessions")
