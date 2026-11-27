@@ -175,6 +175,8 @@ Gợi ý cho Redux: chỉ lưu `UserOut` trong store, không lưu token. Khi nh�
 
 Muốn có hai tài khoản này trên DB local thật: đăng ký `hs01@example.com` qua API, rồi tạo admin bằng CLI ([run-local-stack.md](../operations/run-local-stack.md)).
 
+Frontend đã có mock đầy đủ hơn (tài khoản bị khoá, lỗi mạng, quên mật khẩu bằng OTP). Luồng quên mật khẩu dùng endpoint **đề xuất, chưa có ở backend**. Xem [Trang xác thực frontend](../architecture/frontend-auth.md#hợp-đồng-api-đề-xuất-cho-quên-mật-khẩu).
+
 ## Luồng kiểm thử
 
 Đã chạy ngày 2026-11-27 trên Windows 11, backend chạy trực tiếp, PostgreSQL 16 trong Docker. `-c`/`-b` dùng cookie jar như trình duyệt. Trong kết quả, token được thay bằng `<token>`.
@@ -214,5 +216,6 @@ Test tự động: `cd backend && pytest -q` (40 test, không cần Docker).
 ## Tài liệu liên quan
 
 - [Xác thực và phân quyền backend](../architecture/backend-auth.md)
+- [Trang xác thực frontend](../architecture/frontend-auth.md)
 - [API mẫu](sample-api.md) (định dạng lỗi gốc)
 - Mã: `backend/app/api/v1/auth.py`, `backend/app/api/v1/admin.py`, `backend/app/api/deps.py`

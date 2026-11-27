@@ -9,6 +9,8 @@
 | Hiểu đăng nhập, phiên và phân quyền; kiểm quyền cho endpoint mới | [Xác thực và phân quyền backend](architecture/backend-auth.md) |
 | Gọi hoặc mock API đăng ký, đăng nhập, đăng xuất | [API xác thực](api/auth-api.md) |
 | Viết tính năng mới trong frontend | [Kiến trúc frontend](architecture/frontend-base.md) |
+| Dùng font, thang chữ và token màu chung của giao diện | [Design system frontend](architecture/frontend-design-system.md) |
+| Sửa trang đăng nhập, đăng ký, quên mật khẩu, OTP hoặc dùng mock auth | [Trang xác thực frontend](architecture/frontend-auth.md) |
 | Chạy frontend và deploy Vercel | [Runbook frontend](operations/deploy-frontend-vercel.md) |
 | Chạy PostgreSQL, MinIO và backend trên máy | [Chạy bộ khung local](operations/run-local-stack.md) |
 | Xem định dạng API và gọi thử endpoint mẫu | [API mẫu](api/sample-api.md) |
