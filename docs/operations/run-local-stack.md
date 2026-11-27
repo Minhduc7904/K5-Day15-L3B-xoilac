@@ -62,9 +62,9 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
    uvicorn app.main:asgi_app --reload --port 8000
    ```
 
-5. Thêm admin khác: đăng nhập bằng admin mặc định rồi gọi `POST /api/v1/admin/accounts` kèm mật khẩu của chính mình ([admin-accounts-api.md](../api/admin-accounts-api.md)). Đổi `ADMIN_PASSWORD` sau lần tạo đầu **không** đổi mật khẩu của admin đã có.
+5. Thêm admin khác: đăng nhập bằng admin gốc (tài khoản tạo từ `ADMIN_EMAIL`) rồi gọi `POST /api/v1/admin/users` với `"role": "admin"` ([user-management-api.md](../api/user-management-api.md)). Chỉ admin gốc tạo được admin. Đổi `ADMIN_PASSWORD` sau lần tạo đầu **không** đổi mật khẩu của admin đã có.
 
-6. Cứu hộ khi mọi admin đều bị khoá hoặc quên mật khẩu: tạo một admin mới bằng tay (trong `backend/`), đăng nhập bằng admin đó rồi mở khoá các admin khác qua API.
+6. Cứu hộ khi không ai đăng nhập được admin gốc (quên mật khẩu): tạo một admin thường bằng tay (trong `backend/`) để vào hệ thống. Admin thường không quản lý được admin khác; muốn đặt lại mật khẩu admin gốc thì đổi `password_hash` bằng SQL hoặc dựng lại DB trên máy dev.
 
    ```bash
    python -m app.cli.create_admin --email rescue@example.com --name "Cứu hộ"
@@ -98,7 +98,8 @@ curl http://localhost:8000/api/v1/sample-files/<key trả về ở lệnh trên>
 - Bản ghi tạo ra đọc lại được qua `GET /sample-items` (ORM và PostgreSQL).
 - Tệp tải lên tải lại đúng nội dung (MinIO).
 - Đăng ký, đăng nhập và phân quyền: chạy luồng curl ở [auth-api.md](../api/auth-api.md#luồng-kiểm-thử).
-- Admin mặc định và quản lý admin: luồng curl ở [admin-accounts-api.md](../api/admin-accounts-api.md#luồng-kiểm-thử).
+- Quản lý người dùng: luồng curl ở [user-management-api.md](../api/user-management-api.md#luồng-kiểm-thử).
+- Socket và thống kê online (#20): với backend đang chạy, trong `backend/` chạy `SMOKE_ADMIN_EMAIL=admin@example.com SMOKE_ADMIN_PASSWORD='...' python scripts/socket_smoke.py --base http://localhost:8000`. Mong đợi `Kết quả: 5/5 bước đạt` ([realtime-api.md](../api/realtime-api.md#luồng-kiểm-thử)). Frontend dev nối socket từ `http://localhost:3000` thì đặt `CORS_ORIGINS=http://localhost:3000` trong `backend/.env`.
 
 Test tự động không cần Docker (dùng SQLite và MinIO giả): `cd backend && pytest`.
 

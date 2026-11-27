@@ -4,7 +4,7 @@ Tài liệu này dành cho người viết backend của các issue #3, #4, #5, 
 
 ## Bối cảnh và ràng buộc
 
-- Có hai vai trò là `student` và `admin`. Đăng ký công khai luôn tạo `student`. Quyền admin chỉ đến từ người vận hành máy chủ (biến môi trường hoặc CLI) hoặc từ một admin đang active đã nhập lại mật khẩu (xem [Cấp tài khoản admin](#cấp-tài-khoản-admin)).
+- Có hai vai trò là `student` và `admin`. Đăng ký công khai luôn tạo `student`. Quyền admin chỉ đến từ người vận hành máy chủ (biến môi trường hoặc CLI) hoặc từ **admin gốc** qua API (xem [Cấp tài khoản admin](#cấp-tài-khoản-admin)).
 - Cần đăng xuất và thu hồi phiên có hiệu lực ngay, nên dùng **token opaque lưu trong CSDL**, không dùng JWT.
 - Thiết kế giả định frontend (Next.js trên Vercel) gọi backend qua rewrites `/api/*`, nên trình duyệt chỉ thấy một origin, cookie là cùng site và không cần CORS kèm credentials. Ngày 2026-11-28, frontend trên `main` vẫn gọi thẳng `NEXT_PUBLIC_API_BASE_URL` và chưa có rewrites (việc của #9).
 - Prod chạy sau nginx. Từ commit `4c3058d`, nginx có cấu hình HTTPS (Let's Encrypt) cho `examind.duckdns.org` ([deploy-backend-ci-cd.md](../operations/deploy-backend-ci-cd.md)).
@@ -16,16 +16,17 @@ Tài liệu này dành cho người viết backend của các issue #3, #4, #5, 
 | --- | --- | --- |
 | API | `app/api/v1/auth.py` | Route `/auth/*`, đặt và xoá cookie, đổi `AuthError` thành HTTP |
 | API | `app/api/v1/admin.py` | `GET /admin/ping`: mẫu một router chỉ cho admin, không ghi DB. Giữ lại vì frontend mock và kiểm nhanh phiên admin đang dùng |
-| API | `app/api/v1/admin_accounts.py` | `/admin/accounts`: danh sách, tạo, khoá/mở khoá admin ([API](../api/admin-accounts-api.md)) |
+| API | `app/api/v1/admin_users.py` | `/admin/users`: quản lý học sinh và admin (#20, [API](../api/user-management-api.md)). Thay thế `/admin/accounts` của #8 |
 | API | `app/api/deps.py` | `get_session_token`, `get_current_user`, `require_role(...)`, `AdminDep`, `StudentDep`, `CurrentUserDep`. Đây là nơi duy nhất ghép usecase, repository và service |
 | API | `app/api/errors.py`, `app/api/cookies.py` | Body lỗi `{"detail", "code"}`, bảng mã HTTP, thuộc tính cookie |
 | Usecase | `app/usecase/auth.py` | `register`, `login`, `logout`, `get_current_user`, `create_user`, `ensure_role`. Chứa luật nghiệp vụ, không biết HTTP |
-| Usecase | `app/usecase/admin_accounts.py` | `ensure_default_admin`, `list_admins`, `create_admin`, `set_status`: luật cấp quyền admin, nhập lại mật khẩu, chặn tự khoá và khoá admin cuối |
+| Usecase | `app/usecase/user_management.py` | Hàm thuần `can_manage` (ai được làm gì với ai) và `UserManagementUseCase`: tạo, sửa, khoá, đặt lại mật khẩu; thu hồi phiên và ngắt socket khi khoá, đặt lại mật khẩu, hạ vai trò |
+| Usecase | `app/usecase/default_admin.py` | `ensure_default_admin`: tạo hoặc đánh dấu admin gốc từ `ADMIN_*` |
 | Service | `app/service/password_service.py` | Băm và kiểm mật khẩu bằng argon2id (chạy trong threadpool), kèm hash giả để chống dò email qua thời gian phản hồi |
 | Service | `app/service/token_service.py` | Sinh token bằng `secrets.token_urlsafe(32)` và băm SHA-256 |
 | Repository | `app/repositories/user_repository.py`, `session_repository.py` | Đọc ghi `users`, `sessions` |
-| Model | `app/models/user.py`, `app/models/session.py` | ORM. Migration `0003_auth.py` (bảng) và `0004_users_created_by.py` |
-| CLI | `app/cli/ensure_admin.py` | Tạo admin mặc định từ `ADMIN_*` nếu chưa có. Chạy trong `db-init` |
+| Model | `app/models/user.py`, `app/models/session.py` | ORM. Migration `0003_auth.py` (bảng), `0004_users_created_by.py`, `0005_users_is_root.py` (admin gốc) |
+| CLI | `app/cli/ensure_admin.py` | Tạo admin gốc từ `ADMIN_*` nếu chưa có. Chạy trong `db-init` |
 | CLI | `app/cli/create_admin.py` | Cứu hộ: tạo admin bằng tay. Mật khẩu lấy từ `ADMIN_PASSWORD` hoặc getpass |
 
 Luật nằm ở usecase. Lớp API chỉ đọc cookie hoặc header rồi đổi lỗi sang mã HTTP. Không lớp nào log mật khẩu, token hay hash.
@@ -35,7 +36,7 @@ Luật nằm ở usecase. Lớp API chỉ đọc cookie hoặc header rồi đ�
 ```mermaid
 erDiagram
   users ||--o{ sessions : "có"
-  users |o--o{ users : "created_by (admin tạo admin)"
+  users |o--o{ users : "created_by (admin tạo tài khoản)"
   users {
     int user_id PK
     varchar email "duy nhất theo lower(email)"
@@ -47,6 +48,7 @@ erDiagram
     timestamptz updated_at
     timestamptz last_login_at
     int created_by FK "users.user_id, ON DELETE SET NULL; null = tự đăng ký hoặc người vận hành tạo"
+    boolean is_root "admin gốc; tối đa một dòng true, phải là admin"
   }
   sessions {
     int session_id PK
@@ -159,7 +161,7 @@ stateDiagram-v2
   HieuLuc --> HieuLuc: request hợp lệ<br/>(cập nhật last_used_at)
   HieuLuc --> ThuHoi: logout<br/>(revoked_at = now)
   HieuLuc --> HetHan: now >= expires_at
-  HieuLuc --> ThuHoi: admin khoá tài khoản qua API<br/>(mọi phiên: revoked_at = now)
+  HieuLuc --> ThuHoi: admin khoá / đặt lại mật khẩu / hạ vai trò<br/>(mọi phiên: revoked_at = now, socket bị ngắt)
   HieuLuc --> BiTuChoi: status = disabled bằng SQL<br/>(phiên chưa bị thu hồi)
   BiTuChoi --> HieuLuc: status = active trở lại
   ThuHoi --> [*]
@@ -168,7 +170,8 @@ stateDiagram-v2
 
 - Hạn phiên cố định tính từ lúc tạo, mặc định 168 giờ (7 ngày). Chưa có gia hạn trượt.
 - Khoá tài khoản (`status = disabled`) có hiệu lực ngay với mọi phiên đang mở, vì mỗi request đều đọc lại `users.status` (403 `ACCOUNT_DISABLED`).
-- Khoá admin qua `PATCH /admin/accounts/{id}/status` còn thu hồi mọi phiên của người đó, nên request tiếp theo nhận 401 `SESSION_REVOKED`. Mở khoá thì họ phải đăng nhập lại. Khoá và mở khoá student chưa có API, vẫn phải đổi bằng SQL.
+- Khoá tài khoản qua `PATCH /admin/users/{id}` (#20), đặt lại mật khẩu hay hạ vai trò còn thu hồi mọi phiên và ngắt mọi socket của người đó: request tiếp theo nhận 401 `SESSION_REVOKED`, socket nhận `session:revoked`. Mở khoá thì họ phải đăng nhập lại.
+- Đăng xuất thu hồi phiên hiện tại và ngắt các socket mở bằng ticket của chính phiên đó ([backend-realtime.md](backend-realtime.md)).
 - Phiên đã thu hồi hoặc hết hạn vẫn nằm trong bảng `sessions`. Chưa có job dọn.
 
 ### Cookie và cấu hình
@@ -179,7 +182,8 @@ stateDiagram-v2
 | `COOKIE_SECURE` | `false` | `true` khi trình duyệt tới qua HTTPS. Local để `false` |
 | `SESSION_TTL_HOURS` | `168` | Hạn phiên, cũng là `Max-Age` của cookie |
 | `CORS_ORIGINS` | rỗng | Rỗng thì không bật CORS. Chỉ đặt khi dev cho frontend gọi thẳng backend khác origin; khi đó CORS bật `allow_credentials` |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | rỗng | Admin mặc định do `ensure_admin` tạo trong `db-init`. Chỉ đặt trong `.env`, `prod.env`, không commit. Prod cần mật khẩu ≥ 12 ký tự |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | rỗng | Admin gốc do `ensure_admin` tạo trong `db-init`. Chỉ đặt trong `.env`, `prod.env`, không commit. Prod cần mật khẩu ≥ 12 ký tự |
+| `SOCKET_TICKET_TTL_SECONDS` | `30` | Hạn ticket nối socket (#20) |
 
 Cookie luôn có `HttpOnly`, `SameSite=Lax`, `Path=/`. JavaScript trên trình duyệt không đọc được token, frontend chỉ cần gửi request kèm cookie (cùng origin thì trình duyệt tự gửi).
 
@@ -192,8 +196,12 @@ Cookie luôn có `HttpOnly`, `SameSite=Lax`, `Path=/`. JavaScript trên trình d
 | `POST /auth/logout` | ✓ (204, idempotent) | ✓ | ✓ | `get_session_token` (không bắt buộc phiên) |
 | `GET /auth/me` | 401 | ✓ | ✓ | `CurrentUserDep` |
 | `GET /admin/ping` (mẫu) | 401 | 403 | ✓ | `AdminDep` |
-| `GET /admin/accounts` | 401 | 403 | ✓ | `AdminDep` |
-| `POST /admin/accounts`, `PATCH /admin/accounts/{id}/status` | 401 | 403 | ✓ kèm `current_password` | `AdminDep` + nhập lại mật khẩu ở usecase |
+| `POST /auth/socket-ticket` | 401 | ✓ | ✓ | `CurrentUserDep` |
+| `GET /admin/users`, `GET /admin/users/{id}` | 401 | 403 | ✓ mọi admin | `AdminDep` |
+| `POST`/`PATCH /admin/users`, `/reset-password` với tài khoản học sinh | 401 | 403 | ✓ mọi admin (nâng thành admin: chỉ admin gốc) | `AdminDep` + `can_manage` ở usecase |
+| `POST`/`PATCH /admin/users`, `/reset-password` với tài khoản admin | 401 | 403 | ✓ chỉ admin gốc (không ai đụng admin gốc trừ tự sửa tên) | `AdminDep` + `can_manage` ở usecase |
+| `GET /admin/stats/online-students` | 401 | 403 | ✓ | `AdminDep` |
+| Socket.IO `/api/socket.io` | từ chối | ✓ room `role:student`, `user:{id}` | ✓ room `role:admin`, `user:{id}` | ticket một lần ([realtime-api.md](../api/realtime-api.md)) |
 | Chat tạo đề và đề nháp học sinh (#4) | 401 | ✓ chỉ tài nguyên của mình | 403 *(đề xuất)* | `StudentDep` + kiểm chủ sở hữu ở usecase |
 | Nhập PDF (#3) | 401 | 403 | ✓ | `AdminDep` |
 | Mẫu cấu trúc đề (#5): xem | 401 | ✓ | ✓ | `CurrentUserDep` |
@@ -221,38 +229,40 @@ Các dòng #3, #4, #5, #11 là đề xuất. Người làm issue đó chốt l�
 
 ### Cấp tài khoản admin
 
-Không có đường HTTP công khai nào tạo được admin. Có đúng ba cách:
+Không có đường HTTP công khai nào tạo được admin. **Admin gốc** (`users.is_root`, migration `0005`, tối đa một tài khoản) là tài khoản tạo từ `ADMIN_EMAIL`; chỉ admin gốc tạo, sửa, khoá admin khác và đổi vai trò (#20). Có đúng ba cách có admin:
 
-| Cách | Ai làm | Khi nào dùng | `created_by` |
-| --- | --- | --- | --- |
-| `python -m app.cli.ensure_admin` (tự chạy trong `db-init`, sau `alembic upgrade head`) | Người vận hành, qua `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` trong `.env` / `prod.env` | Có admin đầu tiên ngay khi dựng môi trường mới (local hoặc lần deploy đầu) | `NULL` |
-| `POST /api/v1/admin/accounts` | Admin đang active, đã đăng nhập, nhập lại mật khẩu của mình | Thêm admin thứ hai trở đi trong vận hành bình thường | admin đang thao tác |
-| `python -m app.cli.create_admin --email ...` | Người vận hành có quyền vào máy chủ | Cứu hộ: mọi admin đều bị khoá hoặc quên mật khẩu | `NULL` |
+| Cách | Ai làm | Khi nào dùng | `created_by` | Admin gốc? |
+| --- | --- | --- | --- | --- |
+| `python -m app.cli.ensure_admin` (tự chạy trong `db-init`, sau `alembic upgrade head`) | Người vận hành, qua `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` trong `.env` / `prod.env` | Có admin đầu tiên ngay khi dựng môi trường mới | `NULL` | Có |
+| `POST /api/v1/admin/users` với `"role": "admin"`, hoặc `PATCH` nâng học sinh thành admin | Admin gốc đã đăng nhập | Thêm admin thường trong vận hành bình thường | admin gốc | Không |
+| `python -m app.cli.create_admin --email ...` | Người vận hành có quyền vào máy chủ | Cứu hộ khi không ai đăng nhập được admin gốc | `NULL` | Không |
 
-`ensure_admin` là idempotent và **không bao giờ sửa** tài khoản đã có:
+`ensure_admin` là idempotent và **không bao giờ đổi mật khẩu hay status**:
 
 | Tình huống | Kết quả | Mã thoát |
 | --- | --- | --- |
 | Thiếu `ADMIN_EMAIL` hoặc `ADMIN_PASSWORD` | Bỏ qua | 0 |
-| Chưa có email này | Tạo admin active | 0 |
-| Email đã là admin | "Admin mặc định đã có, không thay đổi": không ghi đè mật khẩu, không đổi status | 0 |
-| Email đang thuộc student | Cảnh báo; không nâng quyền, không đổi mật khẩu hay status | 0 |
+| Chưa có email này, chưa có admin gốc | Tạo admin active, `is_root = true` | 0 |
+| Email đã là admin gốc | "Admin mặc định đã có, không thay đổi" | 0 |
+| Email là admin thường, chưa có admin gốc (vd admin tạo trước #20) | Đánh dấu làm admin gốc | 0 |
+| Đã có admin gốc khác | Cảnh báo, không tạo hay đổi tài khoản nào | 0 |
+| Email đang thuộc student | Cảnh báo; không nâng quyền | 0 |
 | Email sai, mật khẩu ngoài 8–128 ký tự, hoặc `COOKIE_SECURE=true` mà mật khẩu < 12 ký tự | Báo lỗi | 2 |
 
-Mã thoát khác 0 làm `db-init` thất bại, nên backend không khởi động. Trên EC2, `remote-deploy.sh` khi đó quay về commit trước. Chỉ dữ liệu vào sai mới gây lỗi, trong đó có mật khẩu dưới 12 ký tự trên prod: chủ ý không để prod chạy với admin mặc định yếu. Email trùng (kể cả student) chỉ cảnh báo và thoát mã 0, theo review PR #17, để một cấu hình email lỡ trùng không chặn cả lần deploy. `ensure_admin` không chạy trong lifespan của FastAPI, vì nhiều worker có thể chạy cùng lúc và tạo trùng. Trong `docker-compose.prod.yml`, `db-init` nhận `COOKIE_SECURE` mặc định `true` để luật 12 ký tự có hiệu lực.
+Mã thoát khác 0 làm `db-init` thất bại, nên backend không khởi động. Trên EC2, `remote-deploy.sh` khi đó quay về commit trước: chủ ý không để prod chạy với admin gốc yếu. `ensure_admin` không chạy trong lifespan của FastAPI. Trong `docker-compose.prod.yml`, `db-init` nhận `COOKIE_SECURE` mặc định `true` để luật 12 ký tự có hiệu lực. Đổi `ADMIN_PASSWORD` sau lần chạy đầu **không** đổi mật khẩu của admin đã có; đổi `ADMIN_EMAIL` sang email khác cũng không chuyển quyền gốc.
 
-Vì `ensure_admin` không ghi đè, đổi `ADMIN_PASSWORD` sau lần chạy đầu **không** đổi mật khẩu của admin đã có. Mật khẩu chỉ có tác dụng ở lần tạo.
+Luật quản lý tài khoản (#20, hàm thuần `can_manage`, bảng đầy đủ ở [user-management-api.md](../api/user-management-api.md#ma-trận-ai-được-làm-gì)):
 
-Luật chống chiếm quyền khi admin quản lý admin:
+| Luật | Mã | Lý do |
+| --- | --- | --- |
+| Admin thường chỉ quản lý học sinh; đụng tài khoản admin hoặc nâng học sinh thành admin bị chặn | 403 `FORBIDDEN_ROLE` | Quyền cấp và gỡ quyền admin tập trung ở một người |
+| Không ai khoá, hạ, đổi vai trò, đổi email, đặt lại mật khẩu của admin gốc; admin gốc chỉ tự sửa tên | 403 `CANNOT_MODIFY_ROOT` | Luôn còn một admin, nên không cần luật "admin cuối". Email gốc gắn với `ADMIN_EMAIL` trong cấu hình máy chủ |
+| Không tự khoá, không tự hạ vai trò | 403 `CANNOT_MODIFY_SELF` | Tránh tự khoá nhầm |
+| Không đặt `is_root` qua API | 422 (schema cấm trường lạ) | Chỉ người vận hành chọn admin gốc |
+| Ghi `created_by` = admin đang thao tác | — | Truy được ai đã tạo tài khoản nào |
+| Khoá, đặt lại mật khẩu, hạ vai trò: thu hồi mọi phiên rồi ngắt socket | — | Người bị khoá mất quyền ngay ở request và kết nối tiếp theo |
 
-| Luật | Lý do |
-| --- | --- |
-| Tạo, khoá, mở khoá đều đòi `current_password` (sai thì 401 `REAUTH_FAILED`, không đổi gì) | Phiên bị lộ (máy dùng chung, cookie bị đánh cắp) không đủ để tự cấp thêm admin hay khoá admin khác |
-| Ghi `created_by` = admin đang thao tác | Truy được ai đã cấp quyền cho ai |
-| Email đã có, kể cả student, trả 409 `EMAIL_TAKEN` | Không có đường nâng student thành admin; admin muốn cấp quyền thì tạo tài khoản mới với email khác |
-| Không tự đổi trạng thái của mình (409 `CANNOT_MODIFY_SELF`) | Tránh tự khoá nhầm. Muốn rời quyền thì nhờ admin khác khoá |
-| Không khoá admin active cuối cùng (409 `LAST_ADMIN`) | Luôn còn người quản trị. Kiểm trong cùng transaction sau `SELECT ... FOR UPDATE` các dòng admin (sắp theo `user_id`), nên hai admin khoá lẫn nhau cùng lúc thì request sau thấy chỉ còn một admin active và bị từ chối. Đã kiểm trên PostgreSQL, đối chứng bỏ khoá thì mất hết admin ([luồng kiểm thử](../api/admin-accounts-api.md#luồng-kiểm-thử)) |
-| Khoá thì thu hồi mọi phiên của người bị khoá, trong cùng transaction | Người bị khoá mất quyền ngay ở request tiếp theo, không chờ hết hạn phiên |
+`REAUTH_FAILED` (nhập lại mật khẩu) và `LAST_ADMIN` của `/admin/accounts` cũ không có trong đặc tả #20 nên chưa đưa vào `/admin/users` (xem câu hỏi mở).
 
 ## Quyết định và cách kiểm chứng
 
@@ -271,8 +281,8 @@ Luật chống chiếm quyền khi admin quản lý admin:
 
 Kiểm chứng:
 
-- `cd backend && pytest -q`: 70 test, gồm `tests/test_auth.py`, `test_create_admin_cli.py`, `test_ensure_admin_cli.py`, `test_admin_accounts.py`. Chạy bằng SQLite, không cần Docker. SQLite không có khoá dòng, nên ca khoá đồng thời chỉ kiểm thủ công trên PostgreSQL.
-- Kiểm tay với PostgreSQL: [run-local-stack.md](../operations/run-local-stack.md), luồng curl ở [auth-api.md](../api/auth-api.md#luồng-kiểm-thử) và [admin-accounts-api.md](../api/admin-accounts-api.md#luồng-kiểm-thử).
+- `cd backend && pytest -q`: gồm `tests/test_auth.py`, `test_create_admin_cli.py`, `test_ensure_admin_cli.py` (admin gốc), `test_user_permissions.py` (bảng `can_manage`), `test_user_management_api.py` và các test realtime của #20. Chạy bằng SQLite, không cần Docker.
+- Kiểm tay với PostgreSQL: [run-local-stack.md](../operations/run-local-stack.md), luồng curl ở [auth-api.md](../api/auth-api.md#luồng-kiểm-thử) và [user-management-api.md](../api/user-management-api.md#luồng-kiểm-thử).
 
 ### Chưa làm
 
@@ -283,11 +293,8 @@ Kiểm chứng:
 | Quên và đặt lại mật khẩu qua email | Cần dịch vụ gửi mail và bảng token đặt lại có hạn ngắn |
 | Xác thực email | Cần dịch vụ gửi mail |
 | Đăng nhập Google | OAuth. Cần quyết cách gộp với tài khoản cùng email |
-| Khoá, mở khoá tài khoản student và xem danh sách học sinh | Thuộc phần admin (#11). Dùng lại `SessionRepository.revoke_all_for_user` khi khoá |
-| Hạ admin thành student | Cần luật "không hạ admin cuối" giống `LAST_ADMIN`, có nhập lại mật khẩu, thu hồi phiên |
 | Xoá tài khoản | Cân nhắc khoá thay vì xoá; `created_by` của người khác sẽ thành `NULL` (`ON DELETE SET NULL`) |
-| Admin đặt lại mật khẩu cho người khác | Nhập lại mật khẩu, sinh mật khẩu tạm buộc đổi ở lần đăng nhập sau, thu hồi phiên của người đó |
-| Giới hạn số lần nhập sai `current_password` | Như giới hạn đăng nhập: đếm theo admin, khoá tạm thao tác quản lý sau vài lần sai |
+| Buộc đổi mật khẩu sau khi admin đặt lại | Hiện admin đặt mật khẩu mới trực tiếp (#20); chưa có cờ "phải đổi ở lần đăng nhập sau" |
 | Nhật ký thao tác admin | Bảng `admin_audit_log` (ai, làm gì, với ai, lúc nào); hiện chỉ có `created_by` |
 | Dọn phiên hết hạn | Job định kỳ xoá `sessions` đã hết hạn hoặc thu hồi quá N ngày |
 | Chống CSRF ngoài `SameSite=Lax` | Lax đã chặn request ghi (POST) từ site khác. Nếu sau này có GET làm thay đổi dữ liệu hoặc cần cookie khác site, thêm token CSRF |
@@ -297,11 +304,12 @@ Kiểm chứng:
 1. nginx đã có cấu hình HTTPS, nhưng container backend chưa nhận `COOKIE_SECURE` (chỉ `db-init` nhận, để áp luật mật khẩu 12 ký tự). Có bật `COOKIE_SECURE=true` cho backend trên prod không? Cần Đức xác nhận (#13).
 2. Admin có được xem chat hay đề nháp của học sinh không (#4, #11)?
 3. Có cần thu hồi mọi phiên cũ khi người dùng đăng nhập ở thiết bị mới không? Hiện là không.
-4. Admin tạo qua API có cần luật mật khẩu ≥ 12 ký tự trên prod như admin mặc định không? Hiện là 8–128.
+4. Admin tạo qua API có cần luật mật khẩu ≥ 12 ký tự trên prod như admin gốc không? Hiện là 8–128.
+5. (#20) Có giữ `REAUTH_FAILED` (đòi nhập lại mật khẩu khi tạo, khoá admin) cho `/admin/users` không? Hiện theo đặc tả #20: không đòi. `LAST_ADMIN` không còn cần vì admin gốc không khoá được.
 
 ## Tài liệu liên quan
 
-- [API xác thực](../api/auth-api.md) · [API quản lý tài khoản admin](../api/admin-accounts-api.md)
+- [API xác thực](../api/auth-api.md) · [API quản lý người dùng](../api/user-management-api.md) · [Kiến trúc realtime](backend-realtime.md)
 - [Các lớp backend](backend-layers.md) · [Tổng quan hệ thống](system-overview.md)
 - [Chạy bộ khung local](../operations/run-local-stack.md)
 - Đặc tả: [spec.md](../../spec.md) §4 (chỗ người duyệt) và §9 (dữ liệu học sinh)

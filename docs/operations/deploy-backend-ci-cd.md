@@ -84,6 +84,25 @@ ssh -i ./backend-key.pem ubuntu@<host> 'ADMIN_EMAIL=<email-admin> bash -s' < dep
 
 Nếu `ADMIN_PASSWORD` dưới 12 ký tự hoặc sai định dạng, `db-init` thoát mã 2, backend không khởi động và deploy quay về commit trước. Email đã thuộc một tài khoản student thì chỉ cảnh báo trong log, không làm deploy fail. Cách thêm admin khác và cứu hộ: [backend-auth.md](../architecture/backend-auth.md#cấp-tài-khoản-admin).
 
+## Socket và WSS
+
+Kênh Socket.IO của #20 chạy cùng container `backend` tại `/api/socket.io` ([realtime-api.md](../api/realtime-api.md)).
+
+| Mục | Hiện trạng | Ghi chú |
+| --- | --- | --- |
+| nginx | `location ^~ /api/socket.io/` trong `deploy/nginx/conf.d/locations.inc` cho cả cổng 80 và 443: `Upgrade`, `Connection $connection_upgrade`, timeout 1 h, `proxy_buffering off` | Đặt trước location `/api/`. CI kiểm bằng `nginx -t` |
+| Tiến trình | `uvicorn app.main:asgi_app --workers 1` (Dockerfile) | **Không tăng số worker**: presence và ticket nằm trong bộ nhớ. Nhiều worker cần Redis ([backend-realtime.md](../architecture/backend-realtime.md#ràng-buộc-một-worker)) |
+| HTTPS/WSS | nginx có khối 443 và chứng chỉ Let's Encrypt | Trang Vercel (HTTPS) chỉ nối được `wss://`. Ngày 2026-11-28 từ ngoài chưa vào được cổng 443 (TCP treo, HTTP cổng 80 vẫn trả 200): kiểm Security Group mở 443 và chứng chỉ đã cấp |
+| `CORS_ORIGINS` trong `prod.env` | Phải chứa origin của frontend, vd `https://examind-frontend.vercel.app` | Cũng là danh sách origin được nối socket. Thiếu thì trình duyệt bị từ chối khi nối |
+| `SOCKET_TICKET_TTL_SECONDS` | Mặc định 30 trong `docker-compose.prod.yml` | Không cần thêm vào `prod.env` trừ khi muốn đổi |
+| Frontend | `NEXT_PUBLIC_SOCKET_URL=https://examind.duckdns.org` trên Vercel | Không đi qua rewrites |
+
+Kiểm sau deploy, từ máy ngoài:
+
+```bash
+curl -s "https://examind.duckdns.org/api/socket.io/?EIO=4&transport=polling"   # 0{"sid":"...","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000,...}
+```
+
 ## Kiểm tra kết quả
 
 ```bash

@@ -26,6 +26,7 @@ Thư mục hỗ trợ:
 - `app/schemas/`: Pydantic cho request và response.
 - `app/core/`: cấu hình (`config.py`, đọc `backend/.env`) và kết nối DB (`database.py`).
 - `app/api/deps.py`: nơi duy nhất ghép các lớp bằng dependency injection của FastAPI. Test thay thế phần phụ thuộc ở đây.
+- `app/api/socket/`: server Socket.IO (`server.py`, handler mỏng gọi `usecase/realtime.py`) và tên room (`rooms.py`). Xem [backend-realtime.md](backend-realtime.md).
 - `alembic/`: migration.
 
 ## Luồng dữ liệu và tích hợp
