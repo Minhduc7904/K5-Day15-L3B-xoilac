@@ -10,6 +10,7 @@
 | Chạy frontend và deploy Vercel | [Runbook frontend](operations/deploy-frontend-vercel.md) |
 | Chạy PostgreSQL, MinIO và backend trên máy | [Chạy bộ khung local](operations/run-local-stack.md) |
 | Xem định dạng API và gọi thử endpoint mẫu | [API mẫu](api/sample-api.md) |
+| Nhập đề PDF và duyệt câu hỏi | [Pipeline nhập đề](ai/pdf-import/pipeline.md) · [API nhập đề](ai/pdf-import/api.md) |
 | Kết nối EC2 và kiểm tra khả năng truy cập API | [Runbook EC2](operations/deploy-ec2.md) |
 | Deploy backend bằng GitHub Actions, sửa nginx | [Deploy backend CI/CD](operations/deploy-backend-ci-cd.md) |
 | Dựng và nạp dữ liệu nền (câu hỏi, đề, ảnh) | [Nạp dữ liệu nền](operations/seed-base-data.md) |

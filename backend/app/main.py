@@ -1,8 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.usecase.pdf_imports import ImportErrorDetail
+
+
+async def pdf_import_error(_: Request, exc: ImportErrorDetail) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content={"detail": str(exc)})
 
 
 def create_app() -> FastAPI:
@@ -15,6 +21,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router)
+    app.add_exception_handler(ImportErrorDetail, pdf_import_error)
     return app
 
 
