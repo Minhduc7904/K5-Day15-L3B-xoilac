@@ -1,0 +1,25 @@
+:global(html):has(.drawer[open]) {
+  overflow: hidden;
+}
+
+.brand {
+  width: 7.5rem;
+}
+
+@media (min-width: 64rem) {
+  .brand {
+    width: 8.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drawer[open] {
+    animation: enter 180ms ease-out;
+  }
+}
+
+@keyframes enter {
+  from {
+    transform: translateX(-100%);
+  }
+}
