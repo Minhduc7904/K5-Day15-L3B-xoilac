@@ -72,3 +72,45 @@ def test_flags_unresolved_answer_without_coercing_false(answers, state, values):
     assert result["answerState"] == state
     assert [item["isCorrect"] for item in result["statements"]] == values
     assert f"answer_{state}" in result["flags"]
+
+
+def test_restores_stem_fragments_and_explicit_choice_order():
+    data = Extraction(
+        questions=[
+            question("I", "SINGLE_CHOICE", ["![media:11](media:11)", "Choose:",
+                                             "A. one", "B. two", "C. three", "D. four"]),
+            question("III", "SHORT_ANSWER", ["![media:11](media:11)", "Find the result."]),
+        ],
+        answers=[evidence("I", "key", "I 1 D", choices=[4])],
+    )
+    choice, short = build_drafts(data, PAGES)
+    assert "media:11" in choice["content"] and "Choose:" in choice["content"]
+    assert [option["content"] for option in choice["statements"]] == ["one", "two", "three", "four"]
+    assert [option["isCorrect"] for option in choice["statements"]] == [False, False, False, True]
+    assert short["statements"] == [] and "media:11" in short["content"]
+
+
+def test_matches_unlabeled_choices_to_the_complete_source_option_block():
+    draft = question("I", "SINGLE_CHOICE", ["Choose:", "one", "two", "three", "four"])
+    answers = [evidence("I", "key", "I 1 D", choices=[4])]
+    pages = [*PAGES]
+    pages[0] = {"page": 1, "normalized": "![media:10](media:10)\nA. one B. two C. three D. four"}
+    result, = build_drafts(Extraction(questions=[draft], answers=answers), pages)
+    assert [option["content"] for option in result["statements"]] == ["one", "two", "three", "four"]
+    assert "Choose:" in result["content"]
+
+
+@pytest.mark.parametrize("repeated", [False, True])
+def test_reanchors_key_row_only_if_one_page_matches(repeated):
+    key = evidence("III", "key", "|1|2,41|", answer="2,41").model_copy(update={"page": 12})
+    pages = [*PAGES, {"page": 8, "normalized": "| 1 | 2,41 |"}]
+    if repeated:
+        pages.append({"page": 10, "normalized": "| 1 | 2,41 |"})
+    case = Extraction(questions=[question("III", "SHORT_ANSWER")], answers=[key])
+    draft, = build_drafts(case, pages)
+    if repeated:
+        assert draft["answerState"] == "missing"
+        assert draft["evidence"] == []
+    else:
+        assert draft["correctAnswer"] == "2,41"
+        assert draft["evidence"][0]["page"] == 8

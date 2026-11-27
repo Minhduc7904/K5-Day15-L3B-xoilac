@@ -6,6 +6,7 @@ CHOICE_TYPES = {"SINGLE_CHOICE", "MULTIPLE_CHOICE"}
 STATEMENT_TYPES = CHOICE_TYPES | {"TRUE_FALSE"}
 MEDIA_ID = re.compile(r"media:(\d+)")
 MISSING_MEDIA = re.compile(r"media-missing:p\d+-\d+")
+LETTERED_OPTION = re.compile(r"^\s*(?:\*\*)?([A-D])[.)](?:\*\*)?\s+(.+)$", re.DOTALL)
 
 
 def media_ids(*values: str | None) -> set[int]:
@@ -36,24 +37,89 @@ def comparable_answer(value: str) -> str:
     return value
 
 
+def normalize_extracted_question(question: ExtractedQuestion, source: str) -> ExtractedQuestion:
+    """Recover stem fragments when the source has explicit, ordered option labels."""
+    statements = question.statements
+    if question.type not in STATEMENT_TYPES:
+        if statements:
+            stem = "\n\n".join([question.content, *statements])
+            return question.model_copy(update={"content": stem, "statements": []})
+        return question
+    if question.type not in CHOICE_TYPES or len(statements) < 4:
+        return question
+    prefix = statements[:-4]
+    if any(LETTERED_OPTION.match(value) for value in prefix):
+        return question
+    options = statements[-4:]
+    labeled = [LETTERED_OPTION.fullmatch(value) for value in options]
+    if all(labeled) and [match[1] for match in labeled] == list("ABCD"):
+        options = [match[2] for match in labeled]
+    elif not prefix or any(labeled):
+        return question
+    else:
+        # A model may already have removed the option labels. Require the same
+        # four options with ordered labels together on a source page.
+        block = "".join(
+            rf"(?:\*\*)?{label}[.)](?:\*\*)?{re.escape(''.join(value.split()))}"
+            for label, value in zip("ABCD", options)
+        )
+        if not re.search(block, "".join(source.split())):
+            return question
+    return question.model_copy(update={
+        "content": "\n\n".join([question.content, *prefix]),
+        "statements": options,
+    })
+
+
+def table_cells(line: str) -> tuple[str, ...]:
+    line = line.strip()
+    if not line.startswith("|") or not line.endswith("|"):
+        return ()
+    return tuple(" ".join(cell.split()) for cell in line[1:-1].split("|"))
+
+
+def anchor_evidence(
+    item: AnswerEvidence, normalized_pages: dict[int, str], table_pages: dict[tuple[str, ...], set[int]]
+) -> AnswerEvidence | None:
+    excerpt = " ".join(item.excerpt.split())
+    if excerpt and excerpt in normalized_pages.get(item.page, ""):
+        return item
+    cells = table_cells(item.excerpt)
+    if item.source == "key" and cells and cells[0] == item.number:
+        hits = table_pages.get(cells, set())
+        if len(hits) == 1:
+            return item.model_copy(update={"page": next(iter(hits))})
+    return None
+
+
 def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
     page_map = {page["page"]: page["normalized"] for page in pages}
+    normalized_pages = {number: " ".join(markdown.split()) for number, markdown in page_map.items()}
+    table_pages: dict[tuple[str, ...], set[int]] = {}
+    for number, markdown in page_map.items():
+        for line in markdown.splitlines():
+            cells = table_cells(line)
+            if cells and cells[0].isdigit():
+                table_pages.setdefault(cells, set()).add(number)
+    answers = [
+        anchored for item in extraction.answers
+        if (anchored := anchor_evidence(item, normalized_pages, table_pages)) is not None
+    ]
     source_media = {number: media_ids(value) for number, value in page_map.items()}
     keys = [(q.section, q.number) for q in extraction.questions]
     if len(set(keys)) != len(keys):
         raise ValueError("Trùng số câu trong cùng một phần.")
     drafts = []
-    for question in extraction.questions:
-        if not question.pages or not set(question.pages) <= page_map.keys():
+    for extracted in extraction.questions:
+        if not extracted.pages or not set(extracted.pages) <= page_map.keys():
             raise ValueError("Câu hỏi thiếu trang nguồn hợp lệ.")
+        source = "\n".join(page_map[page] for page in sorted(set(extracted.pages)))
+        question = normalize_extracted_question(extracted, source)
         matching = []
         source_excerpts = []
         ambiguous = False
-        for item in extraction.answers:
+        for item in answers:
             if item.number != question.number or item.section not in (None, question.section):
-                continue
-            excerpt = " ".join(item.excerpt.split())
-            if not excerpt or excerpt not in " ".join(page_map.get(item.page, "").split()):
                 continue
             source_excerpts.append(item)
             if item.section is None and sum(number == item.number for _, number in keys) != 1:

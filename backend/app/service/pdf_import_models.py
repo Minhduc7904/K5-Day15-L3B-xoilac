@@ -211,9 +211,12 @@ belongs to the preceding figure. Put each figure token in its own statement in l
 Apply the usual following-content rule when labels precede the option text or inline image.
 Keep a question with A–D options in the single-answer section as SINGLE_CHOICE unless the
 source explicitly permits multiple correct options.
-Answer tables and worked solutions are evidence, not additional questions. Return one record
-per explicit answer source with a short verbatim supporting excerpt and its page. Transcribe a
-printed worked solution only in a solution evidence record, preserving the original content.
+Answer tables and worked solutions are evidence, not additional questions. Return separate
+evidence for both sources when both are printed, including worked solutions for short-answer
+questions. A key excerpt is the exact printed Markdown table row. For each worked solution,
+choose a short, distinct verbatim excerpt (a few words or a printed answer line) from its
+source page, rather than the full solution as the excerpt. Put the full printed solution
+in the solution field, preserving the original content across page breaks.
 Use a null section when the evidence cannot be placed in a section. Never solve or guess.
 Use one-based option indices in choices, and nullable true/false values in source statement order.
 For short answer or essay, use answer only for a result explicitly present in the source.

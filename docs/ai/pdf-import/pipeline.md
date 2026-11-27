@@ -40,13 +40,28 @@ MVP dùng FastAPI BackgroundTasks. Nếu tiến trình dừng trong lúc xử l�
 - [x] Mốc 3. Đã kiểm năm loại câu, số câu lặp, đáp án xung đột, mệnh đề chưa rõ, hình thiếu và câu bị từ chối. Bộ test backend có 49 ca đạt tại mốc này.
 - [x] Mốc 4. Đã kiểm gợi ý nhãn, bỏ trống khi điểm thấp, dùng lại embedding đã lưu và bỏ câu bị ngừng xuất bản. Test dùng vector giả lập.
 - [x] Mốc 5. Đã chạy PostgreSQL và MinIO thật trong Compose local. Hai tệp fixture có chữ và chỉ có ảnh đi qua upload, xem hình, duyệt và đọc kho dùng chung. Cũng đã kiểm tra lưu embedding và truy vấn tham chiếu trên PostgreSQL. Mistral và OpenAI dùng phản hồi fixture trong các lượt này.
-- [ ] Mốc 5. Chờ khóa để chạy hai tệp đại diện qua API Mistral và OpenAI thật, đối chiếu thứ tự hình và đáp án rồi kiểm ngưỡng phân loại trên mẫu đã cho phép.
+- [x] Mốc 5. Đã chạy hai tệp đại diện với Mistral OCR, OpenAI, PostgreSQL và MinIO thật. Cả hai có 22 câu nháp và 22 đáp án khớp bảng in. Đã kiểm hình, duyệt câu và đọc kho dùng chung.
 
 Mẫu tại máy nhóm `data/example_exam.pdf` có 15 trang. Phần I câu 6 có bốn đồ thị trên trang 2 và đáp án D trên trang 7. Phần I câu 5 qua ranh giới trang 1–2. Bản raster hóa local `data/private/pdf-import-example-scanned.pdf` có cùng 15 trang và hoàn toàn gồm ảnh. Cả hai là tệp local.
 
 Chạy từ thư mục gốc trên Windows bằng `.\.venv\Scripts\python.exe -m pytest -q backend`. Test sinh PDF có lớp chữ và PDF chỉ có ảnh. Các test tách câu dùng phản hồi OCR và OpenAI cố định để tái hiện các trường hợp biên. Để nghiệm thu thật, cấu hình `MISTRAL_API_KEY` và `OPENAI_API_KEY` trong `backend/.env`, chạy backend cùng PostgreSQL và MinIO local, rồi thực hiện luồng trong tài liệu API.
 
 Chỉ mục dùng tối đa 160 dòng tham chiếu từ các câu Toán THPT có `visibility=PUBLISHED` và chương hợp lệ trong bảng nền. Khi phiên mới cần gợi ý, hệ thống bổ sung embedding còn thiếu. Vector được lưu theo mã câu và model, làm mới khi thân câu hoặc mệnh đề đổi. Chỉ các câu hiện còn xuất bản được truy vấn. MVP dùng cosine chính xác, tối đa 5 câu gần, ngưỡng khởi điểm 0,65 và chênh tỷ trọng phiếu 0,12. Các ngưỡng này cần đối chiếu với dữ liệu mẫu qua model thật. Câu phụ thuộc vào hình đi thẳng tới gắn nhãn thủ công.
+
+### Nghiệm thu live ngày 28/11/2026
+
+| Đầu vào | Câu nháp theo phần I / II / III | Đáp án khớp bảng in | Câu có gợi ý chương | Câu có lời giải giữ lại |
+| --- | --- | --- | --- | --- |
+| PDF có lớp chữ, 15 trang | 12 / 4 / 6 | 22/22 | 11 | 11 |
+| PDF raster hóa, 15 trang | 12 / 4 / 6 | 22/22 | 11 | 17 |
+
+Một trang PDF scan đi qua Mistral với HTTP 200. Câu 6 giữ phân số `(2x+1)/(x+4)` và đủ bốn đồ thị. Cả hai phiên đầy đủ mở được ảnh A–D qua URL ký, ghi D theo bảng in và chặn duyệt đến khi admin xác nhận ảnh và nhãn. Câu đã duyệt đọc được từ kho với nội dung và thứ tự lựa chọn. Bản đọc dành cho học sinh ẩn đáp án.
+
+Lượt kiểm phát hiện OCR đưa nhãn A–D xuống sau ảnh, model đưa đoạn thân câu vào danh sách lựa chọn, và một số dòng bảng đáp án bị gán sai trang. Pipeline chuẩn hóa thứ tự ảnh trước khi tách, chỉ sửa ranh giới lựa chọn khi có dấu hiệu A–D trong nguồn và định vị lại dòng bảng đáp án khi khớp duy nhất. Test hồi quy kiểm cả ca bảng có dòng lặp.
+
+Tổng lượt kiểm gồm 30 trang Mistral, 29.967 token đầu vào và 26.337 token đầu ra khi tách câu, cùng 12.315 token embedding. Chi phí ước tính theo biểu giá chuẩn là **0,2612 USD**. Con số gồm các lượt kiểm và chạy lại sau sửa. Hai trang scan từ lượt kiểm ban đầu được ghép lại theo thứ tự khi chạy đề đủ. Các lượt kiểm sau tái sử dụng kết quả OCR đã lưu. [Giá Mistral OCR](https://docs.mistral.ai/models/ocr-4-1) · [Giá GPT-5.4 mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini) · [Giá embedding](https://developers.openai.com/api/docs/models/text-embedding-3-small)
+
+Các đề được đối chiếu theo bảng đáp án in trên tài liệu. Trích xuất lời giải chưa đầy đủ và admin cần kiểm lại với PDF gốc. Gợi ý nhãn đôi khi sai chương dù có điểm tương đồng cao, nên vẫn cần admin xác nhận. Bản scan là bản raster hóa cùng đề. Chất lượng trên bản chụp giấy và ngân hàng chương rộng hơn cần kiểm thêm.
 
 ## Tài liệu liên quan
 
