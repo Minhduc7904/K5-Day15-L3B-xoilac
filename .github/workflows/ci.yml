@@ -33,7 +33,7 @@ jobs:
       - name: Kiểm cú pháp Compose (dev và prod)
         run: |
           docker compose -f docker-compose.yml config -q
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+          POSTGRES_PASSWORD=ci S3_ACCESS_KEY=ci S3_SECRET_KEY=ci docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
       - name: Build image backend
         run: docker build -t examind-backend:ci backend
       - name: Kiểm cú pháp nginx
