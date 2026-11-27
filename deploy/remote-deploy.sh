@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Chạy TRÊN VPS (workflow deploy.yml đưa script này qua SSH: `bash -s -- <sha> < deploy/remote-deploy.sh`).
-# Các bước: đồng bộ git → compose up --build → kiểm cú pháp và reload nginx → kiểm sức khoẻ → dọn Docker.
+# Các bước: đồng bộ git → chứng chỉ tạm nếu cần → compose up --build → kiểm cú pháp và reload nginx
+# → kiểm sức khoẻ → xin chứng chỉ HTTPS lần đầu → dọn Docker.
 # Kiểm sức khoẻ lỗi thì quay lại commit trước và dựng lại.
 set -euo pipefail
 
@@ -8,9 +9,47 @@ SHA="${1:-}"
 APP="${APP_DIR:-/opt/examind/app}"
 ENV_FILE="${ENV_FILE:-/opt/examind/prod.env}"
 BRANCH="${BRANCH:-main}"   # chỉ đổi khi thử tay trên nhánh khác
+DOMAIN="${DOMAIN:-examind.duckdns.org}"
+# Hai thư mục này được mount vào nginx và certbot (xem docker-compose.prod.yml).
+export LETSENCRYPT_DIR="${LETSENCRYPT_DIR:-/opt/examind/letsencrypt}"
+export CERTBOT_WEBROOT="${CERTBOT_WEBROOT:-/opt/examind/certbot-www}"
 
 compose() {
   docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.prod.yml "$@"
+}
+
+# nginx cần có file chứng chỉ mới khởi động được khối 443. Chưa có chứng chỉ thật thì tạo bản tự ký tạm.
+ensure_placeholder_cert() {
+  local live="$LETSENCRYPT_DIR/live/$DOMAIN"
+  sudo install -d -m 755 "$CERTBOT_WEBROOT"
+  [ -s "$live/fullchain.pem" ] && return 0
+  sudo install -d -m 755 "$live"
+  sudo openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=$DOMAIN" \
+    -keyout "$live/privkey.pem" -out "$live/fullchain.pem" 2>/dev/null
+}
+
+# Xin chứng chỉ Let's Encrypt lần đầu (HTTP-01 qua cổng 80). Đã có thì bỏ qua: container certbot tự gia hạn.
+# Lỗi ở đây không làm hỏng deploy: API vẫn chạy qua HTTP, lần deploy sau sẽ thử lại.
+obtain_certificate() {
+  [ -f "$LETSENCRYPT_DIR/renewal/$DOMAIN.conf" ] && return 0
+  echo "== Xin chứng chỉ Let's Encrypt cho $DOMAIN"
+  sudo rm -rf "$LETSENCRYPT_DIR/live/$DOMAIN" "$LETSENCRYPT_DIR/archive/$DOMAIN"
+  if compose run --rm --no-deps --entrypoint certbot certbot certonly \
+      --webroot -w /var/www/certbot -d "$DOMAIN" --cert-name "$DOMAIN" \
+      --non-interactive --agree-tos --register-unsafely-without-email; then
+    compose exec -T nginx nginx -s reload
+    echo "== Đã cấp chứng chỉ cho $DOMAIN"
+  else
+    echo "== CẢNH BÁO: chưa xin được chứng chỉ (cổng 80 và 443 đã mở trong Security Group? DNS trỏ đúng IP?)"
+    ensure_placeholder_cert
+    return 1
+  fi
+}
+
+check_https() {
+  curl -fsS --max-time 10 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/v1/health/live" \
+    && echo && echo "== HTTPS hoạt động" \
+    || echo "== HTTPS chưa dùng được (chứng chỉ tạm hoặc cổng 443 lỗi)"
 }
 
 cleanup() {
@@ -24,6 +63,7 @@ cleanup() {
 trap cleanup EXIT
 
 apply() {
+  ensure_placeholder_cert
   compose up -d --build --remove-orphans
   # Cấu hình nginx được mount vào container nên container không tự đổi khi file đổi: luôn kiểm và reload.
   compose exec -T nginx nginx -t
@@ -48,6 +88,8 @@ git reset --hard "${SHA:-origin/$BRANCH}"
 echo "== Deploy $(git rev-parse --short HEAD) (trước đó $(git rev-parse --short "$PREV"))"
 
 if apply && healthy; then
+  obtain_certificate || true
+  check_https
   compose ps
   echo "== Deploy thành công"
   exit 0

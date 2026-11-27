@@ -40,7 +40,7 @@ if [ ! -f "$BASE/prod.env" ]; then
     echo "S3_ACCESS_KEY=examind"
     echo "S3_SECRET_KEY=$(openssl rand -hex 16)"
     echo "SEED_DIR=$BASE/seed"
-    echo "CORS_ORIGINS=http://localhost:3000"
+    echo "CORS_ORIGINS=http://localhost:3000,https://examind-frontend.vercel.app"
   } > "$BASE/prod.env"
   echo "Đã tạo prod.env (mật khẩu sinh ngẫu nhiên, chỉ chủ file đọc được)."
 else
