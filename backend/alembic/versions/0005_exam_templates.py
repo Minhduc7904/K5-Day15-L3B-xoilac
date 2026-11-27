@@ -3,7 +3,7 @@
 Admin tạo, sửa, duyệt mẫu. Agent pipeline học sinh (#4) chỉ tra mẫu status = 'APPROVED'.
 exam_type dùng lại mã của exams.type_of_exam (migration 0002) để hai bảng nói cùng một ngôn ngữ.
 
-Revision ID: 0003
+Revision ID: 0005_exam_templates
 Revises: 0002
 Create Date: 2026-11-28
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0003"
+revision = "0005_exam_templates"
 down_revision = "0002"
 branch_labels = None
 depends_on = None

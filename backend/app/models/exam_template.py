@@ -15,7 +15,7 @@ class ExamTemplate(Base):
     """Mẫu cấu trúc đề thi do admin quản lý (issue #5). Agent pipeline học sinh (#4) chỉ đọc mẫu APPROVED."""
 
     __tablename__ = "exam_templates"
-    # Khớp migration 0003 để alembic autogenerate không sinh khác biệt.
+    # Khớp migration 0005_exam_templates để alembic autogenerate không sinh khác biệt.
     __table_args__ = (Index("idx_exam_templates_lookup", "status", "exam_type", "grade"),)
 
     template_id: Mapped[int] = mapped_column(primary_key=True)
