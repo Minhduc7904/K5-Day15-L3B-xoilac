@@ -39,10 +39,11 @@ import { BookOpen } from 'lucide-react';
 
 ## Linh vật và trạng thái chờ
 
-- `frontend/public/brand/mascot/running/` có 4 khung chạy cho màn hình tải. `app/loading.tsx` hiển thị linh vật khi Next.js đang chờ route. Các route đã sẵn sàng hiển thị ngay.
-- `frontend/public/brand/mascot/thinking/` có 4 khung suy nghĩ. Trong giao diện chat, render `<AgentThinking active={isAwaitingReply} />` từ `@/components/mascot/agent-thinking`. Đặt cờ khi gửi yêu cầu và tắt khi nhận phần phản hồi đầu tiên, yêu cầu lỗi hoặc bị hủy.
-- Mỗi thư mục có 4 tệp `frame-*.webp` trong suốt 256 × 256 và một `loop.webp` chứa cùng các khung theo thứ tự. Mỗi khung chạy kéo dài 120 ms, mỗi khung suy nghĩ kéo dài 800 ms. Component dùng khung đầu khi thiết bị bật `prefers-reduced-motion`.
-- Kiểm thử bằng route có nội dung tải bất đồng bộ và trạng thái chat mô phỏng. Kiểm tra nhãn chờ, 4 khung của mỗi vòng lặp và ảnh tĩnh ở chế độ giảm chuyển động.
+- `frontend/public/brand/mascot/running/` có 8 khung chạy cho màn hình tải. `app/loading.tsx` hiển thị linh vật khi Next.js đang chờ route. Các route đã sẵn sàng hiển thị ngay.
+- `frontend/public/brand/mascot/thinking/` có 8 khung suy nghĩ. Trong giao diện chat, render `<AgentThinking active={isAwaitingReply} />` từ `@/components/mascot/agent-thinking`. Đặt cờ khi gửi yêu cầu và tắt khi nhận phần phản hồi đầu tiên, yêu cầu lỗi hoặc bị hủy.
+- Mỗi thư mục hoạt ảnh có 8 tệp `frame-*.webp` trong suốt 256 × 256 và một `loop.webp` chứa cùng các khung theo thứ tự. Mỗi khung chạy kéo dài 75 ms, mỗi khung suy nghĩ kéo dài 400 ms. Component dùng khung đầu khi thiết bị bật `prefers-reduced-motion`.
+- `frontend/public/brand/mascot/static/` có 8 ảnh WebP trong suốt 384 × 384. Bộ góc nhìn gồm `front.webp`, `left.webp`, `back.webp`, `right.webp`. Bộ tư thế gồm `welcome.webp`, `working.webp`, `success.webp`, `studying.webp`. Dùng đường dẫn `/brand/mascot/static/<tên-tệp>` với `next/image`.
+- Kiểm thử bằng route có nội dung tải bất đồng bộ và trạng thái chat mô phỏng. Kiểm tra nhãn chờ, 8 khung của mỗi vòng lặp và ảnh tĩnh ở chế độ giảm chuyển động.
 
 
 ## Quyết định và cách kiểm chứng
