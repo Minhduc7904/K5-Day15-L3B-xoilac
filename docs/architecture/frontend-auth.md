@@ -50,7 +50,7 @@ Web chỉ có hai loại người dùng: học sinh và admin. Không có trang 
 
 1. Form kiểm tra phía client. Có lỗi thì hiện lỗi dưới từng ô và focus ô sai đầu tiên.
 2. Đăng ký gọi `authApi.register` rồi mở bước OTP. Đăng nhập bằng mật khẩu đúng mở phiên ngay.
-3. Khi dùng API thật, cả hai trang có nút Google. Trang `/login/google` dùng verifier của tab để đổi ticket thành phiên. Nếu backend yêu cầu OTP cho email ngoài Google, trang hiển thị bước xác minh.
+3. Khi dùng API thật, cả hai trang có nút Google. Trang `/login/google` dùng verifier của tab để đổi ticket thành phiên. Nếu backend yêu cầu OTP cho email ngoài Google, trang hiển thị bước xác minh. Không đổi được thì trang báo theo nguyên nhân: backend trả `#error=google` (Google từ chối hoặc huỷ), có ticket mà tab không có verifier (bắt đầu ở domain hoặc tab khác, thường do `FRONTEND_URL` của backend khác domain đang mở), hoặc không có ticket (tải lại trang sau khi đã dùng).
 4. Sau khi có phiên, dispatch `signedIn`. Admin chuyển tới `/admin`, học sinh chuyển tới `/`.
 5. Lỗi được đổi thành `AuthError` và hiện bằng `Alert`: sai thông tin (`INVALID_CREDENTIALS`), tài khoản bị khoá (`ACCOUNT_DISABLED`), email đã dùng (`EMAIL_TAKEN`, kèm lỗi ở ô email), lỗi mạng (`NETWORK`, có nút "Thử lại").
 

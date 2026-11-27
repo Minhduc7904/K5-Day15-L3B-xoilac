@@ -22,13 +22,15 @@ const under = (path: string, base: string) => path === base || path.startsWith(`
 
 export const homeFor = (user: Pick<User, 'role'>) => (user.role === 'admin' ? '/admin' : '/');
 
+const isAuthPage = (path: string) => AUTH_PATHS.some((base) => under(path, base));
+
 /** Trả đường dẫn cần chuyển tới, hoặc `null` nếu được ở lại. `undefined` khi chưa biết phiên. */
 export function guardRedirect(path: string, auth: AuthState): string | null | undefined {
-  const isAuthPage = AUTH_PATHS.some((base) => under(path, base));
-  if (auth.status === 'unknown') return isAuthPage ? null : undefined;
+  const authPage = isAuthPage(path);
+  if (auth.status === 'unknown') return authPage ? null : undefined;
   const { user } = auth;
-  if (!user) return isAuthPage ? null : auth.reason ? `/login?reason=${auth.reason}` : '/login';
-  if (isAuthPage) return homeFor(user);
+  if (!user) return authPage ? null : auth.reason ? `/login?reason=${auth.reason}` : '/login';
+  if (authPage) return homeFor(user);
   if (SHARED_PATHS.some((base) => under(path, base))) return null;
   const inAdmin = under(path, '/admin');
   if (user.role === 'admin' && !inAdmin) return '/admin';
@@ -46,7 +48,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     if (target) router.replace(target);
   }, [target, router]);
 
-  if (target === null) return children;
+  // Trang auth luôn giữ nguyên trong lúc chuyển đi: gỡ ra rồi gắn lại sẽ chạy lại các bước chỉ làm
+  // được một lần (vd /login/google đã dùng ticket), rồi báo lỗi giả.
+  if (target === null || isAuthPage(path)) return children;
   return (
     <div className="grid min-h-dvh place-items-center">
       <Spinner size="lg" label={target ? 'Đang chuyển trang' : 'Đang kiểm tra phiên đăng nhập'} />

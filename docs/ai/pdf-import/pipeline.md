@@ -71,7 +71,7 @@ API nhập đề dùng chung kiểm tra vai trò admin của Auth. URL đọc h�
 
 Revision Alembic `0007_pdf_import_auth` nối hai nhánh `0004` (Auth) và `0004_pdf_import_vectors` (nhập đề). Lượt kiểm PostgreSQL ban đầu nâng DB trắng, DB đã chạy Auth và DB đã chạy nhập đề về revision này. Sau khi `main` thêm `0005_student_auth`, revision `0008_pdf_import_student_auth` nối hai head và giữ nguyên lịch sử migration. Đã nâng cấp PostgreSQL local từ DB trắng và DB ở `0005_student_auth` lên cùng một head mới.
 
-#5 đã vào `main` với `0005_exam_templates` trỏ về `0005_student_auth`. Revision `0009_pdf_import_exam_templates` nối `0005_exam_templates` với `0008_pdf_import_student_auth`, giữ nguyên các revision đã có. Nếu #4 tích hợp sau #3 và migration chưa được triển khai, cập nhật `down_revision` của `0006_exam_chat` từ `0005_exam_templates` sang head trên `main` tại thời điểm merge. Kiểm tra một head duy nhất bằng `alembic heads` và chạy `alembic upgrade head` trước khi triển khai.
+#5 và #4 đã vào `main`. Revision `0009_pdf_import_exam_templates` nối `0005_exam_templates` với `0008_pdf_import_student_auth`. Revision `0010_pdf_import_exam_chat` nối head này với `0006_exam_chat` của #4. Các revision đã có giữ nguyên quan hệ phụ thuộc. Kiểm tra một head duy nhất bằng `alembic heads` và chạy `alembic upgrade head` trước khi triển khai.
 
 Đã nạp và đọc lại đủ 103 mã chương từ `data/chapters.csv` trên PostgreSQL local. Cả 1.279 câu mẫu trong `data/question_bank.csv` dùng mã hợp lệ và quan hệ chương–chương con khớp danh mục. Danh mục trên VPS chưa được đối chiếu vì máy này chưa có host key SSH đã xác minh.
 

@@ -4,7 +4,7 @@
  * Mỗi bước có giới hạn thời gian để splash không bao giờ treo.
  */
 import { authApi } from '@/features/auth/api';
-import { signedIn, signedOut } from '@/features/auth/auth-slice';
+import { sessionChecked } from '@/features/auth/auth-slice';
 import type { AppDispatch } from '@/store';
 
 export interface BootstrapContext {
@@ -51,9 +51,9 @@ export const bootstrapSteps: BootstrapStep[] = [
     // Gọi GET /auth/me qua lớp API của feature auth (đang mock khi bật NEXT_PUBLIC_MOCK_MODE).
     run: async ({ dispatch }) => {
       try {
-        dispatch(signedIn(await authApi.me()));
+        dispatch(sessionChecked(await authApi.me()));
       } catch {
-        dispatch(signedOut());
+        dispatch(sessionChecked(null));
       }
     },
   },
