@@ -149,6 +149,28 @@
     outline-color: var(--color-ring);
   }
 
+  /* Tailwind v4 để con trỏ mũi tên trên nút. Mọi phần tử bấm được hiện bàn tay; trạng thái tắt hiện not-allowed.
+     Nằm trong @layer base nên class tiện ích như cursor-not-allowed vẫn ghi đè được. */
+  a[href],
+  button,
+  summary,
+  select,
+  label[for],
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='option'],
+  input:is([type='button'], [type='submit'], [type='reset'], [type='checkbox'], [type='radio'], [type='file']) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
   ::selection {
     background-color: var(--color-accent-subtle);
     color: var(--color-foreground);
