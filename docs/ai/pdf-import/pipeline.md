@@ -35,7 +35,15 @@ MVP dùng FastAPI BackgroundTasks. Nếu tiến trình dừng trong lúc xử l�
 | 4. Gợi ý nhãn | Câu gần có mã và điểm tương đồng. Câu thiếu căn cứ được để trống nhãn. |
 | 5. Nghiệm thu | Chạy PDF chữ và PDF scan. Kiểm bản đọc sau duyệt và cập nhật ví dụ API. |
 
+- [x] Mốc 1. Đã đối chiếu đề mẫu, trang hình và đáp án. Đã viết tài liệu trước code nghiệp vụ.
+- [x] Mốc 2. Đã kiểm từ tải lên đến câu xuất bản và URL ảnh qua API. Test dùng phản hồi nhà cung cấp giả lập và kho tệp trong bộ nhớ.
+- [x] Mốc 3. Đã kiểm năm loại câu, số câu lặp, đáp án xung đột, mệnh đề chưa rõ, hình thiếu và câu bị từ chối. Bộ test backend có 49 ca đạt tại mốc này.
+- [ ] Mốc 4. Kiểm gợi ý nhãn bằng chỉ mục câu đã duyệt.
+- [ ] Mốc 5. Nghiệm thu với nhà cung cấp và hạ tầng thật.
+
 Mẫu tại máy nhóm `data/example_exam.pdf` có 15 trang. Phần I câu 6 có bốn đồ thị trên trang 2 và đáp án D trên trang 7. Phần I câu 5 qua ranh giới trang 1–2. PDF có lớp văn bản. Ca scan cần thêm bản ảnh hoặc fixture ảnh tương đương.
+
+Chạy từ thư mục gốc trên Windows bằng `..venv\Scripts\python.exe -m pytest -q backend`. Test sinh PDF có lớp chữ và PDF chỉ có ảnh. Các test tách câu dùng phản hồi OCR và OpenAI cố định để tái hiện các trường hợp biên.
 
 ## Tài liệu liên quan
 

@@ -20,7 +20,7 @@ from app.models import Base
 from app.repositories.pdf_imports import PdfImportRepository, questions
 from app.service.pdf_import_models import PdfImportModels
 from tests.conftest import FakeStorage
-from tests.test_auth import login, make_admin
+from tests.test_auth import login, make_admin, register
 
 ROOT = "/api/v1/admin/pdf-imports"
 FIGURE = (
@@ -133,10 +133,12 @@ async def pdf_api(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("scanned", [True, False])
 async def test_upload_preview_approve_and_read(pdf_api, scanned):
-    client, sessions, _ = pdf_api
+    client, sessions, storage = pdf_api
     data = fixture_pdf(scanned=scanned)
     assert bool(PdfReader(BytesIO(data)).pages[0].extract_text()) is not scanned
     assert (await client.get(ROOT)).status_code == 401
+    assert (await register(client)).status_code == 201
+    assert (await client.get(ROOT)).status_code == 403
     assert (await login(client, email="admin@example.com")).status_code == 200
     upload = await client.post(ROOT, files={"file": ("exam.pdf", data, "application/pdf")})
     assert upload.status_code == 202, upload.text
@@ -163,6 +165,11 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
         "chapterCodes": ["12C1"], "difficulty": "TH", "imageReviewed": True,
     })
     assert saved.status_code == 200, saved.text
+    # READY metadata is insufficient if the underlying crop is missing.
+    image_key = next(key for key in storage.objects if key.endswith(".png"))
+    image_data = storage.objects.pop(image_key)
+    assert (await client.post(f"{review}/approve")).status_code == 422
+    storage.objects[image_key] = image_data
     approved = await client.post(f"{review}/approve")
     assert approved.status_code == 200, approved.text
     question_id = approved.json()["questionId"]
@@ -172,3 +179,18 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
     assert question["content"] == "Chọn đồ thị $y=x$."
     assert list(question["statements"][3]) == ["content", "order"]
     assert "correct_answer" not in question and "solution" not in question
+
+
+async def test_invalid_pdf_and_rejected_draft_do_not_publish(pdf_api):
+    client, sessions, _ = pdf_api
+    assert (await login(client, email="admin@example.com")).status_code == 200
+    assert (await client.post(ROOT, files={"file": ("bad.pdf", b"invalid")})).status_code == 415
+    assert (await client.post(ROOT, files={"file": ("bad.pdf", b"%PDF-broken")})).status_code == 422
+    upload = await client.post(ROOT, files={"file": ("exam.pdf", fixture_pdf(scanned=False))})
+    path = upload.json()["statusUrl"]
+    draft, = (await client.get(f"{path}/drafts")).json()
+    review = f"{path}/drafts/{draft['id']}"
+    assert (await client.post(f"{review}/reject")).json()["status"] == "rejected"
+    assert (await client.post(f"{review}/approve")).status_code == 409
+    async with sessions() as db:
+        assert (await db.execute(select(questions))).all() == []

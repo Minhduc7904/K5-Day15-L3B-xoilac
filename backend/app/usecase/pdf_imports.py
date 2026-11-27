@@ -1,10 +1,11 @@
 import base64
-import binascii
+import logging
 import re
 from io import BytesIO
 from pathlib import PurePath
 from uuid import uuid4
 
+from botocore.exceptions import BotoCoreError, ClientError
 from pypdf import PdfReader
 from starlette.concurrency import run_in_threadpool
 
@@ -19,6 +20,7 @@ MAX_PAGES = 30
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 IMAGE_LINK = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 CHAPTER_CODE = re.compile(r"(10|11|12)C\d+")
+logger = logging.getLogger(__name__)
 
 
 class ImportErrorDetail(Exception):
@@ -41,6 +43,8 @@ def decode_image(source: dict) -> tuple[bytes, str]:
     encoded = source.get("image_base64")
     if not isinstance(encoded, str):
         raise ValueError("Thiếu dữ liệu ảnh.")
+    if len(encoded) > MAX_IMAGE_BYTES * 4 // 3 + 128:
+        raise ValueError("Kích thước ảnh không hợp lệ.")
     data = base64.b64decode(encoded.rsplit(",", 1)[-1], validate=True)
     if not data or len(data) > MAX_IMAGE_BYTES:
         raise ValueError("Kích thước ảnh không hợp lệ.")
@@ -97,15 +101,7 @@ class PdfImportUseCase:
             try:
                 data, mime = decode_image(source)
                 identifiers[name] = await self._save_file(name[:255], data, mime, original_id)
-            except (ValueError, binascii.Error, OSError):
-                warnings.append(f"Trang {page.index + 1}: không lưu được hình {name}.")
-                identifiers[name] = None
-            except Exception as exc:
-                # Boto raises ClientError for rejected writes. Database errors fail the stage.
-                from botocore.exceptions import BotoCoreError, ClientError
-
-                if not isinstance(exc, (BotoCoreError, ClientError)):
-                    raise
+            except (ValueError, OSError, BotoCoreError, ClientError):
                 warnings.append(f"Trang {page.index + 1}: không lưu được hình {name}.")
                 identifiers[name] = None
 
@@ -157,7 +153,8 @@ class PdfImportUseCase:
                 self.repo.add_draft(row.id, position, draft)
             row.status, row.stage = "ready_for_review", "review"
             await session.commit()
-        except Exception:
+        except Exception as exc:
+            logger.warning("PDF import %s failed at %s (%s)", import_id, stage, type(exc).__name__)
             await session.rollback()
             row = await self.repo.get_import(import_id)
             row.status, row.stage = "failed", stage
@@ -192,6 +189,8 @@ class PdfImportUseCase:
             raise ImportErrorDetail(422, "Trường đã sửa không được để null.")
         if changes.keys() & {"content", "statements", "solution"} and "imageReviewed" not in changes:
             changes["imageReviewed"] = False
+        if changes.keys() & {"statements", "correctAnswer"}:
+            changes["answerState"] = "edited"
         draft.payload = {**draft.payload, **changes}
         await self.repo.session.commit()
         return draft
@@ -225,18 +224,23 @@ class PdfImportUseCase:
                 raise ImportErrorDetail(422, "Số lựa chọn đúng không phù hợp loại câu.")
             answer = None
         elif options or not ((answer and answer.strip()) or (
-            question_type == "ESSAY" and data["solution"] and data["solution"].strip()
+            question_type == "ESSAY" and data["answerState"] not in {"ambiguous", "conflict"}
+            and data["solution"] and data["solution"].strip()
         )):
             raise ImportErrorDetail(422, "Câu trả lời cần kết quả hoặc lời giải hợp lệ.")
         contents = [data["content"], data["solution"], *(o["content"] for o in options)]
         if any("media-missing:" in value for value in contents if value):
             raise ImportErrorDetail(422, "Còn tham chiếu hình thiếu dữ liệu.")
         refs = media_ids(*contents)
-        if data["imageDependent"] and (not data["imageReviewed"] or not refs):
+        if data["imageDependent"] and not refs:
+            raise ImportErrorDetail(422, "Cần có hình cho câu phụ thuộc hình.")
+        if (data["imageDependent"] or "image_source_mismatch" in data["flags"]) and not data["imageReviewed"]:
             raise ImportErrorDetail(422, "Cần có hình và xác nhận đã kiểm tra hình.")
         row = await self.get_import(import_id)
         for media_id in refs:
-            await self.get_asset(import_id, media_id, original=row.original_media_id, image_only=True)
+            asset = await self.get_asset(import_id, media_id, original=row.original_media_id, image_only=True)
+            if await self.storage.get(asset["object_key"]) is None:
+                raise ImportErrorDetail(422, "Hình tham chiếu không còn trong kho.")
         codes = list(dict.fromkeys(data["chapterCodes"]))
         if not codes or any(not CHAPTER_CODE.fullmatch(code) for code in codes) or not data["difficulty"]:
             raise ImportErrorDetail(422, "Cần xác nhận mã chương và độ khó.")

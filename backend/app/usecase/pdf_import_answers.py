@@ -5,6 +5,7 @@ from app.schemas.pdf_import import AnswerEvidence, ExtractedQuestion, Extraction
 CHOICE_TYPES = {"SINGLE_CHOICE", "MULTIPLE_CHOICE"}
 STATEMENT_TYPES = CHOICE_TYPES | {"TRUE_FALSE"}
 MEDIA_ID = re.compile(r"media:(\d+)")
+MISSING_MEDIA = re.compile(r"media-missing:p\d+-\d+")
 
 
 def media_ids(*values: str | None) -> set[int]:
@@ -28,8 +29,16 @@ def answer_value(question: ExtractedQuestion, evidence: AnswerEvidence):
     return evidence.answer.strip() if evidence.answer and evidence.answer.strip() else None
 
 
+def comparable_answer(value: str) -> str:
+    stripped = value.strip().removeprefix("$").removesuffix("$").strip()
+    if re.fullmatch(r"-?\d+(?:[.,]\d+)?", stripped):
+        return stripped.replace(",", ".")
+    return value
+
+
 def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
     page_map = {page["page"]: page["normalized"] for page in pages}
+    source_media = {number: media_ids(value) for number, value in page_map.items()}
     keys = [(q.section, q.number) for q in extraction.questions]
     if len(set(keys)) != len(keys):
         raise ValueError("Trùng số câu trong cùng một phần.")
@@ -38,15 +47,17 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
         if not question.pages or not set(question.pages) <= page_map.keys():
             raise ValueError("Câu hỏi thiếu trang nguồn hợp lệ.")
         matching = []
+        source_excerpts = []
         ambiguous = False
         for item in extraction.answers:
             if item.number != question.number or item.section not in (None, question.section):
                 continue
+            excerpt = " ".join(item.excerpt.split())
+            if not excerpt or excerpt not in " ".join(page_map.get(item.page, "").split()):
+                continue
+            source_excerpts.append(item)
             if item.section is None and sum(number == item.number for _, number in keys) != 1:
                 ambiguous = True
-                continue
-            excerpt = " ".join(item.excerpt.split())
-            if not excerpt or not 0 < item.page or excerpt not in " ".join(page_map.get(item.page, "").split()):
                 continue
             matching.append(item)
         values = [answer_value(question, item) for item in matching]
@@ -59,17 +70,25 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             conflict = any(len(column) > 1 for column in candidates)
             value = tuple(next(iter(column)) if len(column) == 1 else None for column in candidates)
         else:
-            conflict = len(set(known)) > 1
+            values_to_compare = [comparable_answer(item) if isinstance(item, str) else item for item in known]
+            conflict = len(set(values_to_compare)) > 1
         state = "resolved"
         if conflict:
             state, value = "conflict", None
-        elif ambiguous:
+        elif ambiguous and value is None:
             state, value = "ambiguous", None
         elif value is None or (question.type == "TRUE_FALSE" and None in value):
             state = "missing"
         flags = [] if state == "resolved" else [f"answer_{state}"]
         if question.image_dependent:
             flags.append("image_review")
+        source_pages = set(question.pages) | {item.page for item in matching if item.source == "solution"}
+        content_fields = [question.content, *question.statements, solution or ""]
+        source_ids = set().union(*(source_media[number] for number in source_pages))
+        if media_ids(*content_fields) - source_ids:
+            flags.append("image_source_mismatch")
+        if any(MISSING_MEDIA.search(field) for field in content_fields):
+            flags.append("image_missing")
         options = []
         for i, content in enumerate(question.statements):
             correct = None
@@ -82,7 +101,7 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             "section": question.section, "number": question.number, "sourcePages": sorted(set(question.pages)),
             "type": question.type, "content": question.content, "statements": options,
             "correctAnswer": value if isinstance(value, str) else None, "solution": solution,
-            "answerState": state, "evidence": [item.model_dump() for item in matching],
+            "answerState": state, "evidence": [item.model_dump() for item in source_excerpts],
             "flags": flags, "imageDependent": question.image_dependent, "imageReviewed": False,
             "chapterCodes": [], "difficulty": None, "suggestions": None,
         })
