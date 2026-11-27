@@ -1,8 +1,16 @@
-name: CI
+name: CI backend
 
-# Chạy trên mọi PR vào main và được deploy.yml gọi lại trước khi deploy.
+# Kiểm tra PR liên quan backend và chạy lại khi được deploy.yml gọi.
 on:
   pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "deploy/**"
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/deploy.yml"
   workflow_call:
 
 permissions:

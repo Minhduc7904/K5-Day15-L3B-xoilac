@@ -30,16 +30,16 @@ npm run dev
 
 Mở `http://localhost:3000/` và `http://localhost:3000/admin`. Cả hai trang hiển thị logo ở header.
 
-### Cấu hình Vercel
+### CI và deploy tự động
 
-1. Trên dashboard Vercel, chọn **Add New → Project** và import repo GitHub.
-2. Đặt **Root Directory** thành `frontend`, chọn preset **Next.js** và Node.js **22.x**.
-3. Cài biến môi trường theo bảng trên. Với project mới, Vercel CLI yêu cầu deployment đầu tiên ở Production. Khi nhóm đã đồng ý phát hành lần đầu, dùng Preview cho các nhánh tiếp theo và kiểm tra hai route trước khi cập nhật Production.
-4. Nếu cần quay lui, chọn một deployment trước đó theo quy trình của project Vercel.
+- [CI frontend](../../.github/workflows/frontend-ci.yml) chạy `npm ci`, `npm run typecheck` và `npm run build` trên Node.js 22 khi PR vào `main` hoặc push lên `main` đổi `frontend/` hay workflow CI frontend.
+- Project Vercel `examind-frontend` kết nối repo GitHub. Root Directory là `frontend`, preset là Next.js, Node.js là 22.x và nhánh Production là `main`. Vercel tạo Preview từ nhánh tính năng có thay đổi frontend và deploy Production từ `main`.
+- [Ignored Build Step](../../frontend/vercel.json) so sánh phần `frontend/` với commit đã deploy thành công gần nhất. Preview đầu tiên trên nhánh mới so với điểm tách từ `main`. Nếu thiếu mốc so sánh, Vercel chạy build để giữ bản đang phục vụ đồng bộ. Lần deploy Git đầu tiên trên `main` tạo mốc cho Production.
+- Kiểm tra CI frontend và Preview trước khi merge. Khi cần quay lui, chọn một deployment trước đó trên Vercel.
 
 ## Kiểm tra kết quả
 
-Trong `frontend/`, chạy `npm run typecheck` và `npm run build`. Kết quả build liệt kê `/` và `/admin`. Chạy `npm run start` rồi kiểm HTTP 200 trên cả hai route. Ngày 27/11/2026, bản scaffold được deploy từ thư mục `frontend/` bằng `vercel deploy --prod`. [Route học sinh](https://examind-frontend.vercel.app/) và [route quản trị](https://examind-frontend.vercel.app/admin) đều trả HTTP 200. Bản deploy này dùng Vercel CLI. Tự động deploy từ GitHub cần kết nối repo với project.
+Trong `frontend/`, chạy `npm run typecheck` và `npm run build`. Kết quả build liệt kê `/` và `/admin`. Chạy `npm run start` rồi kiểm HTTP 200 trên cả hai route. Sau deploy, kiểm tra mục Deployments trên Vercel và xác nhận commit khớp với nhánh vừa push. [Route học sinh](https://examind-frontend.vercel.app/) và [route quản trị](https://examind-frontend.vercel.app/admin) phải trả HTTP 200.
 
 ## Xử lý lỗi
 

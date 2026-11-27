@@ -1,6 +1,6 @@
 # Deploy backend lên EC2 bằng GitHub Actions
 
-Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần merge đổi `backend/`, `deploy/` (kể cả cấu hình nginx), `docker-compose*.yml` hoặc hai workflow, GitHub Actions kiểm tra rồi tự deploy lên VPS. Truy cập SSH và thông tin instance nằm ở [deploy-ec2.md](deploy-ec2.md).
+Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần merge đổi `backend/`, `deploy/` (kể cả cấu hình nginx), `docker-compose*.yml` thì GitHub Actions kiểm tra rồi tự deploy lên VPS. Thay đổi hai workflow backend kích hoạt CI trên PR. Nếu cần deploy lại sau khi sửa workflow, chạy workflow Deploy backend thủ công. Truy cập SSH và thông tin instance nằm ở [deploy-ec2.md](deploy-ec2.md).
 
 ## Điều kiện trước khi chạy
 
@@ -20,8 +20,8 @@ Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần me
 
 ## Luồng tự động
 
-1. **PR vào `main`**: `ci.yml` chạy `pytest` backend, kiểm cú pháp Compose (dev và prod), build image backend, kiểm cú pháp nginx (`nginx -t`) và `bash -n` các script.
-2. **Merge vào `main`**: `deploy.yml` gọi lại `ci.yml` trên bản vừa merge. CI lỗi thì dừng, không deploy.
+1. **PR vào `main` có thay đổi backend, hạ tầng hoặc workflow backend**: `ci.yml` chạy `pytest` backend, kiểm cú pháp Compose (dev và prod), build image backend, kiểm cú pháp nginx (`nginx -t`) và `bash -n` các script.
+2. **Merge thay đổi backend hoặc hạ tầng vào `main`**: `deploy.yml` gọi lại `ci.yml` trên bản vừa merge. CI lỗi thì dừng, không deploy.
 3. **Deploy** (`deploy/remote-deploy.sh` chạy trên VPS qua SSH):
    1. `git fetch` rồi `git reset --hard` về commit vừa merge.
    2. `docker compose up -d --build`: dựng lại backend, chạy lại `db-init` (Alembic, một lần) và `minio-init`.
