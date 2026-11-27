@@ -1,4 +1,8 @@
-# xoilac — Trợ lý chat ra đề Toán ôn vá chương yếu
+# xoilac — Examind: Nền tảng AI Agent hỗ trợ tạo đề thi và cá nhân hóa ôn tập môn Toán THPT
+
+*Examind = Exam + Mind, đánh giá thông minh. Slogan: "Beyond traditional assessment".*
+
+**Lát cắt hackathon:** học sinh lớp 12 chat với agent để nhận đề ôn vá chương yếu (xem [canvas.md](canvas.md)).
 
 **Thành viên, lớp, track:** xem [TEAMS.md](TEAMS.md). **Điền TEAMS.md đúng format**: khi chấm và đánh giá, BTC quét file này để ghép điểm cho từng người.
 
