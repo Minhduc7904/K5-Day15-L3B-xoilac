@@ -13,7 +13,10 @@ if [ -z "$baseline" ]; then
   fi
 
   # A new preview branch has no previous deployment to compare against.
-  git fetch --quiet --no-tags --depth=50 origin main || exit 1
+  # Vercel's checkout may not have a remote configured.
+  remote=$(git remote get-url origin 2>/dev/null) ||
+    remote=https://github.com/Minhduc7904/K5-Day15-L3B-xoilac.git
+  git fetch --quiet --no-tags --depth=50 "$remote" main || exit 1
   baseline=$(git merge-base HEAD FETCH_HEAD) || exit 1
 fi
 
