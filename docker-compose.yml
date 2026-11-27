@@ -1,5 +1,5 @@
 # Hạ tầng: PostgreSQL + MinIO và hai container init chạy một lần rồi thoát.
-#   - db-init:    alembic upgrade head, rồi nạp dữ liệu nền nếu có $SEED_DIR (một lần)
+#   - db-init:    alembic upgrade head, tạo admin mặc định từ ADMIN_* nếu chưa có, rồi nạp dữ liệu nền nếu có $SEED_DIR (một lần)
 #   - minio-init: tạo bucket, rồi nạp ảnh nền nếu có $SEED_DIR (một lần)
 # Local: backend/frontend chạy trực tiếp trên máy (docs/operations/run-local-stack.md).
 # VPS:   thêm docker-compose.prod.yml (backend + nginx), xem docs/operations/deploy-backend-ci-cd.md.
@@ -47,9 +47,15 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-examind}:${POSTGRES_PASSWORD:-examind}@postgres:5432/${POSTGRES_DB:-examind}
       SEED_DIR: /seed
+      # Admin mặc định (ensure_admin). Thiếu email hoặc mật khẩu thì bỏ qua. Đã có thì không đổi gì.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - ${SEED_DIR:-./data/private/seed}:/seed:ro
-    command: ["sh", "-c", "alembic upgrade head && python scripts/seed_load.py"]
+    # ensure_admin lỗi (email đang là student, mật khẩu sai luật) thì db-init lỗi và backend không khởi động.
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli.ensure_admin && python scripts/seed_load.py"]
     depends_on:
       postgres:
         condition: service_healthy

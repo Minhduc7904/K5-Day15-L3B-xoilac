@@ -72,6 +72,11 @@ services:
     entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
     logging: *logging
 
+  db-init:
+    environment:
+      # Prod có HTTPS: ensure_admin đòi ADMIN_PASSWORD ≥ 12 ký tự. ADMIN_* lấy từ prod.env (khai ở docker-compose.yml).
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+
   postgres:
     restart: unless-stopped
     logging: *logging
