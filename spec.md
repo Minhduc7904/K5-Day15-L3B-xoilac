@@ -1,33 +1,33 @@
-# AI SPEC — [Tên lát cắt] · Nhóm [tên nhóm] · Phòng [XXX] · Zone [X]
+# AI SPEC — Tạo đề ôn Toán THPT theo chương yếu · Nhóm xoilac · Phòng [XXX] · Zone [X]
 
 > Mốc nộp: §7 chốt chuẩn "đạt" tại **CP2 19:30 Thứ Sáu 27/11** · §0–§7 nộp **CP3 10:00 Thứ Bảy 28/11** · đủ §0–§10 **CP4 14:30 Thứ Bảy 28/11** · §10 changelog ghi tiếp đến **23:59 Thứ Bảy 28/11**.
 > Đầu mỗi mục ghi bước guide (`02-guide.md` trong repo đề) chỉ cách điền. Mỗi mục ngắn, có số và nguồn; chi tiết để ở file được trỏ tới. Xoá dòng hướng dẫn trong ngoặc vuông khi điền xong.
 
-Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E — bài toán: [đề gợi ý trong file track, hoặc bài toán nhóm tự mở rộng] __
-Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
+Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E · [x] F — bài toán nhóm tự mở trong lĩnh vực EdTech: tự ôn Toán THPT cho học sinh lớp 10–12.
+Data BTC cấp đã dùng (nếu có — không commit nguyên file): chưa ghi nhận trong repo.
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
 - Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin):
 - Công cụ / AI đang được dùng cho việc này (nếu có) + nguồn. Không kiểm được thì ghi "chưa kiểm":
 
 ## §1. Người dùng & bằng chứng *(guide 1.1, 1.2)*
-- Người dùng chính (một vai cụ thể):
-- Việc họ cố làm xong (`động từ + đối tượng + bối cảnh`, không có chữ AI):
-- Hôm nay họ giải bằng gì, hỏng ở đâu, vì sao chưa bỏ:
-- Pain (KHÔNG chữ AI): ai — đang làm gì — vướng đâu — hậu quả gì:
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __
+- Người dùng chính (một vai cụ thể): học sinh lớp 10–12 tại Việt Nam đã làm ít nhất một đề Toán và đang tự ôn cho bài kiểm tra, thi học kỳ hoặc thi tốt nghiệp THPT.
+- Việc họ cố làm xong: chọn và làm một đề Toán tiếp theo phù hợp với phần mình còn yếu sau khi chữa đề.
+- Cách hiện tại *(giả thuyết)*: xem điểm và đáp án, tự nhóm lỗi hoặc hỏi người hỗ trợ, rồi tìm bài tương tự. Điểm tổng có thể khó chuyển thành nội dung cần ôn, trong khi đề có sẵn dễ tiếp cận. Cần hỏi học sinh đã làm gì ở lần gần nhất.
+- Pain *(giả thuyết)*: học sinh đang tự ôn Toán khó xác định chương cần ưu tiên sau khi làm đề và mất thời gian tìm bài luyện tiếp. Giả thuyết phụ là học sinh khó tự đối chiếu đề ôn với kỳ thi/năm mình nhắm tới.
+- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __ *(chờ bằng chứng thật, gồm số người gặp, tần suất, thời gian và trích dẫn ẩn danh)*.
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
+| Đề ôn theo chương yếu | __ | __ | __ phút tìm phần cần ôn và bài tập | __ | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
+| Đề theo ma trận từng kỳ thi/năm | __ | __ | __ phút tìm và kiểm tra cấu trúc | __ | Cần kho đủ dạng câu và nguồn đã xác thực theo kỳ thi/năm | Định hướng sản phẩm |
+| Báo cáo phần hay sai sau khi chữa đề | __ | __ | __ phút tự rà và nhóm lỗi | __ | Có thể thử với lịch sử làm bài giả lập đã gắn nhãn | Chưa chọn làm hướng riêng |
 
 - **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
-- Hướng ĐÃ LOẠI + vì sao (giữ lại, đừng xoá):
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8):
+- Lý do chọn sơ bộ: đề ôn theo chương yếu giúp học sinh có bài để làm tiếp ngay sau khi chữa đề. Báo cáo phần hay sai vẫn là đầu vào hữu ích, còn đề theo nhiều ma trận cần thêm nguồn và ngân hàng đủ dạng câu. Sẽ đối chiếu lựa chọn với bằng chứng và bảng impact.
+- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8): ôn rải rác __ · ôn đều __ · ôn dồn trước kỳ thi __. Nguồn: __.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
 - [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì

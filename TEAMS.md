@@ -11,10 +11,10 @@
 
 | STT | Họ và tên | Mã học viên | Vai trò | Phần việc chính |
 |---|---|---|---|---|
-| 1 | Nguyễn Minh Đức | 2A202603751 | Đội trưởng | ____ |
-| 2 | Đỗ Thị Thu Hằng | 2A202603840 | Thành viên | ____ |
-| 3 | Phùng Văn Thanh Cao | 2A202603741 | Thành viên | ____ |
-| 4 | Vũ Quang Huy | 2A202603782 | Thành viên | ____ |
+| 1 | Nguyễn Minh Đức | 2A202603751 | Đội trưởng | PO và Tech Lead, phụ trách DevOps, đảm bảo chất lượng sản phẩm và chốt các quyết định chính |
+| 2 | Đỗ Thị Thu Hằng | 2A202603840 | Thành viên | Phát triển backend và frontend |
+| 3 | Phùng Văn Thanh Cao | 2A202603741 | Thành viên | Phát triển phần AI Agent cùng Huy |
+| 4 | Vũ Quang Huy | 2A202603782 | Thành viên | Phát triển phần AI Agent cùng Cao |
 
 **Quy tắc điền**
 - **Lớp:** `L3A` hoặc `L3B`. **Track:** một chữ `A` (EdTech), `B` (Y tế), `C` (Du lịch), `D` (Thương mại điện tử), `E` (Tài chính) hoặc `F` (Làn khác). **Link repo:** link GitHub công khai của nhóm.

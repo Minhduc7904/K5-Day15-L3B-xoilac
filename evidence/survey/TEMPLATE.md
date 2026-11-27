@@ -3,22 +3,25 @@
 > Điền ở guide bước 1.2. Không khảo sát thì xoá thư mục này.
 > Ngưỡng: **≥20 người ngoài nhóm, đúng người dùng**, giữ log đủ câu hỏi và từng câu trả lời.
 
-## Mẫu form (chép sang Google Form, sửa [việc] theo lát cắt)
+## Mẫu form *(bản nháp, chưa phát)*
+
+Kênh dự kiến: Google Form gửi tới học sinh lớp 10–12 tại trung tâm dạy thêm nơi Nguyễn Minh Đức đang làm quản lý. Nhóm đặt mục tiêu có ≥20 phản hồi hợp lệ từ học sinh ngoài nhóm đã từng tự ôn bằng đề Toán.
 
 8–10 câu, hỏi **hành vi đã xảy ra**, không hỏi "có thích không".
 
 | # | Câu hỏi | Kiểu trả lời |
 |---|---|---|
-| 1 | Bạn là: học viên L3A / L3B / lab coach / TA / giảng viên / khác | Chọn một |
-| 2 | Lần gần nhất bạn [việc] là khi nào? | Hôm nay · tuần này · tuần trước · lâu hơn · chưa bao giờ |
-| 3 | Trong 1 tuần qua, bạn [việc] mấy lần? | Số |
-| 4 | Lần gần nhất đó, bạn đã làm thế nào? | Chọn nhiều (tua video · hỏi bạn · hỏi trợ giảng · ChatGPT riêng · bỏ qua · khác) |
-| 5 | Lần đó mất khoảng bao lâu? | Dưới 5' · 5–15' · 15–30' · trên 30' |
-| 6 | Lần đó có xong việc không? | Xong · xong một phần · bỏ |
-| 7 | Điều gì khó chịu nhất ở lần đó? | Đoạn văn |
-| 8 | (tuỳ chọn) Bạn có sẵn lòng cho nhóm hỏi thêm 10 phút không? | Có — cách liên hệ (không bắt buộc) / Không |
+| 1 | Bạn đang học lớp nào? | Lớp 10 · lớp 11 · lớp 12 · khác |
+| 2 | Lần gần nhất bạn tự ôn bằng một đề Toán là khi nào? | Hôm nay · trong 7 ngày qua · 8–30 ngày trước · lâu hơn · chưa từng |
+| 3 | Lần đó bạn ôn cho việc gì? | Bài kiểm tra · thi học kỳ · thi tốt nghiệp THPT · ôn định kỳ · khác |
+| 4 | Sau khi chữa đề, bạn đã làm gì để quyết định ôn tiếp phần nào? | Chọn nhiều: xem lỗi và lời giải · hỏi người khác · tự chọn đề khác · chưa chọn · khác |
+| 5 | Lần đó bạn có chọn được phần hoặc bài tập để ôn tiếp không? | Có · chọn được một phần · không · không cần ôn tiếp |
+| 6 | Lần đó bạn mất khoảng bao lâu để quyết định ôn gì và tìm bài để làm tiếp? | Dưới 5 phút · 5–14 phút · 15–30 phút · trên 30 phút · không nhớ / không tìm |
+| 7 | Trong 30 ngày qua, có bao nhiêu lần chữa đề xong mà bạn chưa biết ôn phần nào tiếp? | Số · không nhớ |
+| 8 | Lần gần nhất đó, bạn đối chiếu đề ôn với nội dung hoặc cấu trúc bài thi bằng cách nào? | Xem tài liệu của trường / cơ quan tổ chức · hỏi người khác · dựa vào mô tả của đề · không đối chiếu · không áp dụng · khác |
+| 9 | Có điều gì khiến việc chọn phần hoặc đề ôn tiếp dễ hay khó hơn ở lần đó? | Đoạn văn, tuỳ chọn |
 
-Không thu tên, email, mã học viên trong form (trừ câu 8 nếu người trả lời tự để lại).
+Không thu tên, email, mã học viên hoặc thông tin liên hệ trong form. Nếu chọn “chưa từng” ở câu 2 hoặc “khác” ở câu 1, kết thúc trước nhóm câu về lần làm bài gần nhất.
 
 ## Lưu vào thư mục này
 

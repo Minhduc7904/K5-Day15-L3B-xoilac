@@ -1,8 +1,10 @@
 # xoilac — Examind: Nền tảng AI Agent hỗ trợ tạo đề thi và cá nhân hóa ôn tập môn Toán THPT
 
-*Examind = Exam + Mind, đánh giá thông minh. Slogan: "Beyond traditional assessment".*
+*Tên đang dùng trong repo: Examind (Exam + Mind, đánh giá thông minh). Slogan trong repo: "Beyond traditional assessment".*
 
-**Lát cắt hackathon:** học sinh lớp 12 chat với agent để nhận đề ôn vá chương yếu (xem [canvas.md](canvas.md)).
+**Track F · Bài toán CP1:** Học sinh lớp 10–12 tự ôn Toán có thể khó chọn chương và bài tập để ôn tiếp sau khi chữa đề, dẫn đến ôn dàn trải *(giả thuyết cần kiểm)*.
+
+**Lát cắt dự kiến:** Học sinh THPT nhắn yêu cầu ôn phần hay sai để agent dựa trên lịch sử làm bài và đề xuất một đề ngắn từ các câu đã duyệt (xem [canvas.md](canvas.md)).
 
 **Thành viên, lớp, track:** xem [TEAMS.md](TEAMS.md). **Điền TEAMS.md đúng format**: khi chấm và đánh giá, BTC quét file này để ghép điểm cho từng người.
 
@@ -85,14 +87,14 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 
 | Thành phần | Thật / Giả | Ghi chú |
 |---|---|---|
-| Lời gọi AI ở quyết định trung tâm | **Thật** (bắt buộc từ CP3) | Model: ____ |
+| Lời gọi AI ở quyết định trung tâm | Yêu cầu dùng model thật từ CP3 | Model: ____ |
 |  |  |  |
 
 ## Dùng AI vào việc gì
 
 2–3 dòng (bắt buộc): nhóm dùng công cụ AI nào để làm gì, người kiểm lại phần nào. Chi tiết: [docs/ai-usage.md](docs/ai-usage.md). Coding agent đọc [AGENTS.md](AGENTS.md).
 
-____
+Codex hỗ trợ chỉnh phạm vi CP1 và nháp câu hỏi tìm hiểu cách học sinh tự ôn Toán. Nhóm rà giả thuyết và ghi bằng chứng từ người dùng thật.
 
 ## File mẫu — điền ở bước nào
 
