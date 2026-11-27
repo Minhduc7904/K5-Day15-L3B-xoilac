@@ -20,6 +20,9 @@ Tài liệu này dành cho người viết backend của các issue #3, #4, #5, 
 | API | `app/api/deps.py` | `get_session_token`, `get_current_user`, `require_role(...)`, `AdminDep`, `StudentDep`, `CurrentUserDep`. Đây là nơi duy nhất ghép usecase, repository và service |
 | API | `app/api/errors.py`, `app/api/cookies.py` | Body lỗi `{"detail", "code"}`, bảng mã HTTP, thuộc tính cookie |
 | Usecase | `app/usecase/auth.py` | `register`, `login`, `logout`, `get_current_user`, `create_user`, `ensure_role`. Chứa luật nghiệp vụ, không biết HTTP |
+| Usecase | `app/usecase/student_auth.py` | Điều phối OTP và ticket Google cho học sinh |
+| Service | `app/service/google_identity.py`, `email_service.py`, `email_templates.py` | Kiểm danh tính Google, dựng MIME và gửi Gmail |
+| Repository | `app/repositories/auth_challenge_repository.py` | Lưu yêu cầu OTP và trao đổi ticket Google một lần |
 | Usecase | `app/usecase/admin_accounts.py` | `ensure_default_admin`, `list_admins`, `create_admin`, `set_status`: luật cấp quyền admin, nhập lại mật khẩu, chặn tự khoá và khoá admin cuối |
 | Service | `app/service/password_service.py` | Băm và kiểm mật khẩu bằng argon2id (chạy trong threadpool), kèm hash giả để chống dò email qua thời gian phản hồi |
 | Service | `app/service/token_service.py` | Sinh token bằng `secrets.token_urlsafe(32)` và băm SHA-256 |
@@ -66,37 +69,13 @@ Email được bỏ khoảng trắng hai đầu và chuyển về chữ thườn
 
 ### Đăng ký và đăng nhập
 
-```mermaid
-sequenceDiagram
-  participant B as Trình duyệt
-  participant N as Next.js (rewrites /api/*)
-  participant A as api/v1/auth.py
-  participant U as AuthUseCase
-  participant DB as PostgreSQL
-  B->>N: POST /api/v1/auth/register {email, password}
-  N->>A: chuyển tiếp
-  A->>A: kiểm schema (EmailStr, mật khẩu 8–128); bỏ qua trường role
-  A->>U: register(email, password)
-  U->>DB: có email (lower) chưa?
-  alt đã có
-    U-->>A: EmailAlreadyRegistered
-    A-->>B: 409 EMAIL_TAKEN
-  else chưa có
-    U->>U: argon2id(password)
-    U->>DB: INSERT users (role=student)
-    U->>U: token = token_urlsafe(32)
-    U->>DB: INSERT sessions (token_hash = sha256(token), expires_at = now + TTL)
-    U-->>A: (user, token)
-    A-->>B: 201 UserOut + Set-Cookie examind_session=token
-  end
-```
+Đăng ký bằng mật khẩu lưu hash Argon2 của mật khẩu và HMAC của OTP trong `email_challenges`. Mã hết hạn sau 5 phút và khóa sau 5 lần nhập sai. Mã đúng tạo học sinh và phiên trong cùng transaction.
 
-Đăng nhập theo cùng khung, với các bước kiểm như sau:
+Google Sign-In dùng Authorization Code với PKCE, state có chữ ký và nonce. Backend xác minh ID token, cấp ticket dùng một lần trong 2 phút. Tab giữ verifier tương ứng mới đổi được ticket. Với email chưa liên kết mà Google không quản lý tên miền, hệ thống gửi OTP để kiểm tra quyền sở hữu hộp thư.
 
-1. Không có email thì vẫn chạy `verify_dummy` (argon2 trên một hash giả) rồi trả 401 `INVALID_CREDENTIALS`.
-2. Sai mật khẩu cũng trả đúng thông báo đó, nên người gọi không phân biệt được hai trường hợp.
-3. Chỉ khi mật khẩu đúng mà tài khoản `disabled` thì mới trả 403 `ACCOUNT_DISABLED`.
-4. Đăng nhập thành công thì cập nhật `last_login_at` và mở một phiên mới. Các phiên khác của cùng người dùng vẫn giữ nguyên.
+Backend tự tạo học sinh hoặc nối vào tài khoản học sinh cùng email đã xác minh, giữ ID và dữ liệu. Các lần sau nhận diện bằng Google `sub`. Mật khẩu của tài khoản đã xác minh được giữ. Khi nối lần đầu vào tài khoản cũ chưa xác minh, backend vô hiệu hóa mật khẩu cũ và thu hồi các phiên trước đó. Điều này chặn mật khẩu do người chưa chứng minh quyền sở hữu email đặt. Tài khoản đó tiếp tục đăng nhập qua Google. Admin dùng luồng mật khẩu.
+
+Template thư nằm trong `backend/app/templates/email/`. Thư OTP dùng `base.html` và `otp.html`, nhúng logo PNG của frontend và đính kèm bản văn bản thuần.
 
 ### Kiểm phiên ở mỗi request
 
@@ -261,7 +240,7 @@ Luật chống chiếm quyền khi admin quản lý admin:
 | Token opaque, CSDL chỉ lưu SHA-256 | Thu hồi ngay khi đăng xuất hoặc khoá tài khoản. Lộ CSDL cũng không dùng được token |
 | argon2id (`argon2-cffi`, tham số mặc định) | Thuật toán được khuyến nghị cho băm mật khẩu. Băm chạy trong threadpool để không chặn event loop |
 | Cookie ưu tiên hơn Bearer | Trình duyệt dùng cookie. Bearer chỉ để thử bằng curl hoặc Swagger |
-| Body lỗi `{"detail", "code"}` | Giữ `detail` như [API mẫu](../api/sample-api.md), thêm `code` để frontend phân nhánh. Lỗi 422 của FastAPI giữ nguyên định dạng mặc định |
+| Body lỗi `{"detail", "code"}` | Giữ `detail` như [API mẫu](../api/sample-api.md), thêm `code` để frontend phân nhánh. Lỗi 422 của auth giữ danh sách theo trường và bỏ giá trị nhạy cảm |
 | Đăng ký bỏ qua trường lạ (gồm `role`) | Không thể tự tạo admin. Frontend gửi dư trường cũng không lỗi |
 | Tài khoản bị khoá còn phiên: 403 `ACCOUNT_DISABLED` | Frontend báo đúng lý do thay vì đưa về trang đăng nhập |
 | Đăng nhập tài khoản bị khoá: chỉ 403 khi mật khẩu đúng | Người không biết mật khẩu không dò được tài khoản nào bị khoá |
@@ -278,11 +257,9 @@ Kiểm chứng:
 
 | Việc | Đề xuất khi làm |
 | --- | --- |
-| Giới hạn số lần thử đăng nhập và đăng ký | Đếm số lần sai theo IP và theo email (bảng `login_attempts` hoặc bộ nhớ đệm), khoá tạm vài phút sau khoảng 5–10 lần sai, trả 429 `TOO_MANY_ATTEMPTS`. Có thể thêm `limit_req` ở nginx cho `/api/v1/auth/` làm lớp ngoài |
+| Giới hạn số lần thử đăng nhập bằng mật khẩu | Đếm số lần sai theo IP và theo email (bảng `login_attempts` hoặc bộ nhớ đệm), khoá tạm vài phút sau khoảng 5–10 lần sai, trả 429 `TOO_MANY_ATTEMPTS`. Có thể thêm `limit_req` ở nginx cho `/api/v1/auth/` làm lớp ngoài |
 | Đổi mật khẩu | Yêu cầu mật khẩu cũ. Thu hồi mọi phiên khác của người dùng |
 | Quên và đặt lại mật khẩu qua email | Cần dịch vụ gửi mail và bảng token đặt lại có hạn ngắn |
-| Xác thực email | Cần dịch vụ gửi mail |
-| Đăng nhập Google | OAuth. Cần quyết cách gộp với tài khoản cùng email |
 | Khoá, mở khoá tài khoản student và xem danh sách học sinh | Thuộc phần admin (#11). Dùng lại `SessionRepository.revoke_all_for_user` khi khoá |
 | Hạ admin thành student | Cần luật "không hạ admin cuối" giống `LAST_ADMIN`, có nhập lại mật khẩu, thu hồi phiên |
 | Xoá tài khoản | Cân nhắc khoá thay vì xoá; `created_by` của người khác sẽ thành `NULL` (`ON DELETE SET NULL`) |

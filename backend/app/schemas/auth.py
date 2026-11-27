@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -22,6 +22,8 @@ class RegisterIn(BaseModel):
     @field_validator("email")
     @classmethod
     def _lower(cls, v: str) -> str:
+        if not v.rpartition("@")[0].isascii():
+            raise ValueError("Email local part must use ASCII characters.")
         return v.lower()
 
     @field_validator("display_name")
@@ -29,6 +31,40 @@ class RegisterIn(BaseModel):
     def _clean_name(cls, v: str | None) -> str | None:
         v = v.strip() if v else None
         return v or None
+
+
+OpaqueToken = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]
+
+
+class OtpChallengeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    challenge: str
+    email: str
+    expires_in: int
+    resend_after: int
+
+
+class OtpResendIn(BaseModel):
+    challenge: OpaqueToken
+    purpose: Literal["registration", "google_email"]
+
+
+class OtpIn(OtpResendIn):
+    otp: str = Field(pattern=r"^[0-9]{6}$")
+
+
+class GoogleStartIn(BaseModel):
+    challenge: OpaqueToken
+
+
+class GoogleStartOut(BaseModel):
+    url: str
+
+
+class GoogleExchangeIn(BaseModel):
+    ticket: OpaqueToken
+    verifier: OpaqueToken
 
 
 class LoginIn(BaseModel):

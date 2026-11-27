@@ -19,6 +19,15 @@ location ^~ /api/socket.io/ {
     proxy_buffering off;
 }
 
+# Callback chứa mã OAuth dùng một lần, nên tắt access log ở đường dẫn này.
+location = /api/auth/google/callback {
+    access_log off;
+    set $backend http://backend:8000;
+    proxy_pass $backend;
+    include /etc/nginx/conf.d/proxy.inc;
+    proxy_set_header Connection "";
+}
+
 # API và tài liệu tự sinh của FastAPI.
 location ~ ^/(api/|docs|redoc|openapi\.json) {
     set $backend http://backend:8000;

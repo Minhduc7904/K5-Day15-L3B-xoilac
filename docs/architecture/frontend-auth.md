@@ -1,12 +1,12 @@
 # Trang xác thực frontend
 
-Dành cho người phát triển frontend cần sửa hoặc nối API cho các trang đăng nhập, đăng ký, quên mật khẩu, nhập mã OTP và đặt mật khẩu mới. Hiện mọi trang chạy bằng **mock**, chưa gọi backend thật.
+Dành cho người phát triển frontend cần sửa hoặc nối API cho các trang đăng nhập, đăng ký, quên mật khẩu, nhập mã OTP và đặt mật khẩu mới. Đăng nhập và đăng ký dùng được API thật. Quên mật khẩu hiện dùng mock.
 
 ## Bối cảnh và ràng buộc
 
 Issue #16 yêu cầu các trang auth đủ trạng thái: đang gửi, thành công, sai thông tin, lỗi từng trường, tài khoản bị khoá, phiên hết hạn và lỗi mạng. Nhãn phải gắn với ô nhập, focus chuyển tới trường sai đầu tiên, `autocomplete` đúng loại, và chỉ gọi API qua lớp API chung của feature.
 
-Frontend bám hợp đồng `register`, `login`, `logout` và `me` của backend auth ở [PR #17](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/pull/17). PR này đã bị revert ở [PR #18](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/pull/18), nên hiện **backend chưa có endpoint auth nào** và frontend chạy hoàn toàn bằng mock. Luồng quên mật khẩu bằng OTP cũng chưa có, frontend dùng hợp đồng đề xuất ở mục dưới. Khi backend auth quay lại, đối chiếu lại `features/auth/api.ts` với hợp đồng mới.
+Backend auth có từ PR #26. Issue #25 bổ sung xác minh đăng ký và Google Sign-In theo [hợp đồng API](../api/auth-api.md).
 
 ## Thành phần và trách nhiệm
 
@@ -16,10 +16,10 @@ Frontend bám hợp đồng `register`, `login`, `logout` và `me` của backend
 | `app/(auth)/template.tsx` | Hiệu ứng trượt vào mỗi khi đổi trang auth |
 | `app/(auth)/login/page.tsx` | `/login`. Đọc `?reason=session-expired \| password-reset \| logged-out`, giá trị khác bị bỏ qua |
 | `app/(auth)/register`, `forgot-password`, `verify-otp`, `reset-password` | Mỗi trang chỉ render form tương ứng |
-| `features/auth/api.ts` | `authApi`: mock khi `NEXT_PUBLIC_MOCK_MODE` khác `false`, ngược lại gọi Axios với `withCredentials`. Lỗi 422 đổi thành lỗi từng trường |
+| `features/auth/api.ts` | `authApi`: gọi API theo cùng origin. Bật mock bằng `NEXT_PUBLIC_MOCK_MODE=true`. Lỗi 422 đổi thành lỗi từng trường |
 | `features/auth/mock.ts` | API giả lập, lưu trạng thái ở `sessionStorage` key `examind:mock-auth` |
 | `features/auth/types.ts` | `User`, `AuthErrorCode`, lớp `AuthError` và `toAuthError` |
-| `features/auth/validation.ts` | Kiểm tra email, mật khẩu (6–128 ký tự), xác nhận mật khẩu, tên hiển thị, độ mạnh mật khẩu, che email |
+| `features/auth/validation.ts` | Kiểm tra email, mật khẩu mới (8–128 ký tự), xác nhận mật khẩu, tên hiển thị, độ mạnh mật khẩu, che email |
 | `features/auth/use-auth-form.ts` | Hook form: giá trị, lỗi, trạng thái gửi, gộp lỗi từ server, focus trường sai đầu tiên |
 | `features/auth/auth-slice.ts` | Reducer `auth`: `{ user, status: 'unknown' \| 'authenticated' \| 'guest' }`. Chỉ lưu `UserOut`, không lưu token |
 | `features/auth/reset-flow.ts` | Lưu email và `reset_token` của luồng quên mật khẩu trong `sessionStorage` key `examind:reset-flow`, để email không nằm trên URL |
@@ -35,11 +35,12 @@ Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `sig
 ### Đăng nhập và đăng ký
 
 1. Form kiểm tra phía client. Có lỗi thì hiện lỗi dưới từng ô và focus ô sai đầu tiên.
-2. Gọi `authApi.login` hoặc `authApi.register`. Nút chuyển sang trạng thái đang gửi.
-3. Thành công thì dispatch `signedIn`. Admin chuyển tới `/admin`, học sinh chuyển tới `/`.
-4. Lỗi được đổi thành `AuthError` và hiện bằng `Alert`: sai thông tin (`INVALID_CREDENTIALS`), tài khoản bị khoá (`ACCOUNT_DISABLED`), email đã dùng (`EMAIL_TAKEN`, kèm lỗi ở ô email), lỗi mạng (`NETWORK`, có nút "Thử lại").
+2. Đăng ký gọi `authApi.register` rồi mở bước OTP. Đăng nhập bằng mật khẩu đúng mở phiên ngay.
+3. Khi dùng API thật, cả hai trang có nút Google. Trang `/login/google` dùng verifier của tab để đổi ticket thành phiên. Nếu backend yêu cầu OTP cho email ngoài Google, trang hiển thị bước xác minh.
+4. Sau khi có phiên, dispatch `signedIn`. Admin chuyển tới `/admin`, học sinh chuyển tới `/`.
+5. Lỗi được đổi thành `AuthError` và hiện bằng `Alert`: sai thông tin (`INVALID_CREDENTIALS`), tài khoản bị khoá (`ACCOUNT_DISABLED`), email đã dùng (`EMAIL_TAKEN`, kèm lỗi ở ô email), lỗi mạng (`NETWORK`, có nút "Thử lại").
 
-### Quên mật khẩu
+### Quên mật khẩu ở chế độ mock
 
 ```
 /forgot-password ──email──▶ /verify-otp ──mã 6 số──▶ /reset-password ──mật khẩu mới──▶ /login?reason=password-reset

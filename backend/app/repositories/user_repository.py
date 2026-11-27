@@ -21,34 +21,55 @@ class UserRepository:
     async def get(self, user_id: int) -> User | None:
         return await self._session.get(User, user_id)
 
-    async def get_by_email(self, email: str) -> User | None:
-        result = await self._session.execute(select(User).where(func.lower(User.email) == email.lower()))
-        return result.scalar_one_or_none()
+    async def get_by_email(self, email: str, *, lock: bool = False) -> User | None:
+        query = select(User).where(func.lower(User.email) == email.lower())
+        if lock:
+            query = query.with_for_update().execution_options(populate_existing=True)
+        return (await self._session.execute(query)).scalar_one_or_none()
+
+    async def get_by_google_subject(self, subject: str, *, lock: bool = False) -> User | None:
+        query = select(User).where(User.google_subject == subject)
+        if lock:
+            query = query.with_for_update().execution_options(populate_existing=True)
+        return (await self._session.execute(query)).scalar_one_or_none()
 
     async def add(
         self,
         email: str,
-        password_hash: str,
+        password_hash: str | None,
         role: str,
         display_name: str | None = None,
         created_by: int | None = None,
+        *,
+        verified_at: datetime | None = None,
+        google_subject: str | None = None,
+        commit: bool = True,
     ) -> User:
         user = User(
-            email=email, password_hash=password_hash, role=role, display_name=display_name, created_by=created_by
+            email=email, password_hash=password_hash, role=role, display_name=display_name, created_by=created_by,
+            email_verified_at=verified_at, google_subject=google_subject,
         )
-        self._session.add(user)
         try:
+            async with self._session.begin_nested():
+                self._session.add(user)
+                await self._session.flush()
+        except IntegrityError as error:
+            raise DuplicateEmailError from error
+        if commit:
             await self._session.commit()
-        except IntegrityError as e:
-            await self._session.rollback()
-            raise DuplicateEmailError from e
         await self._session.refresh(user)
         return user
 
-    async def set_last_login(self, user: User, at: datetime) -> None:
-        user.last_login_at = at
-        await self._session.commit()
-        await self._session.refresh(user)
+    async def link_google(self, user: User, subject: str, at: datetime) -> None:
+        try:
+            async with self._session.begin_nested():
+                user.google_subject = subject
+                if user.email_verified_at is None:
+                    user.email_verified_at = at
+                    user.password_hash = None
+                await self._session.flush()
+        except IntegrityError as error:
+            raise DuplicateEmailError from error
 
     async def list_by_role(self, role: str) -> Sequence[User]:
         result = await self._session.execute(select(User).where(User.role == role).order_by(User.user_id))
