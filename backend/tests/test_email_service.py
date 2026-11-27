@@ -106,8 +106,8 @@ async def test_google_error_omits_response_body(gmail_settings, failed_url, mess
     assert requests == ([TOKEN_URL] if failed_url == TOKEN_URL else [TOKEN_URL, SEND_URL])
 
 @pytest.mark.asyncio
-async def test_branded_email_contains_plain_text_html_and_inline_logo(gmail_settings):
-    content = verification_email("112233", 5, google=False)
+async def test_branded_email_contains_plain_text_html_and_hosted_logo(gmail_settings):
+    content = verification_email("112233", 5, google=False, site_url="https://app.example/")
 
     def handle(request: httpx.Request) -> httpx.Response:
         if str(request.url) == TOKEN_URL:
@@ -116,14 +116,13 @@ async def test_branded_email_contains_plain_text_html_and_inline_logo(gmail_sett
         message = BytesParser(policy=policy.default).parsebytes(payload)
         assert message["Message-ID"] and message["Date"]
         assert "112233" in message.get_body(("plain",)).get_content()
-        assert "cid:examind-logo" in message.get_body(("html",)).get_content()
-        logo = next(part for part in message.walk() if part.get_content_type() == "image/png")
-        assert logo["Content-ID"] == "<examind-logo>"
-        frontend_logo = Path(__file__).resolve().parents[2] / "frontend/public/brand/examind-mark.png"
-        assert logo.get_payload(decode=True) == frontend_logo.read_bytes()
+        assert 'src="https://app.example/brand/examind-mark-email.png"' in message.get_body(("html",)).get_content()
+        assert not [part for part in message.walk() if part.get_content_maintype() == "image"]
+        assert message["Auto-Submitted"] == "auto-generated"
+        assert (Path(__file__).resolve().parents[2] / "frontend/public/brand/examind-mark-email.png").is_file()
         return httpx.Response(200, json={"id": "gmail-message-id"})
 
     service = GmailEmailService(gmail_settings, transport=httpx.MockTransport(handle))
     assert await service.send(
-        to="student@example.com", subject=content.subject, text=content.text, html=content.html, logo=content.logo
+        to="student@example.com", subject=content.subject, text=content.text, html=content.html
     ) == "gmail-message-id"

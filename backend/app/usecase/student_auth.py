@@ -78,12 +78,14 @@ class StudentAuthUseCase:
         emails: GmailEmailService,
         tokens: TokenService,
         otp_secret: str,
+        site_url: str = "",
     ) -> None:
         self._auth = auth
         self._challenges = challenges
         self._emails = emails
         self._tokens = tokens
         self._otp_secret = otp_secret.encode()
+        self._site_url = site_url
 
     def _otp_digest(self, key: str, otp: str) -> str:
         if len(self._otp_secret) < 32:
@@ -136,10 +138,10 @@ class StudentAuthUseCase:
         if not deliver:
             return PendingVerification(challenge, email)
 
-        content = verification_email(code, OTP_TTL_MINUTES, purpose=purpose)
+        content = verification_email(code, OTP_TTL_MINUTES, purpose=purpose, site_url=self._site_url)
         try:
             await self._emails.send(
-                to=email, subject=content.subject, text=content.text, html=content.html, logo=content.logo
+                to=email, subject=content.subject, text=content.text, html=content.html
             )
         except (EmailConfigurationError, EmailDeliveryError):
             latest = await self._challenges.lock_challenge(purpose, digest)

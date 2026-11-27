@@ -117,7 +117,12 @@ def get_student_auth(
     tokens: Annotated[TokenService, Depends(get_token_service)],
 ) -> StudentAuthUseCase:
     return StudentAuthUseCase(
-        auth, AuthChallengeRepository(session), emails, tokens, settings.auth_otp_secret.get_secret_value()
+        auth,
+        AuthChallengeRepository(session),
+        emails,
+        tokens,
+        settings.auth_otp_secret.get_secret_value(),
+        settings.frontend_url,
     )
 
 

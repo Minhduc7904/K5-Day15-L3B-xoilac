@@ -28,7 +28,7 @@ class GmailEmailService:
         self._transport = transport
 
     async def send(
-        self, *, to: str, subject: str, text: str, html: str | None = None, logo: bytes | None = None
+        self, *, to: str, subject: str, text: str, html: str | None = None
     ) -> str:
         """Submit an email with a plain-text fallback and return the Gmail message ID."""
         settings = self._settings
@@ -55,15 +55,12 @@ class GmailEmailService:
         message["From"] = sender
         message["To"] = _mailbox(to)
         message["Subject"] = subject
+        message["Auto-Submitted"] = "auto-generated"
         message["Date"] = formatdate(usegmt=True)
         message["Message-ID"] = make_msgid(domain=sender.domain)
         message.set_content(text, cte="quoted-printable")
         if html is not None:
             message.add_alternative(html, subtype="html", cte="quoted-printable")
-            if logo is not None:
-                message.get_payload()[-1].add_related(
-                    logo, maintype="image", subtype="png", cid="<examind-logo>"
-                )
         raw = urlsafe_b64encode(message.as_bytes()).decode("ascii")
 
         async with httpx.AsyncClient(timeout=10, transport=self._transport) as client:

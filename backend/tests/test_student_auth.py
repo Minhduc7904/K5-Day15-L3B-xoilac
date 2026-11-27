@@ -41,7 +41,7 @@ async def test_registration_waits_for_otp_and_sends_branded_email(client, db):
     email = mail.outbox[0]
     assert email["to"] == "hs01@example.com"
     assert TEST_OTP in email["text"] and TEST_OTP in email["html"]
-    assert "cid:examind-logo" in email["html"] and email["logo"].startswith(b"\x89PNG")
+    assert "/brand/examind-mark-email.png" in email["html"] and "cid:" not in email["html"]
 
     challenge = response.json()["challenge"]
     assert (await verify_otp(client, challenge, "000000")).json()["code"] == "OTP_INVALID"
