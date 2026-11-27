@@ -5,8 +5,8 @@ Các endpoint mẫu chứng minh backend nối được PostgreSQL và MinIO. D�
 ## Điều kiện gọi
 
 - Base URL local: `http://localhost:8000/api/v1`. Tài liệu tự sinh: `http://localhost:8000/docs`.
-- Chưa có xác thực. Dữ liệu gửi dạng JSON, riêng upload dùng `multipart/form-data`.
-- CORS cho phép origin trong `CORS_ORIGINS` (mặc định `http://localhost:3000`).
+- Các endpoint mẫu không cần đăng nhập. Đăng nhập và phân quyền: [auth-api.md](auth-api.md). Dữ liệu gửi dạng JSON, riêng upload dùng `multipart/form-data`.
+- CORS chỉ bật khi `CORS_ORIGINS` có giá trị (mặc định rỗng từ issue #8; `backend/.env.example` đặt `http://localhost:3000` cho dev).
 
 ## Endpoint và hợp đồng
 
