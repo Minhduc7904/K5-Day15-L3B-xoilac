@@ -29,7 +29,7 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
    ```bash
    ADMIN_EMAIL=admin@example.com
    ADMIN_NAME=Quản trị
-   ADMIN_PASSWORD=<tự đặt, 6–128 ký tự; prod cần ≥ 12>
+   ADMIN_PASSWORD=<tự đặt, 8–128 ký tự; prod cần ≥ 12>
    ```
 
    Không commit `.env`. Trong mật khẩu tránh ký tự `$`, vì compose coi `$` là chỗ thay biến (nếu cần thì viết `$$`). Bỏ trống `ADMIN_EMAIL` hoặc `ADMIN_PASSWORD` thì không có admin mặc định.
@@ -70,7 +70,7 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
    python -m app.cli.create_admin --email rescue@example.com --name "Cứu hộ"
    ```
 
-   Lệnh hỏi mật khẩu hai lần (6–128 ký tự) và không nhận mật khẩu qua tham số. Khi chạy không tương tác (script, `docker exec` không có `-t`), đặt biến `ADMIN_PASSWORD` cho riêng lệnh đó, vd `ADMIN_PASSWORD='...' python -m app.cli.create_admin --email ...` (PowerShell: `$env:ADMIN_PASSWORD='...'`, chạy xong thì `Remove-Item Env:ADMIN_PASSWORD`). Trên Windows, `getpass` đọc thẳng từ console, nên chuyển hướng stdin sẽ làm lệnh treo; trường hợp đó dùng `ADMIN_PASSWORD`.
+   Lệnh hỏi mật khẩu hai lần (8–128 ký tự) và không nhận mật khẩu qua tham số. Khi chạy không tương tác (script, `docker exec` không có `-t`), đặt biến `ADMIN_PASSWORD` cho riêng lệnh đó, vd `ADMIN_PASSWORD='...' python -m app.cli.create_admin --email ...` (PowerShell: `$env:ADMIN_PASSWORD='...'`, chạy xong thì `Remove-Item Env:ADMIN_PASSWORD`). Trên Windows, `getpass` đọc thẳng từ console, nên chuyển hướng stdin sẽ làm lệnh treo; trường hợp đó dùng `ADMIN_PASSWORD`.
 
    | Mã thoát | Ý nghĩa |
    | --- | --- |

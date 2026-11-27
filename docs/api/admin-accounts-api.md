@@ -56,7 +56,7 @@ Tạo một admin mới. `created_by` được ghi là admin đang thao tác.
 | Trường | Ràng buộc |
 | --- | --- |
 | `email` | Bắt buộc, cùng luật với đăng ký: `EmailStr`, bỏ khoảng trắng, chữ thường, tối đa 255 ký tự, duy nhất không phân biệt hoa thường |
-| `password` | Bắt buộc, 6–128 ký tự |
+| `password` | Bắt buộc, 8–128 ký tự |
 | `display_name` | Tuỳ chọn, tối đa 100 ký tự |
 | `current_password` | Bắt buộc, mật khẩu của admin đang thao tác |
 
@@ -83,7 +83,7 @@ Thứ tự kiểm: mật khẩu xác nhận → tài khoản đích là admin �
 
 | HTTP | `code` | Khi nào | Frontend nên làm gì |
 | --- | --- | --- | --- |
-| 422 | (không có) | Email sai, mật khẩu ngoài 6–128 ký tự, thiếu `current_password`, `status` khác `active`/`disabled` | Hiện lỗi ở trường |
+| 422 | (không có) | Email sai, mật khẩu ngoài 8–128 ký tự, thiếu `current_password`, `status` khác `active`/`disabled` | Hiện lỗi ở trường |
 | 401 | `REAUTH_FAILED` | `current_password` sai. Không có gì thay đổi | Báo "Mật khẩu xác nhận không đúng". **Giữ phiên, không chuyển tới trang đăng nhập** |
 | 401 | `SESSION_MISSING` / `SESSION_INVALID` / `SESSION_EXPIRED` / `SESSION_REVOKED` | Mất phiên (xem [auth-api.md](auth-api.md#lỗi-và-trường-hợp-biên)) | Chuyển tới trang đăng nhập |
 | 403 | `FORBIDDEN_ROLE` | Người gọi là student | Báo không có quyền |

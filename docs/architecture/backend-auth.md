@@ -75,7 +75,7 @@ sequenceDiagram
   participant DB as PostgreSQL
   B->>N: POST /api/v1/auth/register {email, password}
   N->>A: chuyển tiếp
-  A->>A: kiểm schema (EmailStr, mật khẩu 6–128); bỏ qua trường role
+  A->>A: kiểm schema (EmailStr, mật khẩu 8–128); bỏ qua trường role
   A->>U: register(email, password)
   U->>DB: có email (lower) chưa?
   alt đã có
@@ -237,7 +237,7 @@ Không có đường HTTP công khai nào tạo được admin. Có đúng ba c�
 | Chưa có email này | Tạo admin active | 0 |
 | Email đã là admin | "Admin mặc định đã có, không thay đổi": không ghi đè mật khẩu, không đổi status | 0 |
 | Email đang thuộc student | Cảnh báo; không nâng quyền, không đổi mật khẩu hay status | 0 |
-| Email sai, mật khẩu ngoài 6–128 ký tự, hoặc `COOKIE_SECURE=true` mà mật khẩu < 12 ký tự | Báo lỗi | 2 |
+| Email sai, mật khẩu ngoài 8–128 ký tự, hoặc `COOKIE_SECURE=true` mà mật khẩu < 12 ký tự | Báo lỗi | 2 |
 
 Mã thoát khác 0 làm `db-init` thất bại, nên backend không khởi động. Trên EC2, `remote-deploy.sh` khi đó quay về commit trước. Chỉ dữ liệu vào sai mới gây lỗi, trong đó có mật khẩu dưới 12 ký tự trên prod: chủ ý không để prod chạy với admin mặc định yếu. Email trùng (kể cả student) chỉ cảnh báo và thoát mã 0, theo review PR #17, để một cấu hình email lỡ trùng không chặn cả lần deploy. `ensure_admin` không chạy trong lifespan của FastAPI, vì nhiều worker có thể chạy cùng lúc và tạo trùng. Trong `docker-compose.prod.yml`, `db-init` nhận `COOKIE_SECURE` mặc định `true` để luật 12 ký tự có hiệu lực.
 
@@ -266,6 +266,7 @@ Luật chống chiếm quyền khi admin quản lý admin:
 | Tài khoản bị khoá còn phiên: 403 `ACCOUNT_DISABLED` | Frontend báo đúng lý do thay vì đưa về trang đăng nhập |
 | Đăng nhập tài khoản bị khoá: chỉ 403 khi mật khẩu đúng | Người không biết mật khẩu không dò được tài khoản nào bị khoá |
 | Đăng ký trả 409 khi email đã có | Chấp nhận lộ việc email đã tồn tại ở bước đăng ký, để người dùng biết mà đăng nhập. Đăng nhập thì không lộ |
+| Mật khẩu mới tối thiểu 8 ký tự (theo review PR #17), tối đa 128 | 6 ký tự quá yếu trước tấn công dò mật khẩu. Luật chỉ áp cho mật khẩu mới; đăng nhập không kiểm độ dài nên tài khoản cũ có mật khẩu 6–7 ký tự vẫn vào được. Admin mặc định trên prod vẫn cần ≥ 12 |
 | Email dùng kiểm tra chặt của `EmailStr` | `email-validator` từ chối tên miền dùng riêng như `.local`, `.test`. Email admin và tài khoản demo dùng tên miền thật hoặc `example.com` |
 
 Kiểm chứng:
@@ -296,7 +297,7 @@ Kiểm chứng:
 1. nginx đã có cấu hình HTTPS, nhưng container backend chưa nhận `COOKIE_SECURE` (chỉ `db-init` nhận, để áp luật mật khẩu 12 ký tự). Có bật `COOKIE_SECURE=true` cho backend trên prod không? Cần Đức xác nhận (#13).
 2. Admin có được xem chat hay đề nháp của học sinh không (#4, #11)?
 3. Có cần thu hồi mọi phiên cũ khi người dùng đăng nhập ở thiết bị mới không? Hiện là không.
-4. Admin tạo qua API có cần luật mật khẩu ≥ 12 ký tự trên prod như admin mặc định không? Hiện là 6–128.
+4. Admin tạo qua API có cần luật mật khẩu ≥ 12 ký tự trên prod như admin mặc định không? Hiện là 8–128.
 
 ## Tài liệu liên quan
 

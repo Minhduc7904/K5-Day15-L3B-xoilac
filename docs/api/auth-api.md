@@ -42,7 +42,7 @@ Công khai. Tạo tài khoản **student** và đăng nhập luôn.
 | Trường | Ràng buộc |
 | --- | --- |
 | `email` | Bắt buộc, đúng định dạng email, tối đa 255 ký tự. Được bỏ khoảng trắng hai đầu và chuyển về chữ thường. Duy nhất, không phân biệt hoa thường |
-| `password` | Bắt buộc, 6–128 ký tự. Không bị cắt khoảng trắng |
+| `password` | Bắt buộc, 8–128 ký tự (trước review PR #17 là 6). Không bị cắt khoảng trắng |
 | `display_name` | Tuỳ chọn, tối đa 100 ký tự. Chuỗi rỗng được lưu thành `null` |
 | Trường khác (vd `role`) | Bị bỏ qua. Không cách nào tự đăng ký thành admin |
 
@@ -59,7 +59,7 @@ Công khai. Mở một phiên mới; các phiên cũ của cùng người dùng 
 {"user_id": 1, "email": "hs01@example.com", "role": "student", "status": "active", "display_name": null, "created_at": "2026-11-27T15:52:23.845134Z"}
 ```
 
-`password` dài 1–128 ký tự. Email được chuẩn hoá như khi đăng ký.
+`password` dài 1–128 ký tự: đăng nhập không áp luật 8 ký tự, nên tài khoản đã đặt mật khẩu 6–7 ký tự trước khi đổi luật vẫn đăng nhập được. Luật 8 ký tự chỉ áp cho mật khẩu mới (đăng ký, tạo admin). Email được chuẩn hoá như khi đăng ký.
 
 ### POST /auth/logout
 
@@ -100,7 +100,7 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
 - Ví dụ 422 khi mật khẩu quá ngắn:
 
   ```json
-  {"detail": [{"type": "string_too_short", "loc": ["body", "password"], "msg": "String should have at least 6 characters", "input": "12345", "ctx": {"min_length": 6}}]}
+  {"detail": [{"type": "string_too_short", "loc": ["body", "password"], "msg": "String should have at least 8 characters", "input": "xxxxxxx", "ctx": {"min_length": 8}}]}
   ```
 
 - Không phải mọi 401 đều là mất phiên. API quản lý admin trả 401 `REAUTH_FAILED` khi mật khẩu xác nhận sai, lúc đó phiên vẫn còn ([admin-accounts-api.md](admin-accounts-api.md#lỗi-và-trường-hợp-biên)). Frontend phân nhánh theo `code`: chỉ `SESSION_MISSING`, `SESSION_INVALID`, `SESSION_EXPIRED`, `SESSION_REVOKED` mới chuyển tới trang đăng nhập.
