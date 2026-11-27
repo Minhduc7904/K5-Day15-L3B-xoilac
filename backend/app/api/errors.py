@@ -23,7 +23,8 @@ from app.usecase.auth import (
 )
 
 from app.usecase.student_auth import (
-    EmailUnavailable, ExpiredOtp, InvalidChallenge, InvalidGoogleLogin, InvalidOtp, ResendLimited, TooManyAttempts,
+    EmailUnavailable, ExpiredOtp, InvalidChallenge, InvalidGoogleLogin, InvalidOtp, InvalidResetToken, ResendLimited,
+    TooManyAttempts,
 )
 
 _STATUS: dict[type[AuthError], int] = {
@@ -33,6 +34,7 @@ _STATUS: dict[type[AuthError], int] = {
     InvalidChallenge: status.HTTP_400_BAD_REQUEST,
     InvalidGoogleLogin: status.HTTP_400_BAD_REQUEST,
     InvalidOtp: status.HTTP_400_BAD_REQUEST,
+    InvalidResetToken: status.HTTP_400_BAD_REQUEST,
     ResendLimited: status.HTTP_429_TOO_MANY_REQUESTS,
     TooManyAttempts: status.HTTP_429_TOO_MANY_REQUESTS,
     EmailAlreadyRegistered: status.HTTP_409_CONFLICT,

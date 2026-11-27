@@ -14,6 +14,8 @@ from app.usecase.auth import AuthError, AuthUseCase, _aware
 
 REGISTRATION = "registration"
 GOOGLE_EMAIL = "google_email"
+PASSWORD_RESET = "password_reset"
+RESET_TOKEN_TTL_MINUTES = 10
 OTP_TTL_MINUTES = 5
 RESEND_SECONDS = 60
 MAX_ATTEMPTS = 5
@@ -53,6 +55,11 @@ class EmailUnavailable(AuthError):
 class InvalidGoogleLogin(AuthError):
     code = "GOOGLE_INVALID"
     message = "Không xác minh được đăng nhập Google. Hãy bắt đầu lại."
+
+
+class InvalidResetToken(AuthError):
+    code = "RESET_TOKEN_INVALID"
+    message = "Phiên đặt lại mật khẩu không còn hiệu lực. Hãy bắt đầu lại."
 
 
 @dataclass(frozen=True)
@@ -102,7 +109,11 @@ class StudentAuthUseCase:
         row = await self._lock_challenge(purpose, challenge)
         return await self._send_code(row, challenge, datetime.now(UTC))
 
-    async def _send_code(self, row: EmailChallenge, challenge: str, now: datetime) -> PendingVerification:
+    async def _send_code(
+        self, row: EmailChallenge, challenge: str, now: datetime, *, deliver: bool = True
+    ) -> PendingVerification:
+        """Tạo mã mới và gửi thư. `deliver=False` vẫn tạo mã và tính giới hạn gửi nhưng không gửi thư,
+        để email chưa có tài khoản đi đúng cùng đường với email có tài khoản (không lộ email nào tồn tại)."""
         if row.sent_at and _aware(row.sent_at) + timedelta(seconds=RESEND_SECONDS) > now:
             raise ResendLimited()
         if row.window_start is None or _aware(row.window_start) + timedelta(hours=1) <= now:
@@ -122,8 +133,10 @@ class StudentAuthUseCase:
         row.attempts = 0
         email, purpose = row.email, row.purpose
         await self._challenges.commit()
+        if not deliver:
+            return PendingVerification(challenge, email)
 
-        content = verification_email(code, OTP_TTL_MINUTES, google=purpose == GOOGLE_EMAIL)
+        content = verification_email(code, OTP_TTL_MINUTES, purpose=purpose)
         try:
             await self._emails.send(
                 to=email, subject=content.subject, text=content.text, html=content.html, logo=content.logo
@@ -144,20 +157,24 @@ class StudentAuthUseCase:
             raise InvalidChallenge()
         return row
 
-    async def verify_email(
-        self, purpose: str, challenge: str, otp: str, user_agent: str | None
-    ) -> tuple[User, str]:
-        row = await self._lock_challenge(purpose, challenge)
+    async def _check_otp(self, row: EmailChallenge, otp: str) -> None:
+        """Kiểm mã của dòng đã khoá. Sai thì tăng số lần thử và commit trước khi báo lỗi."""
         if row.expires_at is None or _aware(row.expires_at) <= datetime.now(UTC) or row.otp_hash is None:
             raise ExpiredOtp()
         if row.attempts >= MAX_ATTEMPTS:
             raise TooManyAttempts()
-        expected = self._otp_digest(self._tokens.hash(challenge), otp)
+        expected = self._otp_digest(row.challenge_hash or "", otp)
         if not hmac.compare_digest(row.otp_hash, expected):
             row.attempts += 1
             error = TooManyAttempts() if row.attempts == MAX_ATTEMPTS else InvalidOtp()
             await self._challenges.commit()
             raise error
+
+    async def verify_email(
+        self, purpose: str, challenge: str, otp: str, user_agent: str | None
+    ) -> tuple[User, str]:
+        row = await self._lock_challenge(purpose, challenge)
+        await self._check_otp(row, otp)
 
         payload = row.payload
         row.payload = row.otp_hash = row.challenge_hash = None
@@ -187,3 +204,45 @@ class StudentAuthUseCase:
         if identity.authoritative or await self._auth.has_google_account(identity.subject):
             return await self._auth.google_login(identity, user_agent)
         return await self._start(GOOGLE_EMAIL, identity.email, payload)
+
+    # Quên mật khẩu: email → mã OTP → reset_token → mật khẩu mới. Chỉ cho học sinh đang hoạt động.
+    # Email không có tài khoản đi cùng đường (tạo mã, tính giới hạn) nhưng không gửi thư.
+
+    async def start_password_reset(self, email: str) -> None:
+        now = datetime.now(UTC)
+        await self._challenges.delete_stale_challenges(now - timedelta(days=1))
+        row = await self._challenges.lock_email(PASSWORD_RESET, email)
+        user = await self._auth.password_reset_candidate(email)
+        row.payload = {"user_id": user.user_id if user else None, "verified": False}
+        await self._send_code(row, self._tokens.generate(), now, deliver=user is not None)
+
+    async def verify_password_reset(self, email: str, otp: str) -> str:
+        row = await self._challenges.lock_existing_email(PASSWORD_RESET, email)
+        if row is None or row.payload is None or row.payload.get("verified"):
+            raise ExpiredOtp()
+        await self._check_otp(row, otp)
+        if row.payload.get("user_id") is None:
+            # Mã của email không có tài khoản không bao giờ được gửi đi; coi như sai mã.
+            raise InvalidOtp()
+        token = self._tokens.generate()
+        row.challenge_hash = self._tokens.hash(token)
+        row.otp_hash = None
+        row.expires_at = datetime.now(UTC) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+        row.payload = {"user_id": row.payload["user_id"], "verified": True}
+        await self._challenges.commit()
+        return token
+
+    async def reset_password(self, reset_token: str, password: str) -> None:
+        row = await self._challenges.lock_challenge(PASSWORD_RESET, self._tokens.hash(reset_token))
+        if (
+            row is None
+            or not (row.payload or {}).get("verified")
+            or row.expires_at is None
+            or _aware(row.expires_at) <= datetime.now(UTC)
+        ):
+            raise InvalidResetToken()
+        user_id = row.payload["user_id"]
+        row.payload = row.challenge_hash = None
+        if not await self._auth.set_password(user_id, password):
+            await self._challenges.commit()
+            raise InvalidResetToken()

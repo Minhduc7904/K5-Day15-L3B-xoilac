@@ -19,7 +19,6 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/feedback';
 import { Accordion } from '@/components/ui/interactive';
 import { cn } from '@/lib/cn';
-import { AuthButton } from './auth-actions';
 import { chapters, difficulties, faqs } from './content';
 
 /* ---------- Dải chương chạy ngang ---------- */
@@ -409,56 +408,5 @@ export function Faq() {
         </Reveal>
       </Container>
     </Section>
-  );
-}
-
-/* ---------- Kêu gọi cuối trang ---------- */
-
-export function FinalCta() {
-  return (
-    <section aria-labelledby="cta-title" className="pb-20 sm:pb-28">
-      <Container>
-        <Reveal>
-          <div className="relative overflow-hidden rounded-[32px] bg-linear-to-br from-primary to-foreground px-6 py-14 text-center sm:px-12 sm:py-16 lg:text-left">
-            <div
-              className="pointer-events-none absolute inset-0 bg-grid-inverse"
-              aria-hidden="true"
-            />
-            <div
-              className="pointer-events-none absolute -right-20 -bottom-24 size-80 rounded-full bg-accent/30 blur-3xl"
-              aria-hidden="true"
-            />
-            <div className="relative grid items-center gap-10 lg:grid-cols-[1fr_auto]">
-              <div className="grid justify-items-center gap-5 lg:justify-items-start">
-                <h2 id="cta-title" className="text-h1 text-balance text-primary-foreground">
-                  Sẵn sàng ôn đúng chỗ chưa?
-                </h2>
-                <p className="max-w-xl text-body-lg text-primary-foreground/80">
-                  Tạo tài khoản, nhắn yêu cầu đầu tiên và xem Examind đề xuất đề ôn cho riêng bạn.
-                </p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <AuthButton kind="register" variant="accent" arrow>
-                    Tạo tài khoản
-                  </AuthButton>
-                  <AuthButton kind="login" variant="inverse">
-                    Đăng nhập
-                  </AuthButton>
-                </div>
-              </div>
-              <Float distance={14} duration={4} className="mx-auto w-40 sm:w-48">
-                <Image
-                  src="/brand/mascot/static/success.webp"
-                  alt="Linh vật Examind ăn mừng"
-                  width={384}
-                  height={384}
-                  sizes="192px"
-                  className="h-auto w-full drop-shadow-mascot"
-                />
-              </Float>
-            </div>
-          </div>
-        </Reveal>
-      </Container>
-    </section>
   );
 }

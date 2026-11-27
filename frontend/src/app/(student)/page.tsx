@@ -1,6 +1,6 @@
 import { LandingPage } from '@/features/landing/landing-page';
 
-// Khách vào `/` thấy landing. Khi có phiên đăng nhập thật (#8), học sinh đã đăng nhập sẽ được chuyển vào khu học tập.
+// Trang chủ của học sinh. Khách bị `AuthGuard` chuyển tới /login, admin tới /admin.
 export default function StudentPage() {
   return <LandingPage />;
 }

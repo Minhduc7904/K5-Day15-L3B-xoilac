@@ -1,7 +1,5 @@
-import { ArrowLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/layout/logo';
-import { Button } from '@/components/ui/button';
 import { AuthAside } from '@/features/auth/components/auth-aside';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -10,11 +8,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <AuthAside />
       <div className="relative flex min-w-0 flex-col">
         <div className="bg-grid mask-fade pointer-events-none absolute inset-0 lg:hidden" aria-hidden="true" />
-        <header className="relative flex h-16 items-center justify-between gap-4 px-4 sm:h-18 sm:px-8">
-          <Logo />
-          <Button href="/" variant="ghost" size="sm" leftIcon={<ArrowLeft aria-hidden="true" />}>
-            Trang chủ
-          </Button>
+        <header className="relative flex h-16 items-center px-4 sm:h-18 sm:px-8">
+          <Logo href="/login" />
         </header>
         <main id="noi-dung" className="relative flex flex-1 items-start justify-center px-4 py-8 sm:items-center sm:px-8 sm:py-12">
           <div className="w-full max-w-[440px]">{children}</div>

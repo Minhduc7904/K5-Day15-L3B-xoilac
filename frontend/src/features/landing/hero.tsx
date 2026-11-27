@@ -7,7 +7,6 @@ import { Container } from '@/components/layout/container';
 import { Float, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/feedback';
-import { AuthButton } from './auth-actions';
 import { ChatDemo } from './chat-demo';
 
 const promises = ['Nêu rõ căn cứ bằng số liệu', 'Bạn duyệt trước khi tạo đề', 'Chỉ dùng câu đã được duyệt'];
@@ -87,9 +86,6 @@ export function Hero() {
             </p>
           </StaggerItem>
           <StaggerItem className="flex flex-wrap gap-3">
-            <AuthButton kind="register" arrow>
-              Bắt đầu ôn ngay
-            </AuthButton>
             <Button variant="outline" size="lg" href="#cach-hoat-dong">
               Xem cách hoạt động
             </Button>
