@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     cookie_name: str = "examind_session"
     cookie_secure: bool = False
     session_ttl_hours: int = Field(default=168, ge=1)
+
+    # Admin mặc định, chỉ lệnh `python -m app.cli.ensure_admin` đọc (chạy trong db-init).
+    # SecretStr để mật khẩu không lộ khi in hay log đối tượng Settings.
+    admin_email: str = ""
+    admin_password: SecretStr = SecretStr("")
+    admin_name: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
