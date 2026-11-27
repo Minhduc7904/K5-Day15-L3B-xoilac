@@ -6,6 +6,20 @@
 
 Repo nộp bài hackathon AI20K của nhóm: một bản chạy thử AI cho **một lát cắt** (xem `spec.md` §4), kèm bằng chứng, bộ câu thử và mô phỏng chi phí. Mọi câu trả lời phải chạy được bằng các lệnh dưới đây.
 
+## Bắt đầu phiên làm việc: đồng bộ code và nhánh
+
+Làm bước này **trước khi đọc tài liệu hay sửa bất cứ gì**, để agent không làm trên code cũ hoặc sai nhánh:
+
+1. **Xác định issue.** Lấy số issue từ yêu cầu của người dùng. Không rõ thì hỏi một câu ngắn: "Làm cho issue nào?". Việc không thuộc issue nào (sửa nhỏ, tài liệu, chore) thì dùng nhánh `chore/<mô-tả-ngắn>`.
+2. **Kiểm tra thay đổi đang dở.** Chạy `git status`. Có thay đổi chưa commit thì **không** checkout hay pull, báo cho người dùng và hỏi nên commit, stash hay giữ nguyên. Không dùng `git reset --hard`, `git checkout -- .` hay `git clean` để dọn cho xong việc.
+3. **Lấy code mới nhất.** `git fetch origin`, rồi `git checkout main` và `git pull --ff-only origin main`. Pull không fast-forward được thì dừng lại, báo người dùng, không tự merge hay rebase.
+4. **Vào nhánh của issue.**
+   - Nhánh đã có (cục bộ hoặc trên `origin`): `git checkout <nhánh>` rồi `git pull --ff-only`. Nếu nhánh tụt sau `main`, báo người dùng, chưa tự merge `main` vào.
+   - Chưa có: tạo từ `main` vừa pull, `git checkout -b feat/issue-<số>-<mô-tả-ngắn>`. Tên chữ thường, có gạch ngang, mô tả ngắn không dấu (ví dụ `feat/issue-2-deploy`). Dùng tiền tố `fix/`, `docs/`, `chore/` thay `feat/` khi hợp hơn.
+5. **Báo lại** một dòng: đang ở nhánh nào, ở commit nào, đã pull từ đâu. Rồi mới sang phần "Đọc trước khi làm".
+
+**Người dùng có quyền làm khác quy trình này.** Họ có thể bảo làm ngay trên `main`, dùng nhánh khác, bỏ qua bước pull, hoặc chỉ định cách đặt tên. Khi đó agent làm theo, không từ chối và không bắt người dùng giải thích. Chỉ cần nói ngắn gọn một lần nếu việc đó có rủi ro cụ thể (ví dụ làm trên code chưa pull có thể xung đột), rồi tiếp tục. Quy trình trên là mặc định khi người dùng chưa nói gì.
+
 ## Đọc trước khi làm
 
 1. Đọc [AGENTS.md](AGENTS.md), [README.md](README.md), [mục lục và quy chuẩn tài liệu](docs/README.md) và phần liên quan trong [spec.md](spec.md). Riêng việc đụng tới luồng sản phẩm hoặc kiểm thử phải đọc §4 và §7.
