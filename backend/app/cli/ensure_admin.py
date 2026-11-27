@@ -9,8 +9,10 @@ có thể chạy cùng lúc.
 | Tình huống | Kết quả | Mã thoát |
 | --- | --- | --- |
 | Thiếu ADMIN_EMAIL hoặc ADMIN_PASSWORD | Bỏ qua | 0 |
-| Chưa có tài khoản với email này | Tạo admin active, created_by = NULL | 0 |
-| Email đã là admin | Không đổi gì (không ghi đè mật khẩu, không đổi status) | 0 |
+| Chưa có tài khoản, chưa có admin gốc | Tạo admin active, is_root = true, created_by = NULL | 0 |
+| Email đã là admin gốc | Không đổi gì (không ghi đè mật khẩu, không đổi status) | 0 |
+| Email là admin thường, chưa có admin gốc | Đánh dấu làm admin gốc (#20), không đổi mật khẩu hay status | 0 |
+| Đã có admin gốc khác | Cảnh báo, không đổi gì, không tạo tài khoản | 0 |
 | Email đang thuộc tài khoản không phải admin (student) | Cảnh báo, không đổi mật khẩu, vai trò hay status | 0 |
 | Email sai định dạng, mật khẩu sai độ dài, prod mà mật khẩu < 12 ký tự | Báo lỗi | 2 |
 
@@ -44,9 +46,17 @@ async def _ensure(email: str, password: str, name: str | None, settings: Setting
             print(f"Lỗi admin mặc định: {e.message}", file=sys.stderr)
             return 2
     if result is EnsureResult.CREATED:
-        print(f"Đã tạo admin mặc định user_id={user.user_id} email={user.email}")
-    else:
+        print(f"Đã tạo admin mặc định (admin gốc) user_id={user.user_id} email={user.email}")
+    elif result is EnsureResult.MARKED_ROOT:
+        print(f"Admin mặc định đã có, đánh dấu làm admin gốc (user_id={user.user_id} email={user.email}); không đổi mật khẩu")
+    elif result is EnsureResult.ALREADY_ROOT:
         print(f"Admin mặc định đã có, không thay đổi (user_id={user.user_id} email={user.email})")
+    else:
+        print(
+            f"CẢNH BÁO: đã có admin gốc khác (user_id={user.user_id} email={user.email}). "
+            f"Không tạo hay đổi tài khoản {email}.",
+            file=sys.stderr,
+        )
     return 0
 
 

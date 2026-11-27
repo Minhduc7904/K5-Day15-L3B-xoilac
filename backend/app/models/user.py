@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -19,6 +19,15 @@ class User(Base):
         CheckConstraint("role IN ('student','admin')", name="ck_users_role"),
         CheckConstraint("status IN ('active','disabled')", name="ck_users_status"),
         Index("uq_users_email_lower", func.lower(text("email")), unique=True),
+        # Admin gốc (migration 0005): tối đa một tài khoản, và phải là admin.
+        CheckConstraint("NOT is_root OR role = 'admin'", name="ck_users_root_is_admin"),
+        Index(
+            "uq_users_single_root",
+            "is_root",
+            unique=True,
+            postgresql_where=text("is_root"),
+            sqlite_where=text("is_root"),
+        ),
     )
 
     user_id: Mapped[int] = mapped_column(primary_key=True)
@@ -36,3 +45,5 @@ class User(Base):
     created_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.user_id", ondelete="SET NULL", name="fk_users_created_by")
     )
+    # Admin gốc: tạo từ ADMIN_EMAIL (ensure_admin). Không API nào đặt được cột này.
+    is_root: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))

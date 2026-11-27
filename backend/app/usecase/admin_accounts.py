@@ -12,7 +12,7 @@ from enum import Enum
 
 from app.models.user import ROLE_ADMIN, STATUS_ACTIVE, STATUS_DISABLED, User
 from app.repositories.session_repository import SessionRepository
-from app.repositories.user_repository import UserRepository
+from app.repositories.user_repository import DuplicateRootError, UserRepository
 from app.service.password_service import PasswordService
 from app.usecase.auth import (
     PASSWORD_MAX,
@@ -57,8 +57,10 @@ class EmailBelongsToNonAdmin(AuthError):
 
 class EnsureResult(Enum):
     SKIPPED = "skipped"
-    CREATED = "created"
-    ALREADY_ADMIN = "already_admin"
+    CREATED = "created"  # tạo admin mới, là admin gốc
+    ALREADY_ROOT = "already_root"  # email đã là admin gốc: không đổi gì
+    MARKED_ROOT = "marked_root"  # email là admin thường, hệ thống chưa có gốc: đánh dấu làm gốc
+    OTHER_ROOT = "other_root"  # đã có admin gốc khác: không đổi gì, không tạo
 
 
 class AdminAccountsUseCase:
@@ -81,9 +83,13 @@ class AdminAccountsUseCase:
     async def ensure_default_admin(
         self, email: str, password: str, display_name: str | None, strict: bool
     ) -> tuple[EnsureResult, User | None]:
-        """Tạo admin mặc định nếu chưa có. Idempotent: admin đã có thì không đổi gì (kể cả mật khẩu, status).
+        """Tạo admin gốc từ ADMIN_EMAIL nếu chưa có (#20). Idempotent, không bao giờ đổi mật khẩu hay status.
 
-        `strict` (prod) đòi mật khẩu ≥ PROD_ADMIN_PASSWORD_MIN. Email đang thuộc student: không nâng quyền.
+        - Chưa có tài khoản và chưa có admin gốc: tạo admin, đặt is_root.
+        - Email là admin thường và chưa có admin gốc: đánh dấu làm gốc.
+        - Email đã là gốc, hoặc đã có gốc khác: không đổi gì (OTHER_ROOT để CLI cảnh báo).
+        - Email đang thuộc student: EmailBelongsToNonAdmin, không nâng quyền.
+        `strict` (prod) đòi mật khẩu ≥ PROD_ADMIN_PASSWORD_MIN.
         """
         email = normalize_email(email)
         if not email or not password:
@@ -97,19 +103,33 @@ class AdminAccountsUseCase:
             )
 
         existing = await self._users.get_by_email(email)
-        if existing is not None:
-            if existing.role == ROLE_ADMIN:
-                return EnsureResult.ALREADY_ADMIN, existing
+        if existing is not None and existing.role != ROLE_ADMIN:
             raise EmailBelongsToNonAdmin()
+        if existing is not None and existing.is_root:
+            return EnsureResult.ALREADY_ROOT, existing
+
+        # Từ đây: email là admin thường, hoặc chưa có tài khoản. Không bao giờ đổi mật khẩu hay status.
+        root = await self._users.get_root()
+        if root is not None:
+            # Đã có admin gốc khác: không tạo thêm admin, không chuyển quyền gốc.
+            return EnsureResult.OTHER_ROOT, root
+        if existing is None:
+            try:
+                existing = await self._auth.create_user(email, password, ROLE_ADMIN, display_name, created_by=None)
+            except EmailAlreadyRegistered:
+                # Một tiến trình khác vừa tạo cùng email: đọc lại.
+                existing = await self._users.get_by_email(email)
+                if existing is None or existing.role != ROLE_ADMIN:
+                    raise EmailBelongsToNonAdmin() from None
+            result = EnsureResult.CREATED
+        else:
+            result = EnsureResult.MARKED_ROOT
         try:
-            user = await self._auth.create_user(email, password, ROLE_ADMIN, display_name, created_by=None)
-        except EmailAlreadyRegistered:
-            # Một tiến trình khác vừa tạo cùng email: đọc lại để trả kết quả đúng.
-            existing = await self._users.get_by_email(email)
-            if existing is not None and existing.role == ROLE_ADMIN:
-                return EnsureResult.ALREADY_ADMIN, existing
-            raise EmailBelongsToNonAdmin() from None
-        return EnsureResult.CREATED, user
+            await self._users.set_root(existing)
+        except DuplicateRootError:
+            # Tiến trình khác vừa đặt admin gốc trước.
+            return EnsureResult.OTHER_ROOT, await self._users.get_root()
+        return result, existing
 
     # ---- Admin đã đăng nhập --------------------------------------------------------
 

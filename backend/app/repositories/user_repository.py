@@ -12,6 +12,10 @@ class DuplicateEmailError(Exception):
     """Vi phạm unique index trên lower(email)."""
 
 
+class DuplicateRootError(Exception):
+    """Vi phạm unique index một phần uq_users_single_root (đã có admin gốc khác)."""
+
+
 class UserRepository:
     """Chỉ truy cập bảng users. Không chứa luật nghiệp vụ."""
 
@@ -48,6 +52,19 @@ class UserRepository:
     async def set_last_login(self, user: User, at: datetime) -> None:
         user.last_login_at = at
         await self._session.commit()
+        await self._session.refresh(user)
+
+    async def get_root(self) -> User | None:
+        result = await self._session.execute(select(User).where(User.is_root.is_(True)))
+        return result.scalar_one_or_none()
+
+    async def set_root(self, user: User) -> None:
+        user.is_root = True
+        try:
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            raise DuplicateRootError from e
         await self._session.refresh(user)
 
     async def list_by_role(self, role: str) -> Sequence[User]:

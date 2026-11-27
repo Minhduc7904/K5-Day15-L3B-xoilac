@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.cli.ensure_admin import main
@@ -169,3 +169,76 @@ def test_output_never_contains_password(db_url, capsys):
     out = capsys.readouterr()
     for secret in (PW, PW_OTHER, too_short, "$argon2"):
         assert secret not in out.out + out.err
+
+
+# ---- Admin gốc (#20) ------------------------------------------------------------
+
+
+def _make_admin(url, email):
+    async def _q():
+        async with _session(url) as s:
+            uc = AuthUseCase(UserRepository(s), SessionRepository(s), PasswordService(), TokenService(), 168)
+            await uc.create_user(email, PW, "admin")
+
+    asyncio.run(_q())
+
+
+def _by_email(url):
+    return {u.email: u for u in _users(url)}
+
+
+def test_created_admin_is_root(db_url):
+    assert _run(db_url) == 0
+    [user] = _users(db_url)
+    assert user.is_root is True
+
+
+def test_existing_plain_admin_is_marked_root_without_password_change(db_url, capsys):
+    _make_admin(db_url, "admin@example.com")
+    before = _by_email(db_url)["admin@example.com"]
+    assert before.is_root is False
+
+    assert _run(db_url, password=PW_OTHER) == 0
+    assert "đánh dấu làm admin gốc" in capsys.readouterr().out
+    after = _by_email(db_url)["admin@example.com"]
+    assert after.is_root is True
+    assert after.password_hash == before.password_hash  # không đổi mật khẩu
+    # Chạy lại: giữ nguyên, vẫn một admin gốc.
+    assert _run(db_url) == 0
+    assert [u.email for u in _users(db_url) if u.is_root] == ["admin@example.com"]
+
+
+def test_other_root_exists_new_email_is_not_created(db_url, capsys):
+    assert _run(db_url) == 0  # admin@example.com là gốc
+    capsys.readouterr()
+    assert _run(db_url, email="admin2@example.com") == 0
+    assert "đã có admin gốc khác" in capsys.readouterr().err
+    assert set(_by_email(db_url)) == {"admin@example.com"}
+
+
+def test_other_root_exists_plain_admin_is_not_marked(db_url, capsys):
+    assert _run(db_url) == 0
+    _make_admin(db_url, "admin2@example.com")
+    capsys.readouterr()
+    assert _run(db_url, email="admin2@example.com") == 0
+    assert "đã có admin gốc khác" in capsys.readouterr().err
+    users = _by_email(db_url)
+    assert users["admin@example.com"].is_root is True
+    assert users["admin2@example.com"].is_root is False
+
+
+def test_database_allows_at_most_one_root_and_root_must_be_admin(db_url):
+    from sqlalchemy.exc import IntegrityError
+
+    assert _run(db_url) == 0
+    _make_admin(db_url, "admin2@example.com")
+
+    async def _try(sql):
+        async with _session(db_url) as s:
+            await s.execute(text(sql))
+            await s.commit()
+
+    with pytest.raises(IntegrityError):
+        asyncio.run(_try("UPDATE users SET is_root = 1 WHERE email = 'admin2@example.com'"))
+    with pytest.raises(IntegrityError):
+        asyncio.run(_try("UPDATE users SET role = 'student' WHERE email = 'admin@example.com'"))
