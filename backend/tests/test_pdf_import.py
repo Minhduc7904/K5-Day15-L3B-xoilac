@@ -9,16 +9,17 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject, NumberObject
-from sqlalchemy import select
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.api.deps import get_pdf_import_models, get_storage
 from app.core.config import get_settings
 from app.core.database import get_session, get_sessionmaker
 from app.main import app
-from app.models import Base
-from app.repositories.pdf_imports import PdfImportRepository, questions
+from app.models import Base, PdfReferenceVector
+from app.repositories.pdf_imports import PdfImportRepository, question_chapters, questions
 from app.service.pdf_import_models import PdfImportModels
+from app.usecase.pdf_import_classification import classify_drafts
 from tests.conftest import FakeStorage
 from tests.test_auth import login, make_admin, register
 
@@ -62,6 +63,8 @@ def fixture_pdf(*, scanned: bool) -> bytes:
 
 
 class FixtureModels(PdfImportModels):
+    embedding_calls = 0
+
     async def _post(self, url, key, body, timeout):
         if url.endswith("/ocr"):
             assert body["include_image_base64"] is True
@@ -72,6 +75,12 @@ class FixtureModels(PdfImportModels):
                 "markdown": "I. Câu 1. Chọn đồ thị $y=x$. A. text B. text C. text D. ![img](img.png)\nI. 1 D",
                 "images": [{"id": "img.png", "image_base64": f"data:image/png;base64,{FIGURE}"}],
             }]}
+        if url.endswith("/embeddings"):
+            self.embedding_calls += 1
+            return {"data": [
+                {"index": i, "embedding": [0.0, 1.0] if "không liên quan" in value else [1.0, 0.0]}
+                for i, value in enumerate(body["input"])
+            ]}
         assert url.endswith("/chat/completions")
         assert body["response_format"]["json_schema"]["strict"] is True
         media = re.search(r"!\[media:\d+\]\(media:\d+\)", body["messages"][1]["content"]).group()
@@ -178,6 +187,7 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
         question = await PdfImportRepository(db).read_published_question(question_id)
     assert question["content"] == "Chọn đồ thị $y=x$."
     assert list(question["statements"][3]) == ["content", "order"]
+    assert question["chapterCodes"] == ["12C1"]
     assert "correct_answer" not in question and "solution" not in question
 
 
@@ -194,3 +204,62 @@ async def test_invalid_pdf_and_rejected_draft_do_not_publish(pdf_api):
     assert (await client.post(f"{review}/approve")).status_code == 409
     async with sessions() as db:
         assert (await db.execute(select(questions))).all() == []
+
+
+async def test_reference_cache_uses_published_questions_and_abstains(pdf_api):
+    _, sessions, _ = pdf_api
+    models = FixtureModels(get_settings())
+    async with sessions() as session:
+        ids = []
+        for visibility in ["PUBLISHED", "DRAFT", "PRIVATE"]:
+            row = await session.execute(insert(questions).values(
+                content=f"Tính đạo hàm $x^2$ {visibility}.", slug=visibility.lower(), type="SHORT_ANSWER",
+                difficulty="TH", grade=12, subject_id=1, visibility=visibility,
+            ).returning(questions.c.question_id))
+            question_id = row.scalar_one()
+            ids.append(question_id)
+            await session.execute(insert(question_chapters).values(question_id=question_id, chapter_id=1))
+        await session.commit()
+        repo = PdfImportRepository(session)
+        matched, weak = (
+            {"content": content, "imageDependent": False, "statements": [], "flags": []}
+            for content in ["Đạo hàm của $x^3$.", "Câu không liên quan."]
+        )
+        await classify_drafts([matched, weak], repo, models)
+        await session.commit()
+        labels = matched["suggestions"]
+        assert (labels["chapter"], labels["grade"], labels["difficulty"]) == ("12C1", 12, "TH")
+        assert [n["questionId"] for n in labels["neighbors"]] == ids[:1]
+        assert labels["neighbors"][0]["similarity"] == 1
+        assert weak["suggestions"]["chapter"] is None and weak["flags"] == ["label_review"]
+        assert list(await session.scalars(select(PdfReferenceVector.question_id))) == ids[:1]
+        calls = models.embedding_calls
+        await classify_drafts([matched], repo, models)
+        assert models.embedding_calls == calls + 1   # Query only, cached reference reused.
+        await session.execute(update(questions).where(questions.c.question_id == ids[0]).values(visibility="PRIVATE"))
+        await session.commit()
+        await classify_drafts([matched], repo, models)
+        assert matched["suggestions"]["neighbors"] == []
+
+
+async def test_ocr_adapter_output_contract(monkeypatch):
+    from app.core.config import Settings
+    from app.service.pdf_import_models import OcrImage, OcrPage
+
+    async def post(url, key, body, timeout):
+        assert url.endswith("/ocr")
+        assert body["model"] == "selected-mistral"
+        return {"pages": [
+            {"index": 1, "markdown": "Trang 2", "images": [{"id": "bad.png", "image_base64": "?"}]},
+            {"index": 0, "markdown": "Trang 1", "images": [{"id": "figure.png", "image_base64": FIGURE}]},
+        ]}
+
+    settings = Settings(ocr_provider="mistral", ocr_model="selected-mistral", mistral_api_key="fixture")
+    models = PdfImportModels(settings)
+    monkeypatch.setattr(models, "_post", post)
+    model, pages = await models.recognize(b"test")
+    assert model == "selected-mistral"
+    assert pages == [
+        OcrPage(0, "Trang 1", [OcrImage("figure.png", base64.b64decode(FIGURE))]),
+        OcrPage(1, "Trang 2", [OcrImage("bad.png", None)]),
+    ]

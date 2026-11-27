@@ -25,7 +25,7 @@ Backend dùng PostgreSQL, MinIO và schema nền từ migration `0002`. PDF cầ
 
 ## Quyết định và cách kiểm chứng
 
-MVP dùng FastAPI BackgroundTasks. Nếu tiến trình dừng trong lúc xử lý, lần tải lại PDF tạo một phiên mới. OCR mặc định dùng Mistral với model cấu hình được. Tệp gốc và hình nằm trong MinIO riêng tư. URL xem hình có thời hạn đi qua backend để trình duyệt dùng được khi MinIO nằm trong mạng Docker.
+MVP dùng FastAPI BackgroundTasks. Nếu tiến trình dừng trong lúc xử lý, lần tải lại PDF tạo một phiên mới. \`OCR_PROVIDER=mistral\` chọn adapter duy nhất hiện có. \`OCR_MODEL\` chọn model Mistral. Adapter chuyển phản hồi thành danh sách trang có chỉ số bắt đầu từ 0, Markdown và ảnh gồm mã tham chiếu trong Markdown cùng byte ảnh hoặc giá trị thiếu. Bước lưu ảnh và bước tách câu cùng dùng hợp đồng này. Để thêm nhà cung cấp, bổ sung adapter và cấu hình lựa chọn. Tệp gốc và hình nằm trong MinIO riêng tư. URL xem hình có thời hạn đi qua backend để trình duyệt dùng được khi MinIO nằm trong mạng Docker.
 
 | Mốc | Bằng chứng hoàn thành |
 | --- | --- |
@@ -38,12 +38,14 @@ MVP dùng FastAPI BackgroundTasks. Nếu tiến trình dừng trong lúc xử l�
 - [x] Mốc 1. Đã đối chiếu đề mẫu, trang hình và đáp án. Đã viết tài liệu trước code nghiệp vụ.
 - [x] Mốc 2. Đã kiểm từ tải lên đến câu xuất bản và URL ảnh qua API. Test dùng phản hồi nhà cung cấp giả lập và kho tệp trong bộ nhớ.
 - [x] Mốc 3. Đã kiểm năm loại câu, số câu lặp, đáp án xung đột, mệnh đề chưa rõ, hình thiếu và câu bị từ chối. Bộ test backend có 49 ca đạt tại mốc này.
-- [ ] Mốc 4. Kiểm gợi ý nhãn bằng chỉ mục câu đã duyệt.
+- [x] Mốc 4. Đã kiểm gợi ý nhãn, bỏ trống khi điểm thấp, dùng lại embedding đã lưu và bỏ câu bị ngừng xuất bản. Test dùng vector giả lập.
 - [ ] Mốc 5. Nghiệm thu với nhà cung cấp và hạ tầng thật.
 
 Mẫu tại máy nhóm `data/example_exam.pdf` có 15 trang. Phần I câu 6 có bốn đồ thị trên trang 2 và đáp án D trên trang 7. Phần I câu 5 qua ranh giới trang 1–2. PDF có lớp văn bản. Ca scan cần thêm bản ảnh hoặc fixture ảnh tương đương.
 
-Chạy từ thư mục gốc trên Windows bằng `..venv\Scripts\python.exe -m pytest -q backend`. Test sinh PDF có lớp chữ và PDF chỉ có ảnh. Các test tách câu dùng phản hồi OCR và OpenAI cố định để tái hiện các trường hợp biên.
+Chạy từ thư mục gốc trên Windows bằng `.\.venv\Scripts\python.exe -m pytest -q backend`. Test sinh PDF có lớp chữ và PDF chỉ có ảnh. Các test tách câu dùng phản hồi OCR và OpenAI cố định để tái hiện các trường hợp biên. Để nghiệm thu thật, cấu hình `MISTRAL_API_KEY` và `OPENAI_API_KEY` trong `backend/.env`, chạy backend cùng PostgreSQL và MinIO local, rồi thực hiện luồng trong tài liệu API.
+
+Chỉ mục dùng tối đa 160 dòng tham chiếu từ các câu Toán THPT có `visibility=PUBLISHED` và chương hợp lệ trong bảng nền. Khi phiên mới cần gợi ý, hệ thống bổ sung embedding còn thiếu. Vector được lưu theo mã câu và model, làm mới khi thân câu hoặc mệnh đề đổi. Chỉ các câu hiện còn xuất bản được truy vấn. MVP dùng cosine chính xác, tối đa 5 câu gần, ngưỡng khởi điểm 0,65 và chênh tỷ trọng phiếu 0,12. Các ngưỡng này cần đối chiếu với dữ liệu mẫu qua model thật. Câu phụ thuộc vào hình đi thẳng tới gắn nhãn thủ công.
 
 ## Tài liệu liên quan
 

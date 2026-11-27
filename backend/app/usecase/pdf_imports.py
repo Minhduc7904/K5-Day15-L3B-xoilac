@@ -1,4 +1,3 @@
-import base64
 import logging
 import re
 from io import BytesIO
@@ -11,13 +10,13 @@ from starlette.concurrency import run_in_threadpool
 
 from app.repositories.pdf_imports import PdfImportRepository
 from app.schemas.pdf_import import DraftEdit
-from app.service.pdf_import_models import OcrPage, PdfImportModels
+from app.service.pdf_import_models import MAX_IMAGE_BYTES, OcrPage, PdfImportModels
 from app.service.storage_service import StorageService
 from app.usecase.pdf_import_answers import STATEMENT_TYPES, build_drafts, media_ids
+from app.usecase.pdf_import_classification import classify_drafts
 
 MAX_PDF_BYTES = 20 * 1024 * 1024
 MAX_PAGES = 30
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
 IMAGE_LINK = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 CHAPTER_CODE = re.compile(r"(10|11|12)C\d+")
 logger = logging.getLogger(__name__)
@@ -39,21 +38,15 @@ def count_pdf_pages(data: bytes) -> int:
         raise ImportErrorDetail(422, "PDF không đọc được hoặc được mã hóa.") from None
 
 
-def decode_image(source: dict) -> tuple[bytes, str]:
-    encoded = source.get("image_base64")
-    if not isinstance(encoded, str):
-        raise ValueError("Thiếu dữ liệu ảnh.")
-    if len(encoded) > MAX_IMAGE_BYTES * 4 // 3 + 128:
-        raise ValueError("Kích thước ảnh không hợp lệ.")
-    data = base64.b64decode(encoded.rsplit(",", 1)[-1], validate=True)
+def image_mime(data: bytes | None) -> str:
     if not data or len(data) > MAX_IMAGE_BYTES:
         raise ValueError("Kích thước ảnh không hợp lệ.")
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return data, "image/png"
+        return "image/png"
     if data.startswith(b"\xff\xd8\xff"):
-        return data, "image/jpeg"
+        return "image/jpeg"
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return data, "image/webp"
+        return "image/webp"
     raise ValueError("Định dạng ảnh không được hỗ trợ.")
 
 
@@ -94,13 +87,14 @@ class PdfImportUseCase:
     async def _normalize_page(self, page: OcrPage, original_id: int) -> tuple[dict, list[str]]:
         identifiers = {}
         warnings = []
-        for source in page.images:
-            name = source["id"]
+        for image in page.images:
+            name = image.reference
             if name in identifiers:
                 raise ValueError("Mã ảnh OCR bị trùng trên một trang.")
             try:
-                data, mime = decode_image(source)
-                identifiers[name] = await self._save_file(name[:255], data, mime, original_id)
+                mime = image_mime(image.data)
+                assert image.data is not None
+                identifiers[name] = await self._save_file(name[:255], image.data, mime, original_id)
             except (ValueError, OSError, BotoCoreError, ClientError):
                 warnings.append(f"Trang {page.index + 1}: không lưu được hình {name}.")
                 identifiers[name] = None
@@ -149,6 +143,16 @@ class PdfImportUseCase:
             drafts = build_drafts(extraction, normalized)
             if not drafts:
                 raise ValueError("Không tìm thấy câu hỏi có nguồn.")
+            stage = row.stage = "classify"
+            await session.commit()
+            try:
+                async with session.begin_nested():
+                    await classify_drafts(drafts, self.repo, self.models)
+            except Exception as exc:
+                logger.warning("PDF import %s classification unavailable (%s)", import_id, type(exc).__name__)
+                row.warnings = [*row.warnings, "Chưa lấy được gợi ý nhãn. Hãy gắn nhãn khi duyệt."]
+                for draft in drafts:
+                    draft["flags"].append("label_review")
             for position, draft in enumerate(drafts, 1):
                 self.repo.add_draft(row.id, position, draft)
             row.status, row.stage = "ready_for_review", "review"
@@ -169,6 +173,10 @@ class PdfImportUseCase:
 
     async def list_imports(self, offset: int, limit: int):
         return await self.repo.list_imports(offset, limit)
+
+    @property
+    def providers_configured(self) -> bool:
+        return self.models.configured
 
     async def list_drafts(self, import_id: int):
         await self.get_import(import_id)
@@ -231,10 +239,16 @@ class PdfImportUseCase:
         contents = [data["content"], data["solution"], *(o["content"] for o in options)]
         if any("media-missing:" in value for value in contents if value):
             raise ImportErrorDetail(422, "Còn tham chiếu hình thiếu dữ liệu.")
+        if any(not re.fullmatch(r"media:\d+", image[2])
+               for value in contents if value for image in IMAGE_LINK.finditer(value)):
+            raise ImportErrorDetail(422, "Hình Markdown phải tham chiếu media của phiên nhập.")
         refs = media_ids(*contents)
         if data["imageDependent"] and not refs:
             raise ImportErrorDetail(422, "Cần có hình cho câu phụ thuộc hình.")
-        if (data["imageDependent"] or "image_source_mismatch" in data["flags"]) and not data["imageReviewed"]:
+        needs_image_review = data["imageDependent"] or any(
+            flag in data["flags"] for flag in ("image_source_mismatch", "image_unplaced")
+        )
+        if needs_image_review and not data["imageReviewed"]:
             raise ImportErrorDetail(422, "Cần có hình và xác nhận đã kiểm tra hình.")
         row = await self.get_import(import_id)
         for media_id in refs:

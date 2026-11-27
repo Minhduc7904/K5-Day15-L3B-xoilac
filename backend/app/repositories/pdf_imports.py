@@ -1,7 +1,9 @@
-from sqlalchemy import column, insert, select, table
+from sqlalchemy import and_, column, func, insert, select, table
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.pdf_import import PdfDraft, PdfImport
+from app.models.pdf_import import PdfDraft, PdfImport, PdfReferenceVector
 
 # Migration 0002 owns these tables. These projections share its columns with Issues #4 and #11.
 media = table(
@@ -82,6 +84,53 @@ class PdfImportRepository:
         ])
         return question_id
 
+    async def eligible_references(self, limit: int):
+        parent = chapters.alias("parent")
+        root_code = func.coalesce(parent.c.code, chapters.c.code)
+        rank = func.row_number().over(
+            partition_by=(root_code, questions.c.difficulty),
+            order_by=(questions.c.question_id, chapters.c.level.desc(), chapters.c.chapter_id),
+        )
+        query = (
+            select(questions.c.question_id, questions.c.content, questions.c.difficulty, questions.c.grade,
+                   root_code.label("root_code"), chapters.c.code.label("chapter_code"))
+            .select_from(
+                questions.join(question_chapters, question_chapters.c.question_id == questions.c.question_id)
+                .join(chapters, and_(chapters.c.chapter_id == question_chapters.c.chapter_id,
+                                     chapters.c.subject_id == questions.c.subject_id))
+                .outerjoin(parent, parent.c.chapter_id == chapters.c.parent_chapter_id)
+            )
+            .where(questions.c.visibility == "PUBLISHED", questions.c.grade.in_([10, 11, 12]),
+                   chapters.c.level.in_([0, 1]), questions.c.difficulty.in_(["NB", "TH", "VD", "VDC"]),
+                   root_code.like("1_C%"), chapters.c.code.like("1_C%"),
+                   ~questions.c.content.contains("media:"))
+            .order_by(rank, root_code, questions.c.difficulty, questions.c.question_id)
+            .limit(limit)
+        )
+        return (await self.session.execute(query)).mappings().all()
+
+    async def reference_options(self, question_ids: list[int]) -> dict[int, list[str]]:
+        result = {question_id: [] for question_id in question_ids}
+        query = select(statements.c.question_id, statements.c.content).where(statements.c.question_id.in_(question_ids))
+        query = query.order_by(statements.c.order, statements.c.statement_id)
+        for question_id, content in await self.session.execute(query):
+            result[question_id].append(content)
+        return result
+
+    async def reference_vectors(self, model: str, question_ids: list[int]) -> dict[int, PdfReferenceVector]:
+        query = select(PdfReferenceVector).where(
+            PdfReferenceVector.model == model, PdfReferenceVector.question_id.in_(question_ids)
+        )
+        return {row.question_id: row for row in await self.session.scalars(query)}
+
+    async def store_reference_vectors(self, rows: list[dict]) -> None:
+        insert_rows = sqlite_insert if self.session.get_bind().dialect.name == "sqlite" else pg_insert
+        query = insert_rows(PdfReferenceVector).values(rows)
+        await self.session.execute(query.on_conflict_do_update(
+            index_elements=["question_id", "model"],
+            set_={"fingerprint": query.excluded.fingerprint, "vector": query.excluded.vector},
+        ))
+
     async def read_published_question(self, question_id: int) -> dict | None:
         """Student-safe projection for the shared bank handoff."""
         question = (await self.session.execute(
@@ -94,4 +143,8 @@ class PdfImportRepository:
             select(statements.c.content, statements.c.order).where(statements.c.question_id == question_id)
             .order_by(statements.c.order, statements.c.statement_id)
         )).mappings().all()
-        return {**question, "statements": [dict(option) for option in options]}
+        codes = (await self.session.scalars(
+            select(chapters.c.code).join(question_chapters, question_chapters.c.chapter_id == chapters.c.chapter_id)
+            .where(question_chapters.c.question_id == question_id).order_by(chapters.c.level, chapters.c.code)
+        )).all()
+        return {**question, "statements": [dict(option) for option in options], "chapterCodes": list(codes)}

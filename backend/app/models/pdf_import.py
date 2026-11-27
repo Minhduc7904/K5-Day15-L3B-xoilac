@@ -32,3 +32,12 @@ class PdfDraft(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")
     payload: Mapped[dict] = mapped_column(JSON)
     question_id: Mapped[int | None] = mapped_column(unique=True)
+
+
+class PdfReferenceVector(Base):
+    __tablename__ = "pdf_import_reference_vectors"
+
+    question_id: Mapped[int] = mapped_column(primary_key=True)
+    model: Mapped[str] = mapped_column(String(128), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    vector: Mapped[list[float]] = mapped_column(JSON)

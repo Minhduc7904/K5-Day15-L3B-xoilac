@@ -105,4 +105,14 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             "flags": flags, "imageDependent": question.image_dependent, "imageReviewed": False,
             "chapterCodes": [], "difficulty": None, "suggestions": None,
         })
+    placed = set().union(*(media_ids(
+        draft["content"], draft["solution"], *(item["content"] for item in draft["statements"])
+    ) for draft in drafts))
+    for draft in drafts:
+        pages_with_questions = draft["sourcePages"]
+        fields = [draft["content"], draft["solution"] or "", *(item["content"] for item in draft["statements"])]
+        visible_missing = set(MISSING_MEDIA.findall("\n".join(fields)))
+        if any(source_media[page] - placed or set(MISSING_MEDIA.findall(page_map[page])) - visible_missing
+               for page in pages_with_questions):
+            draft["flags"].append("image_unplaced")
     return drafts

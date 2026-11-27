@@ -1,4 +1,5 @@
 import base64
+import math
 import re
 from dataclasses import dataclass
 
@@ -7,12 +8,20 @@ import httpx
 from app.core.config import Settings
 from app.schemas.pdf_import import Extraction
 
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class OcrImage:
+    reference: str
+    data: bytes | None
+
 
 @dataclass(frozen=True)
 class OcrPage:
     index: int
     markdown: str
-    images: list[dict]
+    images: list[OcrImage]
 
 
 class ExtractionTooLong(ValueError):
@@ -31,13 +40,28 @@ class PdfImportModels:
             response.raise_for_status()
             return response.json()
 
+    @property
+    def ocr_key(self) -> str | None:
+        # Keep provider selection and credentials together in the adapter.
+        if self.settings.ocr_provider == "mistral" and self.settings.mistral_api_key:
+            return self.settings.mistral_api_key.get_secret_value() or None
+        return None
+
+    @property
+    def configured(self) -> bool:
+        key = self.settings.openai_api_key
+        return bool(self.ocr_key and key and key.get_secret_value())
+
     async def recognize(self, pdf: bytes) -> tuple[str, list[OcrPage]]:
-        key = self.settings.mistral_api_key
+        key = self.ocr_key
         if not key:
-            raise ValueError("Chưa cấu hình Mistral OCR.")
+            raise ValueError("Chưa cấu hình OCR.")
+        return await self._recognize_mistral(pdf, key)
+
+    async def _recognize_mistral(self, pdf: bytes, key: str) -> tuple[str, list[OcrPage]]:
         data = await self._post(
             "https://api.mistral.ai/v1/ocr",
-            key.get_secret_value(),
+            key,
             {
                 "model": self.settings.ocr_model,
                 "document": {
@@ -48,7 +72,13 @@ class PdfImportModels:
             },
             timeout=120,
         )
-        pages = [OcrPage(p["index"], p["markdown"], p.get("images") or []) for p in data["pages"]]
+        pages = [
+            OcrPage(page["index"], page["markdown"], [
+                OcrImage(image["id"], decode_mistral_image(image.get("image_base64")))
+                for image in page.get("images") or []
+            ])
+            for page in data["pages"]
+        ]
         return data.get("model") or self.settings.ocr_model, sorted(pages, key=lambda p: p.index)
 
     async def extract(self, pages: list[dict]) -> tuple[str, Extraction]:
@@ -114,6 +144,40 @@ class PdfImportModels:
             raise ValueError("Model trả kết quả chưa hoàn chỉnh.")
         extraction = Extraction.model_validate_json(message["content"])
         return data.get("model") or self.settings.pdf_import_extraction_model, extraction
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        key = self.settings.openai_api_key
+        if not key:
+            raise ValueError("Chưa cấu hình OpenAI.")
+        vectors = []
+        for start in range(0, len(texts), 32):
+            batch = texts[start:start + 32]
+            data = await self._post(
+                "https://api.openai.com/v1/embeddings",
+                key.get_secret_value(),
+                {"model": self.settings.pdf_import_embedding_model, "input": batch},
+                timeout=45,
+            )
+            items = sorted(data["data"], key=lambda item: item["index"])
+            if [item["index"] for item in items] != list(range(len(batch))):
+                raise ValueError("Embedding trả thiếu kết quả.")
+            for item in items:
+                vector = item["embedding"]
+                if not vector or not all(isinstance(x, (float, int)) and math.isfinite(x) for x in vector):
+                    raise ValueError("Embedding không hợp lệ.")
+                vectors.append(vector)
+        if vectors and len({len(vector) for vector in vectors}) != 1:
+            raise ValueError("Kích thước embedding không đồng nhất.")
+        return vectors
+
+
+def decode_mistral_image(encoded: str | None) -> bytes | None:
+    if not isinstance(encoded, str) or len(encoded) > MAX_IMAGE_BYTES * 4 // 3 + 128:
+        return None
+    try:
+        return base64.b64decode(encoded.rsplit(",", 1)[-1], validate=True)
+    except ValueError:
+        return None
 
 
 EXTRACTION_INSTRUCTIONS = """

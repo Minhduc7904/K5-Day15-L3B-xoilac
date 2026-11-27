@@ -38,8 +38,7 @@ async def upload_pdf(
     file: UploadFile, request: Request, tasks: BackgroundTasks, usecase: PdfImportUseCaseDep,
     run_import: PdfImportRunnerDep,
 ):
-    settings = usecase.models.settings
-    if not settings.mistral_api_key or not settings.openai_api_key:
+    if not usecase.providers_configured:
         raise HTTPException(503, "Chưa cấu hình OCR hoặc model tách đề.")
     row = await usecase.upload(file.filename or "exam.pdf", await file.read(MAX_PDF_BYTES + 1))
     tasks.add_task(run_import, row.id)

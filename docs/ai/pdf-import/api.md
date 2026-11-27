@@ -1,6 +1,6 @@
 # API nhập đề PDF
 
-Hợp đồng dự kiến cho backend, frontend admin và kiểm thử Issue #3.
+Hợp đồng cho backend, frontend admin và kiểm thử Issue #3.
 
 ## Điều kiện gọi
 
@@ -39,7 +39,7 @@ Ví dụ phản hồi tải lên
 | 422 | PDF không đọc được hoặc câu chưa đạt điều kiện duyệt. |
 | 503 | Backend chưa cấu hình nhà cung cấp. |
 
-Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa xác định hoặc hình bắt buộc bị thiếu cần được sửa trước khi duyệt.
+Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa xác định hoặc hình bắt buộc bị thiếu cần được sửa trước khi duyệt. `suggestions` chứa nhãn đề xuất và danh sách `neighbors` gồm `questionId`, mã chương, độ khó và điểm cosine. Frontend gửi chương và độ khó đã xác nhận qua PATCH.
 
 ## Luồng kiểm thử
 
@@ -47,6 +47,14 @@ Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa
 2. Mở bản nháp Phần I câu 6 của mẫu, kiểm thứ tự A–D và dùng URL xem từng hình. Đối chiếu đáp án D với trang 7.
 3. Chốt chương và độ khó, duyệt câu, rồi dùng mã câu trả về để kiểm bản đọc chung chỉ chứa nội dung, lựa chọn có thứ tự và tham chiếu ảnh.
 4. Duyệt một câu có đáp án mâu thuẫn hoặc thiếu hình để kiểm API trả `422`.
+
+Ví dụ phần cập nhật sau khi đã kiểm ảnh và chốt nhãn
+
+```json
+{"chapterCodes":["12C1"],"difficulty":"TH","imageReviewed":true}
+```
+
+Issue #4 có thể dùng `PdfImportRepository.read_published_question(question_id)` làm ví dụ truy vấn kho chung. Kết quả gồm mã câu, nội dung, kiểu, khối, độ khó, `chapterCodes` và mệnh đề có thứ tự. Ảnh dùng mã `media:ID` trong nội dung. Hợp đồng phân phối ảnh cho người dùng học sinh sẽ được nối tại phía đọc kho. Route tạo URL xem trước thuộc quyền admin.
 
 ## Tài liệu liên quan
 
