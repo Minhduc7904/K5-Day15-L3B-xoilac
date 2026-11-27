@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, ChevronDown, Coins, Menu, UserRound, X } from 'lucide-react';
+import { Bell, ChevronDown, Coins, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import { Logo } from '@/components/layout/logo';
 import { IconButton } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
 import { useLogout } from '@/features/auth/use-logout';
+import { useTour } from '@/features/onboarding/tour-provider';
 import { cn } from '@/lib/cn';
 import { mockMode } from '@/lib/config';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -42,6 +43,7 @@ function StudentNavigation({ path, onNavigate }: { path: string; onNavigate?: ()
             <Link
               href={href}
               onClick={onNavigate}
+              data-tour={href === '/exams/new' ? 'nav-create' : undefined}
               aria-current={active === href ? 'page' : undefined}
               className={cn(
                 'relative flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-label transition-colors lg:h-full lg:rounded-none lg:px-0',
@@ -85,6 +87,7 @@ export function StudentHeader() {
             label="Mở điều hướng"
             aria-haspopup="dialog"
             aria-controls="student-navigation"
+            data-tour="nav-menu"
             className="-ml-2.5 lg:hidden"
             onClick={() => drawer.current?.showModal()}
           >
@@ -127,7 +130,8 @@ export function StudentHeader() {
 
 function HeaderActions({ profileActive }: { profileActive: boolean }) {
   const hydrated = useHydrated();
-  const { user, status } = useAppSelector((state) => state.auth);
+  const user = useAppSelector((state) => state.auth.user);
+  const { start: startTour } = useTour();
   const { leaving, logout } = useLogout();
   const router = useRouter();
   const [open, setOpen] = useState<'notifications' | 'account' | null>(null);
@@ -148,7 +152,8 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
     };
   }, [open]);
 
-  const name = user?.display_name?.trim() || user?.email || 'Khách demo';
+  // `AuthGuard` đảm bảo trang học sinh chỉ mở khi đã đăng nhập, nên tên luôn là của người dùng thật.
+  const name = user?.display_name?.trim() || user?.email || '';
 
   return (
     <div
@@ -185,7 +190,7 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
       </div>
       <span className="hidden h-6 w-px bg-border lg:block" aria-hidden="true" />
 
-      {!hydrated || status === 'unknown' ? (
+      {!hydrated || !user ? (
         <Skeleton className="size-11 rounded-xl lg:w-40" />
       ) : (
         <div className="sm:relative">
@@ -203,7 +208,7 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
             )}
           >
             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary-subtle text-label font-semibold text-primary" aria-hidden="true">
-              {user ? name.charAt(0).toLocaleUpperCase('vi') : <UserRound className="size-4" />}
+              {name.charAt(0).toLocaleUpperCase('vi')}
             </span>
             <span className="hidden min-w-0 max-w-28 truncate text-label font-semibold lg:block xl:max-w-40">{name}</span>
             <ChevronDown className="hidden size-3.5 shrink-0 text-muted-foreground lg:block" strokeWidth={1.75} aria-hidden="true" />
@@ -218,25 +223,29 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
               <Link href="/profile" aria-current={profileActive ? 'page' : undefined} onClick={() => setOpen(null)} className={cn(panelLink, 'text-foreground')}>
                 Hồ sơ
               </Link>
-              {user ? (
-                <button
-                  type="button"
-                  className={cn(panelLink, 'text-danger disabled:opacity-60')}
-                  disabled={leaving}
-                  aria-busy={leaving || undefined}
-                  onClick={async () => {
-                    await logout();
-                    setOpen(null);
-                    router.replace('/login?reason=logged-out');
-                  }}
-                >
-                  {leaving ? 'Đang đăng xuất…' : 'Đăng xuất'}
-                </button>
-              ) : (
-                <Link href="/login" className={cn(panelLink, 'text-primary')}>
-                  Đăng nhập
-                </Link>
-              )}
+              <button
+                type="button"
+                className={cn(panelLink, 'text-foreground')}
+                onClick={() => {
+                  setOpen(null);
+                  startTour();
+                }}
+              >
+                Xem lại hướng dẫn
+              </button>
+              <button
+                type="button"
+                className={cn(panelLink, 'text-danger disabled:opacity-60')}
+                disabled={leaving}
+                aria-busy={leaving || undefined}
+                onClick={async () => {
+                  await logout();
+                  setOpen(null);
+                  router.replace('/login?reason=logged-out');
+                }}
+              >
+                {leaving ? 'Đang đăng xuất…' : 'Đăng xuất'}
+              </button>
             </div>
           </div>
         </div>

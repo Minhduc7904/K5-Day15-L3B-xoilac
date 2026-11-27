@@ -18,7 +18,7 @@ export function ChapterStats({ chapters }: { chapters: ChapterStat[] }) {
   const shown = chapters.filter((entry) => grade === 'all' || String(entry.chapter.grade) === grade);
 
   return (
-    <section aria-labelledby="chapter-title" className="grid content-start gap-4 rounded-2xl bg-background p-5 shadow-soft sm:p-6">
+    <section aria-labelledby="chapter-title" data-tour="dash-chapters" className="grid content-start gap-4 rounded-2xl bg-background p-5 shadow-soft sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="chapter-title" className="text-h3 text-foreground">Theo từng chương</h2>

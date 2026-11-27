@@ -116,7 +116,7 @@ function Result({ data }: { data: Data }) {
       <section aria-labelledby="result-title" className="relative isolate overflow-hidden rounded-3xl bg-primary text-primary-foreground shadow-lift">
         <div aria-hidden="true" className="bg-grid-inverse absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_95%)]" />
         <div className="grid gap-6 p-5 sm:p-8 md:grid-cols-[auto_minmax(0,1fr)] md:items-center lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,17rem)]">
-          <div className="justify-self-center">
+          <div data-tour="result-score" className="justify-self-center">
             <ScoreRing score={attempt.score} />
           </div>
           <div className="grid gap-3 text-center md:text-left">
@@ -302,7 +302,7 @@ function Review({ results, times, filter, onFilter: setFilter }: { results: Ques
 
   return (
     <section aria-labelledby="review-title" className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div data-tour="result-review" className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="review-title" className="text-h2 text-foreground">Xem lại bài làm</h2>
           <p className="text-caption text-muted-foreground">So đáp án của bạn với đáp án đúng, mở lời giải từng câu.</p>

@@ -393,7 +393,7 @@ function Welcome({ onPick }: { onPick: (s: (typeof STARTERS)[number]) => void })
           Mình chọn câu đã duyệt trong ngân hàng để ghép đề. Bạn xem trước, chỉnh số câu, dạng câu và độ khó rồi mới tạo đề.
         </p>
       </div>
-      <ul className="grid w-full gap-2.5 text-left sm:grid-cols-2">
+      <ul data-tour="chat-starters" className="grid w-full gap-2.5 text-left sm:grid-cols-2">
         {STARTERS.map((s, i) => (
           <motion.li key={s.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.06 }}>
             <button

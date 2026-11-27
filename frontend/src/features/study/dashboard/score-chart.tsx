@@ -17,7 +17,7 @@ export function ScoreChart({ scores }: { scores: Score[] }) {
   const datesByAttempt = new Map(scores.map(({ attemptId, date }) => [attemptId, shortDate(date)]));
 
   return (
-    <section aria-labelledby="chart-title" className="min-w-0 rounded-2xl bg-background p-5 shadow-soft sm:p-6">
+    <section aria-labelledby="chart-title" data-tour="dash-chart" className="min-w-0 rounded-2xl bg-background p-5 shadow-soft sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div>
           <h2 id="chart-title" className="text-h3 text-foreground">Điểm qua các đề</h2>

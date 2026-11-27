@@ -10,7 +10,6 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
-import { mockMode } from '@/lib/config';
 import { useAppSelector } from '@/store';
 import type { AuthState } from './auth-slice';
 import type { User } from './types';
@@ -25,14 +24,10 @@ export const homeFor = (user: Pick<User, 'role'>) => (user.role === 'admin' ? '/
 
 const isAuthPage = (path: string) => AUTH_PATHS.some((base) => under(path, base));
 /**
- * Trang học sinh dựng bằng dữ liệu mock. Ở chế độ mock (dev), khách cũng xem được để demo và
- * xem thay đổi trực tiếp mà không cần đăng nhập. Khi tắt mock, các trang này vẫn yêu cầu đăng nhập.
+ * Khách chỉ xem được trang chủ (để biết Examind là gì) và các trang auth. Các trang học sinh
+ * (`/dashboard`, `/exams`, `/results`, `/profile`) luôn yêu cầu đăng nhập, kể cả khi dữ liệu là mock.
  */
-const MOCK_OPEN_PATHS = ['/dashboard', '/exams', '/results', '/profile'];
-
-/** Khách xem được trang chủ để biết Examind là gì trước khi đăng nhập. */
-const isPublicPage = (path: string) =>
-  isAuthPage(path) || path === '/' || (mockMode && MOCK_OPEN_PATHS.some((base) => under(path, base)));
+const isPublicPage = (path: string) => isAuthPage(path) || path === '/';
 
 /** Trả đường dẫn cần chuyển tới, hoặc `null` nếu được ở lại. `undefined` khi chưa biết phiên. */
 export function guardRedirect(path: string, auth: AuthState): string | null | undefined {

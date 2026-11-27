@@ -68,7 +68,7 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
   const canSend = !disabled && (text.trim().length > 0 || attachments.length > 0);
 
   return (
-    <form onSubmit={submit} className="rounded-3xl border border-border bg-background p-2 shadow-soft transition-shadow focus-within:border-primary/40 focus-within:shadow-lift">
+    <form onSubmit={submit} data-tour="chat-composer" className="rounded-3xl border border-border bg-background p-2 shadow-soft transition-shadow focus-within:border-primary/40 focus-within:shadow-lift">
       <AnimatePresence initial={false}>
         {attachments.length > 0 && (
           <motion.ul
