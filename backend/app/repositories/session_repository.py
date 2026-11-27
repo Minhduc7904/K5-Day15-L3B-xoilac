@@ -33,6 +33,14 @@ class SessionRepository:
         row.last_used_at = at
         await self._session.commit()
 
+    async def revoke_all_for_user(self, user_id: int, at: datetime) -> None:
+        """Thu hồi mọi phiên còn mở của một tài khoản. KHÔNG commit: chạy trong transaction của usecase."""
+        await self._session.execute(
+            update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+            .values(revoked_at=at)
+        )
+
     async def revoke(self, session_id: int, at: datetime) -> None:
         await self._session.execute(
             update(UserSession)

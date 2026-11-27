@@ -130,8 +130,16 @@ class AuthUseCase:
         token = await self._open_session(user, user_agent)
         return user, token
 
-    async def create_user(self, email: str, password: str, role: str, display_name: str | None = None) -> User:
-        """Tạo tài khoản. Chỉ register (student) và lệnh CLI (admin) gọi hàm này."""
+    async def create_user(
+        self,
+        email: str,
+        password: str,
+        role: str,
+        display_name: str | None = None,
+        created_by: int | None = None,
+    ) -> User:
+        """Tạo tài khoản. Chỉ được gọi từ: register (student), CLI create_admin / ensure_admin (admin,
+        created_by=None) và AdminAccountsUseCase.create_admin (admin, created_by = admin đang thao tác)."""
         if role not in ROLES:
             raise InvalidInput(f"Vai trò không hợp lệ: {role}")
         if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
@@ -141,7 +149,7 @@ class AuthUseCase:
             raise EmailAlreadyRegistered()
         password_hash = await self._passwords.hash(password)
         try:
-            return await self._users.add(email, password_hash, role, display_name)
+            return await self._users.add(email, password_hash, role, display_name, created_by)
         except DuplicateEmailError:
             # Hai request đăng ký cùng email chạy song song.
             raise EmailAlreadyRegistered() from None
