@@ -1,8 +1,11 @@
-"""Tạo tài khoản admin. Cách duy nhất để có admin (đăng ký công khai chỉ tạo student).
+"""Tạo tài khoản admin bằng tay. Dùng để CỨU HỘ khi mọi admin đều mất quyền truy cập.
+
+Cách thường dùng: admin mặc định do `ensure_admin` tạo lúc khởi động, rồi admin tạo admin khác qua API
+(xem docs/architecture/backend-auth.md, mục "Cấp tài khoản admin").
 
 Chạy trong thư mục backend/ (đọc DATABASE_URL từ backend/.env hoặc biến môi trường):
 
-    python -m app.cli.create_admin --email admin@example.com [--name "Quản trị"]
+    python -m app.cli.create_admin --email admin2@example.com [--name "Quản trị"]
 
 Mật khẩu lấy từ biến ADMIN_PASSWORD, nếu không có thì hỏi qua getpass (nhập hai lần).
 Không nhận mật khẩu qua tham số dòng lệnh để mật khẩu không nằm trong lịch sử shell.
@@ -13,33 +16,11 @@ import asyncio
 import getpass
 import os
 import sys
-from collections.abc import AsyncIterator, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
-from pydantic import EmailStr, TypeAdapter, ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.cli.common import NAME_MAX, SessionFactory, build_auth, default_session, utf8_console, validate_email
 from app.core.config import get_settings
-from app.core.database import get_engine, get_session
 from app.models.user import ROLE_ADMIN
-from app.repositories.session_repository import SessionRepository
-from app.repositories.user_repository import UserRepository
-from app.service.password_service import PasswordService
-from app.service.token_service import TokenService
-from app.usecase.auth import AuthUseCase, EmailAlreadyRegistered, InvalidInput, normalize_email
-
-SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
-
-_email = TypeAdapter(EmailStr)
-
-
-@asynccontextmanager
-async def _default_session() -> AsyncIterator[AsyncSession]:
-    try:
-        async for session in get_session():
-            yield session
-    finally:
-        await get_engine().dispose()
+from app.usecase.auth import EmailAlreadyRegistered, InvalidInput
 
 
 def _read_password() -> str | None:
@@ -58,15 +39,8 @@ def _read_password() -> str | None:
 
 async def _create(email: str, password: str, name: str | None, session_factory: SessionFactory) -> int:
     async with session_factory() as session:
-        usecase = AuthUseCase(
-            users=UserRepository(session),
-            sessions=SessionRepository(session),
-            passwords=PasswordService(),
-            tokens=TokenService(),
-            session_ttl_hours=get_settings().session_ttl_hours,
-        )
         try:
-            user = await usecase.create_user(email, password, ROLE_ADMIN, name)
+            user = await build_auth(session, get_settings()).create_user(email, password, ROLE_ADMIN, name)
         except EmailAlreadyRegistered:
             print(f"Email {email} đã có tài khoản. Không tạo trùng, không đổi vai trò hay mật khẩu.", file=sys.stderr)
             return 1
@@ -78,30 +52,26 @@ async def _create(email: str, password: str, name: str | None, session_factory: 
 
 
 def main(argv: list[str] | None = None, session_factory: SessionFactory | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m app.cli.create_admin", description="Tạo tài khoản admin.")
+    parser = argparse.ArgumentParser(prog="python -m app.cli.create_admin", description="Tạo tài khoản admin (cứu hộ).")
     parser.add_argument("--email", required=True)
-    parser.add_argument("--name", default=None, help="Tên hiển thị (tùy chọn, tối đa 100 ký tự)")
+    parser.add_argument("--name", default=None, help=f"Tên hiển thị (tùy chọn, tối đa {NAME_MAX} ký tự)")
     args = parser.parse_args(argv)
 
-    try:
-        email = normalize_email(str(_email.validate_python(args.email.strip())))
-    except ValidationError:
+    email = validate_email(args.email)
+    if email is None:
         print(f"Email không hợp lệ: {args.email}", file=sys.stderr)
         return 2
     name = (args.name or "").strip() or None
-    if name and len(name) > 100:
-        print("Tên hiển thị tối đa 100 ký tự.", file=sys.stderr)
+    if name and len(name) > NAME_MAX:
+        print(f"Tên hiển thị tối đa {NAME_MAX} ký tự.", file=sys.stderr)
         return 2
 
     password = _read_password()
     if password is None:
         return 2
-    return asyncio.run(_create(email, password, name, session_factory or _default_session))
+    return asyncio.run(_create(email, password, name, session_factory or default_session))
 
 
 if __name__ == "__main__":
-    # Console Windows mặc định cp1252, không in được tiếng Việt.
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8", errors="replace")
+    utf8_console()
     sys.exit(main())
