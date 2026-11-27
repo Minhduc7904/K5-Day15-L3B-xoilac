@@ -28,10 +28,17 @@ flowchart LR
 
 `docker-compose.yml` ở thư mục gốc chạy `postgres`, `minio` và hai container init chạy một lần rồi thoát:
 
-- `db-init`: dùng image backend, chạy `alembic upgrade head`.
+- `db-init`: dùng image backend, chạy `alembic upgrade head`, tạo admin mặc định từ `ADMIN_*` nếu chưa có (`python -m app.cli.ensure_admin`), rồi nạp dữ liệu nền nếu có.
 - `minio-init`: tạo bucket nếu chưa có (`mc mb --ignore-existing`).
 
 Backend đọc cấu hình local từ `backend/.env`. Frontend có cấu hình cho Axios và hai entry point riêng.
+
+### Xác thực (issue #8)
+
+- Hai vai trò `student` và `admin`. Đăng ký công khai chỉ tạo `student`. Admin đầu tiên do `db-init` tạo từ `ADMIN_EMAIL`/`ADMIN_PASSWORD`; admin khác do admin đã đăng nhập tạo qua `/api/v1/admin/accounts` (kèm nhập lại mật khẩu); `python -m app.cli.create_admin` dùng để cứu hộ. Chi tiết: [Cấp tài khoản admin](backend-auth.md#cấp-tài-khoản-admin).
+- Phiên là token opaque nằm trong cookie `examind_session` (HttpOnly, SameSite=Lax). PostgreSQL chỉ lưu SHA-256 của token (bảng `sessions`, migration `0003_auth`). Đăng xuất hoặc khoá tài khoản có hiệu lực ngay.
+- Frontend gọi backend qua rewrites `/api/*` của Next.js nên cùng origin: cookie đi kèm tự động, không cần CORS. `CORS_ORIGINS` mặc định rỗng, chỉ đặt khi dev gọi thẳng backend.
+- Endpoint kiểm quyền bằng dependency trong `app/api/deps.py`. Chi tiết: [backend-auth.md](backend-auth.md), hợp đồng HTTP: [auth-api.md](../api/auth-api.md).
 
 ### Trên VPS
 
@@ -50,5 +57,6 @@ Kiểm chứng: làm theo [run-local-stack.md](../operations/run-local-stack.md)
 ## Tài liệu liên quan
 
 - [Các lớp backend](backend-layers.md)
+- [Xác thực và phân quyền backend](backend-auth.md)
 - [Chạy bộ khung local](../operations/run-local-stack.md)
 - [API mẫu](../api/sample-api.md)

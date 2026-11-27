@@ -40,10 +40,32 @@ if [ ! -f "$BASE/prod.env" ]; then
     echo "S3_ACCESS_KEY=examind"
     echo "S3_SECRET_KEY=$(openssl rand -hex 16)"
     echo "SEED_DIR=$BASE/seed"
-    echo "CORS_ORIGINS=http://localhost:3000"
+    echo "CORS_ORIGINS=http://localhost:3000,https://examind-frontend.vercel.app"
   } > "$BASE/prod.env"
   echo "Đã tạo prod.env (mật khẩu sinh ngẫu nhiên, chỉ chủ file đọc được)."
 else
-  echo "prod.env đã có, giữ nguyên."
+  echo "prod.env đã có, giữ nguyên các giá trị cũ."
 fi
+
+# Biến của auth (#8). Chỉ THÊM biến còn thiếu, không ghi đè giá trị đã có, nên chạy lại trên VPS cũ cũng an toàn.
+add_env() {
+  grep -q "^$1=" "$BASE/prod.env" || { echo "$1=$2" >> "$BASE/prod.env"; echo "  + $1"; }
+}
+echo "== Biến auth trong prod.env"
+umask 077
+add_env COOKIE_SECURE true          # nginx có TLS (cổng 443)
+add_env COOKIE_NAME examind_session
+add_env SESSION_TTL_HOURS 168
+# Admin mặc định: db-init tạo admin này ở lần deploy kế tiếp nếu chưa có.
+# Truyền email khi chạy script: ssh ubuntu@<host> 'ADMIN_EMAIL=ban@vi-du.com bash -s' < deploy/bootstrap-vps.sh
+if [ -n "${ADMIN_EMAIL:-}" ]; then
+  add_env ADMIN_EMAIL "$ADMIN_EMAIL"
+  add_env ADMIN_NAME "Quản trị"
+  # Khoảng 30 ký tự ngẫu nhiên (≥ 12 như ensure_admin đòi trên prod), bỏ ký tự $ / + = để compose và shell không hiểu sai.
+  add_env ADMIN_PASSWORD "$(openssl rand -base64 24 | tr -d '$/+=\n' | cut -c1-32)"
+  echo "  Mật khẩu admin KHÔNG được in ra. Xem trên VPS: grep '^ADMIN_PASSWORD=' $BASE/prod.env"
+elif ! grep -q '^ADMIN_EMAIL=' "$BASE/prod.env"; then
+  echo "  Chưa có ADMIN_EMAIL: bỏ qua admin mặc định. Chạy lại script với ADMIN_EMAIL=... để thêm."
+fi
+chmod 600 "$BASE/prod.env"
 echo "== Xong. Đăng nhập lại để quyền nhóm docker có hiệu lực."

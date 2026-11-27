@@ -51,12 +51,13 @@ Thêm tính năng mới:
 | #4 chat tạo đề | router SSE `api/v1/exam_chat.py`; gọi `codebase/agent.py` qua một service riêng |
 | #5 mẫu cấu trúc đề | `models/exam_template.py`, repository và usecase tương ứng |
 
-Giả định còn mở: chưa có xác thực và phân quyền; thêm cùng issue đầu tiên cần quyền admin.
+Endpoint cần đăng nhập hoặc cần vai trò dùng `CurrentUserDep`, `StudentDep`, `AdminDep` hoặc `require_role(...)` trong `deps.py` (issue #8). Xem [backend-auth.md](backend-auth.md) và [auth-api.md](../api/auth-api.md#áp-dụng-quyền-cho-3-4-5-11).
 
-Kiểm chứng: `cd backend && pytest` (5 test, không cần Docker).
+Kiểm chứng: `cd backend && pytest -q` (không cần Docker).
 
 ## Tài liệu liên quan
 
 - [Tổng quan hệ thống](system-overview.md)
+- [Xác thực và phân quyền backend](backend-auth.md)
 - [API mẫu](../api/sample-api.md)
 - [Chạy bộ khung local](../operations/run-local-stack.md)

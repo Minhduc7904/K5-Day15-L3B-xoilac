@@ -14,14 +14,19 @@ JsonType = JSON().with_variant(JSONB(), "postgresql")
 class ExamChatSession(Base):
     """Một phiên hội thoại tạo đề.
 
-    user_id: chủ phiên (tài khoản học sinh đăng nhập, Auth #8). Chưa có Auth thì NULL và student_ref do client gửi.
-    Không đặt khoá ngoại tới bảng users vì bảng đó thuộc migration của #8, chưa có trên main; thêm khi #8 merge.
+    user_id: chủ phiên (tài khoản học sinh đăng nhập, Auth #8). API luôn gắn chủ phiên; NULL chỉ có ở dữ liệu tạo
+    không qua đăng nhập (test logic) và không ai đăng nhập đọc được phiên đó.
+    student_ref: mã dùng tra lịch sử làm bài.
     """
 
     __tablename__ = "exam_chat_sessions"
 
     session_id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE", name="fk_exam_chat_sessions_user_id"),
+        nullable=True,
+        index=True,
+    )
     student_ref: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

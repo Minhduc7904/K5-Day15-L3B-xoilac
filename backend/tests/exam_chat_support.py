@@ -11,12 +11,23 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.api.deps import get_exam_template_source, get_requester, get_student_history
+from app.api.deps import (
+    get_exam_template_source,
+    get_password_service,
+    get_requester,
+    get_student_history,
+)
+from app.core.config import get_settings
 from app.core.database import get_session
 from app.main import app
 from app.models import Base
 from app.repositories.question_bank_repository import chapters, content_metadata, questions, questions_chapters, statements
+from app.repositories.session_repository import SessionRepository
+from app.repositories.user_repository import UserRepository
 from app.service.exam_chat_sources import NoHistory, NoTemplates
+from app.service.token_service import TokenService
+from app.usecase.auth import AuthUseCase
+from tests.conftest import TEST_SETTINGS, new_password
 
 BASE = "/api/v1/exam-chat"
 
@@ -77,8 +88,21 @@ class Holder:
 
 @asynccontextmanager
 async def chat_client(
-    *, history=None, templates=None, requester: Holder | None = None, seed_fn: Callable | None = seed
+    *,
+    history=None,
+    templates=None,
+    requester: Holder | None = None,
+    seed_fn: Callable | None = seed,
+    real_auth: bool = False,
+    real_templates: bool = False,
 ) -> AsyncIterator[AsyncClient]:
+    """Client HTTP với DB riêng. Ba chế độ người gọi:
+
+    - mặc định (test logic): bỏ qua đăng nhập, người gọi None, client gửi student_ref như trước khi có Auth;
+    - requester=Holder(...): người gọi do test đặt (test luật chủ sở hữu);
+    - real_auth=True: dùng đăng nhập thật của #8 (cookie phiên), tạo tài khoản bằng login_as().
+    real_templates=True: tra mẫu qua ExamTemplateUseCase thật của #5 thay vì nguồn giả.
+    """
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -92,16 +116,35 @@ async def chat_client(
             yield s
 
     app.dependency_overrides[get_session] = _session
+    app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS
     app.dependency_overrides[get_student_history] = lambda: history or NoHistory()
-    app.dependency_overrides[get_exam_template_source] = lambda: templates or NoTemplates()
+    if not real_templates:
+        app.dependency_overrides[get_exam_template_source] = lambda: templates or NoTemplates()
     if requester is not None:
         app.dependency_overrides[get_requester] = lambda: requester.value
+    elif not real_auth:
+        app.dependency_overrides[get_requester] = lambda: None
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            c.db = maker  # để login_as() tạo tài khoản trong cùng DB
             yield c
     finally:
         app.dependency_overrides.clear()
         await engine.dispose()
+
+
+async def login_as(c: AsyncClient, email: str, role: str = "student") -> int:
+    """Tạo tài khoản (mật khẩu sinh lúc chạy, không viết cứng) rồi đăng nhập; cookie phiên giữ trong client.
+
+    Trả user_id. Gọi lại với email khác để đổi người dùng."""
+    password = new_password()
+    async with c.db() as s:
+        uc = AuthUseCase(UserRepository(s), SessionRepository(s), get_password_service(), TokenService(), 168)
+        user = await uc.create_user(email, password, role)
+    c.cookies.clear()
+    r = await c.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return user.user_id
 
 
 def parse_sse(body: str) -> list[tuple[str, dict]]:

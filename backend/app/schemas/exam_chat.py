@@ -12,7 +12,9 @@ AnyStructure = Annotated[PreviewStructure | TemplatePreviewStructure, Field(disc
 
 
 class SessionCreate(BaseModel):
-    """Đã đăng nhập (Auth #8) thì bỏ trống: học sinh lấy từ phiên đăng nhập. Chưa có Auth thì bắt buộc."""
+    """Qua API luôn có đăng nhập (Auth #8): student_ref lấy từ tài khoản, trường này bị bỏ qua và có thể bỏ trống.
+
+    Chỉ dùng khi chạy use case không qua đăng nhập (test logic)."""
 
     student_ref: str | None = Field(default=None, min_length=1, max_length=64)
 

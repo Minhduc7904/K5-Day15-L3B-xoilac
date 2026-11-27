@@ -1,8 +1,8 @@
 """API pipeline học sinh tạo đề ôn (issue #4): phiên chat, gửi tin nhận SSE, bản xem trước, xác nhận, đề nháp.
 
-Quyền: mọi route nhận người gọi qua RequesterDep. Chưa có Auth (#8) thì người gọi là None, student_ref do client
-gửi khi tạo phiên. Khi Auth #8 merge, get_requester() trong deps.py trả học sinh đang đăng nhập; học sinh chỉ thấy
-phiên của mình, kể cả kết nối SSE, phiên của người khác trả 404 như không tồn tại.
+Quyền (Auth #8): mọi route cần đăng nhập vai trò học sinh (RequesterDep lấy từ StudentDep): chưa đăng nhập 401,
+không phải học sinh 403. Học sinh chỉ thấy phiên của chính mình, kể cả kết nối SSE; phiên của người khác trả 404
+như không tồn tại. student_ref lấy từ tài khoản, giá trị client gửi bị bỏ qua.
 """
 import json
 import logging

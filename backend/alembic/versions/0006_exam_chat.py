@@ -1,11 +1,11 @@
 """bảng phiên chat tạo đề, tin nhắn, bản xem trước, đề nháp (issue #4)
 
-Lưu ý thứ tự migration: tạm nối sau 0002 để nhánh #4 chạy độc lập. Khi merge, đổi down_revision trỏ vào
-migration mới nhất trên main lúc đó (theo thứ tự đã chốt, ví dụ "0005_exam_templates" của #5), nếu không
+Nối sau 0005_exam_templates (#5), vốn nối sau 0004_users_created_by (auth #8). PR #4 phải merge sau PR #5.
+Nếu trước lúc merge main có thêm migration khác, đổi down_revision trỏ vào migration mới nhất trên main, nếu không
 Alembic có hai head và `alembic upgrade head` báo lỗi khi deploy.
 
 Revision ID: 0006_exam_chat
-Revises: 0002
+Revises: 0005_exam_templates
 Create Date: 2026-11-28
 """
 import sqlalchemy as sa
@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0006_exam_chat"
-down_revision = "0002"
+down_revision = "0005_exam_templates"
 branch_labels = None
 depends_on = None
 
@@ -22,8 +22,10 @@ def upgrade() -> None:
     op.create_table(
         "exam_chat_sessions",
         sa.Column("session_id", sa.Integer(), primary_key=True),
-        # Chủ phiên (Auth #8). Chưa đặt khoá ngoại tới users vì bảng đó thuộc migration của #8.
-        sa.Column("user_id", sa.Integer(), nullable=True),
+        # Chủ phiên: tài khoản học sinh (Auth #8). Xoá tài khoản thì xoá luôn phiên và dữ liệu chat của tài khoản đó.
+        sa.Column("user_id", sa.Integer(),
+                  sa.ForeignKey("users.user_id", ondelete="CASCADE", name="fk_exam_chat_sessions_user_id"),
+                  nullable=True),
         sa.Column("student_ref", sa.String(64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

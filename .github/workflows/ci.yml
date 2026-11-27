@@ -46,8 +46,15 @@ jobs:
         run: docker build -t examind-backend:ci backend
       - name: Kiểm cú pháp nginx
         run: |
+          # Khối 443 cần file chứng chỉ để nginx -t qua; dùng chứng chỉ tự ký tạm, giống bản tạm trên VPS.
+          certs="$(mktemp -d)"
+          mkdir -p "$certs/live/examind.duckdns.org"
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj "/CN=examind.duckdns.org" \
+            -keyout "$certs/live/examind.duckdns.org/privkey.pem" \
+            -out "$certs/live/examind.duckdns.org/fullchain.pem" 2>/dev/null
           docker run --rm \
             -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$certs:/etc/letsencrypt:ro" \
             nginx:1.27-alpine nginx -t
       - name: Kiểm script shell
         run: |
