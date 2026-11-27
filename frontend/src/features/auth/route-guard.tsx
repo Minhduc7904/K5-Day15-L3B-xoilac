@@ -8,7 +8,7 @@
  * Đây chỉ là lớp UX. Quyền thật do backend kiểm ở từng API.
  */
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppSelector } from '@/store';
 import type { AuthState } from './auth-slice';
@@ -43,6 +43,17 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const target = guardRedirect(path, auth);
+  const firstPath = useRef(true);
+
+  // Sang trang khác (vd đăng nhập xong về `/`) thì luôn bắt đầu từ đầu trang, không giữ vị trí cuộn của
+  // trang trước. Bỏ qua lần đầu để không phá việc trình duyệt nhảy tới `#neo` khi mở thẳng link.
+  useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [path]);
 
   useEffect(() => {
     if (target) router.replace(target);
