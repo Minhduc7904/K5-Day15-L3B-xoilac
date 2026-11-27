@@ -103,7 +103,7 @@ flowchart LR
 - **Hình dạng:** [ ] workflow cố định · [x] một agent · [ ] nhiều agent.
   - Học sinh dùng **một agent** với hai nhánh (cá nhân hóa, theo kỳ thi) dùng chung bước preview và bước dựng đề. Agent chọn công cụ theo yêu cầu và dừng ở MAX_STEPS.
   - Không chọn nhiều agent vì các bước nối tiếp trên cùng ngữ cảnh một học sinh, chia agent chỉ thêm lần gọi model, chi phí và chỗ lỗi khó dò. Luồng admin là workflow cố định vì các bước theo thứ tự cố định, không cần agent tự chọn.
-- **AI dựa vào đâu** — mỗi công cụ (khớp `codebase/tools.py`; hiện file còn công cụ mẫu `search_example`, **cần viết lại theo bảng này**):
+- **AI dựa vào đâu** — mỗi công cụ (khớp `codebase/tools.py`; cả 4 công cụ ở bảng dưới đã viết, chỉ đọc CSV trong `data/` và tạo bản nháp trong bộ nhớ):
 
   | Công cụ | Input | Output | Tác động ra ngoài? |
   |---|---|---|---|
@@ -127,7 +127,9 @@ flowchart LR
 
 - Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật:
   - Model đang ở chế độ giả (`MODEL_PROVIDER` để trống), chưa gọi model thật; token đang là 0.
-  - `codebase/tools.py` và `agent.py` còn là khung mẫu, 3 công cụ ở bảng trên chưa viết.
+  - `agent.py` là workflow cố định bằng quy tắc (nhận diện yêu cầu, chọn nhánh, dựng cấu trúc, kiểm đầu ra), chưa dùng model để quyết định. Model chỉ dùng để diễn đạt lại tin nhắn không chứa câu hỏi khi đã nối model thật; ở chế độ giả agent trả thẳng bản dựng bằng code. Chưa có lần chạy nào với model thật.
+  - `get_exam_template` luôn trả "chưa có" vì chưa có cấu trúc kỳ thi nào được xác thực nguồn.
+  - Chọn câu hiện theo thứ tự mã câu (chưa có embedding hay xếp hạng theo độ tương tự).
   - Ngân hàng câu hỏi là dữ liệu thật của trung tâm; repo chỉ chứa mẫu 1.279 câu (`data/question_bank.csv`), bản đầy đủ để ngoài repo. Kết quả làm bài HS01–HS04 là dữ liệu **tự dựng** (`synthetic`, 256 dòng, `data/student_results.csv`, sinh bằng `data/make_student_results.py`); xem `data/DATA_CARD.md`.
   - Tìm kiếm bằng embedding trong vector DB chưa chọn model; bản đầu có thể lọc theo chương và độ khó.
   - Luồng admin nhập PDF và nhánh kỳ thi có sẵn cấu trúc chưa dựng.
