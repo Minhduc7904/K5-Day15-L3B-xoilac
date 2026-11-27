@@ -6,7 +6,7 @@ Học sinh chat với agent để nhận đề xuất cấu trúc đề (bản x
 
 - Base URL local: `http://localhost:8000/api/v1`. Tài liệu tự sinh: `http://localhost:8000/docs`.
 - Dữ liệu gửi dạng JSON. Tin nhắn chat trả về luồng **SSE** (`text/event-stream`).
-- Cần migration `0004` (`alembic upgrade head`) và dữ liệu nền (bảng `questions`, `chapters`, `statements`).
+- Cần migration `0006_exam_chat` (`alembic upgrade head`) và dữ liệu nền (bảng `questions`, `chapters`, `statements`).
 - **Chưa có xác thực.** Khi tạo phiên, client gửi `student_ref` (mã học sinh). Khi Auth #8 xong, học sinh lấy từ phiên đăng nhập và mỗi học sinh chỉ đọc được phiên của mình, kể cả kết nối SSE.
 
 ## Khái niệm
@@ -174,7 +174,7 @@ Test tự động: `cd backend && pytest tests/test_exam_chat_api.py tests/test_
 4. "Em xác nhận, tạo đề nháp" → dùng bản đã sửa qua API, đề nháp 3 câu 12C4 và `shortages` báo thiếu 1 câu; không có đáp án.
 5. Các ca hỏi lại hoặc từ chối không tạo bản xem trước hay mã câu.
 
-Chưa kiểm với PostgreSQL thật và dữ liệu nền. Đã kiểm SQL của migration bằng `alembic upgrade 0002:0004 --sql`.
+Chưa kiểm với PostgreSQL thật và dữ liệu nền. Đã kiểm SQL của migration bằng `alembic upgrade 0002:0006_exam_chat --sql`.
 
 ## Phần còn chờ
 

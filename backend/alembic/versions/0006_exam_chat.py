@@ -1,10 +1,10 @@
 """bảng phiên chat tạo đề, tin nhắn, bản xem trước, đề nháp (issue #4)
 
-Lưu ý thứ tự migration: nhánh #5 thêm 0003 (exam_templates), cũng nối sau 0002. Migration này tạm nối sau 0002
-để nhánh #4 chạy độc lập. PR nào merge sau phải đổi down_revision cho nối tiếp PR trước (ví dụ "0003"), nếu không
-Alembic sẽ có hai head và `alembic upgrade head` báo lỗi khi deploy.
+Lưu ý thứ tự migration: tạm nối sau 0002 để nhánh #4 chạy độc lập. Khi merge, đổi down_revision trỏ vào
+migration mới nhất trên main lúc đó (theo thứ tự đã chốt, ví dụ "0005_exam_templates" của #5), nếu không
+Alembic có hai head và `alembic upgrade head` báo lỗi khi deploy.
 
-Revision ID: 0004
+Revision ID: 0006_exam_chat
 Revises: 0002
 Create Date: 2026-11-28
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0004"
+revision = "0006_exam_chat"
 down_revision = "0002"
 branch_labels = None
 depends_on = None
