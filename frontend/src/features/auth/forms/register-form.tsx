@@ -1,7 +1,6 @@
 'use client';
 
 import { Mail, RotateCcw, UserPlus, UserRound } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,22 +8,20 @@ import { Alert } from '@/components/ui/feedback';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
-import { useToast } from '@/components/ui/toast';
-import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
-import { signedIn } from '../auth-slice';
 import { AuthHeader, AuthSwitch, MockNote } from '../components/auth-shell';
+import { GoogleSignIn } from '../components/google-sign-in';
 import { PasswordStrength } from '../components/password-strength';
 import { SignedInNotice } from '../components/signed-in-notice';
-import { toAuthError, type AuthErrorCode } from '../types';
+import { toAuthError, type PendingOtp } from '../types';
 import { useAuthForm } from '../use-auth-form';
 import { normalizeEmail, validateConfirm, validateDisplayName, validateEmail, validateNewPassword } from '../validation';
 
+import { EmailOtpForm } from './email-otp-form';
+
 export function RegisterForm() {
-  const router = useRouter();
-  const dispatch = useAppDispatch();
-  const toast = useToast();
-  const [failure, setFailure] = useState<AuthErrorCode | null>(null);
+  const [pending, setPending] = useState<PendingOtp>();
+  const [failure, setFailure] = useState<ReturnType<typeof toAuthError>>();
 
   const form = useAuthForm(
     { displayName: '', email: '', password: '', confirm: '', agree: false as boolean },
@@ -38,24 +35,19 @@ export function RegisterForm() {
   );
 
   const submit = form.handleSubmit(async ({ displayName, email, password }) => {
-    setFailure(null);
+    setFailure(undefined);
     try {
-      const user = await authApi.register({
+      const verification = await authApi.register({
         email: normalizeEmail(email),
         password,
         display_name: displayName.trim() || undefined,
       });
-      dispatch(signedIn(user));
-      toast({
-        tone: 'success',
-        title: `Chào mừng ${user.display_name ?? 'bạn'} đến với Examind!`,
-        description: 'Tài khoản đã được tạo.',
-      });
-      router.push('/');
+      form.patch({ password: '', confirm: '' });
+      setPending(verification);
     } catch (error) {
       const authError = toAuthError(error);
       if (authError.code === 'EMAIL_TAKEN') {
-        setFailure('EMAIL_TAKEN');
+        setFailure(authError);
         form.setServerErrors({ email: 'Email này đã được đăng ký.' });
       } else if (authError.code === 'VALIDATION' && authError.fieldErrors) {
         form.setServerErrors({
@@ -64,10 +56,14 @@ export function RegisterForm() {
           displayName: authError.fieldErrors.display_name,
         });
       } else {
-        setFailure('NETWORK');
+        setFailure(authError);
       }
     }
   });
+
+  if (pending) {
+    return <EmailOtpForm initial={pending} purpose="registration" onBack={() => setPending(undefined)} />;
+  }
 
   return (
     <div className="grid gap-7">
@@ -80,7 +76,7 @@ export function RegisterForm() {
 
       <SignedInNotice />
 
-      {failure === 'EMAIL_TAKEN' && (
+      {failure?.code === 'EMAIL_TAKEN' && (
         <Alert
           tone="info"
           title="Email này đã có tài khoản"
@@ -90,21 +86,19 @@ export function RegisterForm() {
             </Button>
           }
         >
-          Bạn đăng nhập bằng email này, hoặc dùng mục Quên mật khẩu nếu không nhớ.
+          Bạn có thể đăng nhập bằng email này.
         </Alert>
       )}
-      {failure === 'NETWORK' && (
+      {failure && failure.code !== 'EMAIL_TAKEN' && (
         <Alert
           tone="danger"
-          title="Không kết nối được máy chủ"
+          title={failure.message}
           action={
             <Button size="sm" variant="outline" leftIcon={<RotateCcw aria-hidden="true" />} onClick={() => submit()} loading={form.submitting}>
               Thử lại
             </Button>
           }
-        >
-          Kiểm tra kết nối mạng rồi thử lại nhé.
-        </Alert>
+        />
       )}
 
       <form ref={form.formRef} noValidate onSubmit={submit} className="grid gap-5">
@@ -139,7 +133,7 @@ export function RegisterForm() {
         </FormField>
 
         <div className="grid gap-2">
-          <FormField label="Mật khẩu" required hint="Từ 6 đến 128 ký tự." error={form.errors.password}>
+          <FormField label="Mật khẩu" required hint="Từ 8 đến 128 ký tự." error={form.errors.password}>
             {(field) => (
               <PasswordInput
                 {...field}
@@ -185,9 +179,11 @@ export function RegisterForm() {
         </div>
 
         <Button type="submit" size="lg" fullWidth loading={form.submitting}>
-          {form.submitting ? 'Đang tạo tài khoản…' : 'Tạo tài khoản'}
+          {form.submitting ? 'Đang gửi mã…' : 'Gửi mã xác minh'}
         </Button>
       </form>
+
+      <GoogleSignIn />
 
       <AuthSwitch question="Đã có tài khoản?" href="/login" label="Đăng nhập" />
 

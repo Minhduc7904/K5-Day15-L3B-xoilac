@@ -9,10 +9,12 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { useToast } from '@/components/ui/toast';
+import { mockMode } from '@/lib/config';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
 import { AuthHeader, AuthSwitch, MockLoginHint, TextLink } from '../components/auth-shell';
+import { GoogleSignIn } from '../components/google-sign-in';
 import { SignedInNotice } from '../components/signed-in-notice';
 import { toAuthError, type AuthErrorCode } from '../types';
 import { useAuthForm } from '../use-auth-form';
@@ -140,15 +142,19 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
               />
             )}
           </FormField>
-          <div className="flex justify-end">
-            <TextLink href="/forgot-password">Quên mật khẩu?</TextLink>
-          </div>
+          {mockMode && (
+            <div className="flex justify-end">
+              <TextLink href="/forgot-password">Quên mật khẩu?</TextLink>
+            </div>
+          )}
         </div>
 
         <Button type="submit" size="lg" fullWidth loading={form.submitting}>
           {form.submitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
         </Button>
       </form>
+
+      <GoogleSignIn />
 
       <AuthSwitch question="Chưa có tài khoản?" href="/register" label="Tạo tài khoản" />
 

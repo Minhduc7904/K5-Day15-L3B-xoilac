@@ -14,7 +14,7 @@ Admin tạo, sửa và duyệt mẫu cấu trúc đề (giữa kỳ, cuối kỳ
   | `GET /exam-templates/lookup` | Mọi tài khoản đã đăng nhập. Chỉ trả mẫu đã duyệt nên không lộ mẫu nháp |
 
   Chưa đăng nhập trả `401`; học sinh gọi route quản trị trả `403` với `code = "FORBIDDEN_ROLE"` (định dạng lỗi chung của auth: `{"detail": "...", "code": "..."}`).
-- Cần migration `0005_exam_templates`, nối sau `0004_users_created_by` của auth (`alembic upgrade head`).
+- Cần migration `0005_exam_templates`, nối sau `0005_student_auth` trên main (`alembic upgrade head`).
 
 ## Mô hình dữ liệu
 
@@ -128,7 +128,7 @@ Test tự động: `cd backend && pytest tests/test_exam_templates.py` (chạy b
 6. Các ca `422` nghiệp vụ, `422` hình dạng và `404`.
 7. Phân quyền: chưa đăng nhập nhận `401` ở mọi route; học sinh nhận `403 FORBIDDEN_ROLE` ở route quản trị nhưng tra cứu được mẫu đã duyệt; học sinh không bao giờ thấy mẫu nháp qua `lookup`.
 
-Chưa kiểm với PostgreSQL thật. Đã kiểm SQL của migration bằng `alembic upgrade 0004:0005_exam_templates --sql`.
+Chưa kiểm với PostgreSQL thật. Đã kiểm SQL của migration bằng `alembic upgrade 0005_student_auth:0005_exam_templates --sql`.
 
 ## Tài liệu liên quan
 
