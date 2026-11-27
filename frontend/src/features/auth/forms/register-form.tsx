@@ -12,7 +12,6 @@ import { authApi } from '../api';
 import { AuthHeader, AuthSwitch, MockNote } from '../components/auth-shell';
 import { GoogleSignIn } from '../components/google-sign-in';
 import { PasswordStrength } from '../components/password-strength';
-import { SignedInNotice } from '../components/signed-in-notice';
 import { toAuthError, type PendingOtp } from '../types';
 import { useAuthForm } from '../use-auth-form';
 import { normalizeEmail, validateConfirm, validateDisplayName, validateEmail, validateNewPassword } from '../validation';
@@ -73,8 +72,6 @@ export function RegisterForm() {
         title="Tạo tài khoản"
         description="Tài khoản học sinh để nhận đề ôn theo chương bạn còn yếu."
       />
-
-      <SignedInNotice />
 
       {failure?.code === 'EMAIL_TAKEN' && (
         <Alert

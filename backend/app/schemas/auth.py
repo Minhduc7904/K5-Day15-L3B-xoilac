@@ -79,6 +79,30 @@ class LoginIn(BaseModel):
         return v.lower()
 
 
+class PasswordForgotIn(BaseModel):
+    email: EmailStr = Field(max_length=255)
+
+    _strip = field_validator("email", mode="before")(_strip_email)
+
+    @field_validator("email")
+    @classmethod
+    def _lower(cls, v: str) -> str:
+        return v.lower()
+
+
+class PasswordVerifyIn(PasswordForgotIn):
+    otp: str = Field(pattern=r"^[0-9]{6}$")
+
+
+class ResetTokenOut(BaseModel):
+    reset_token: str
+
+
+class PasswordResetIn(BaseModel):
+    reset_token: OpaqueToken
+    password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
+
+
 class UserOut(BaseModel):
     """Không bao giờ chứa password_hash hay token."""
 

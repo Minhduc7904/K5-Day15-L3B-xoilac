@@ -130,6 +130,37 @@ sequenceDiagram
   Note over C,DB: Request sau dùng lại token cũ sẽ nhận 401 SESSION_REVOKED
 ```
 
+### Quên mật khẩu
+
+Dùng lại bảng `email_challenges` với `purpose = "password_reset"`, mỗi email một dòng. Code ở `StudentAuthUseCase` (`start_password_reset`, `verify_password_reset`, `reset_password`).
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant U as StudentAuthUseCase
+  participant DB as PostgreSQL
+  participant M as Gmail
+  C->>U: POST /auth/password/forgot {email}
+  U->>DB: khoá dòng (password_reset, email), kiểm giới hạn gửi, lưu HMAC của mã
+  alt email là học sinh đang hoạt động
+    U->>M: gửi mã 6 số (hạn 5 phút)
+  else email lạ, admin, tài khoản bị khoá
+    U-->>U: tạo mã nhưng không gửi
+  end
+  U-->>C: 204
+  C->>U: POST /auth/password/verify-otp {email, otp}
+  U->>DB: đúng mã thì thay mã bằng hash của reset_token (hạn 10 phút)
+  U-->>C: {reset_token}
+  C->>U: POST /auth/password/reset {reset_token, password}
+  U->>DB: đặt password_hash mới, thu hồi mọi phiên, xoá reset_token
+  U-->>C: 204
+```
+
+- Email lạ đi cùng đường với email có tài khoản: cùng 204, cùng giới hạn gửi (429 `OTP_RESEND_LIMIT`), cùng `OTP_INVALID` khi nhập sai. Mã của email lạ không được gửi đi nên nhập đúng cũng không cấp `reset_token`. Ngoại lệ: lỗi gửi thư (503) chỉ xảy ra với email có tài khoản.
+- Admin không tự đặt lại qua email, dùng `app.cli.create_admin` như mục cấp tài khoản admin.
+- Đặt lại xong không mở phiên mới. Mọi phiên cũ bị thu hồi, người dùng đăng nhập lại.
+- Tài khoản chỉ có Google (`password_hash` rỗng) đặt được mật khẩu bằng luồng này vì đã chứng minh sở hữu email qua OTP.
+
 ### Vòng đời phiên
 
 ```mermaid
@@ -259,7 +290,6 @@ Kiểm chứng:
 | --- | --- |
 | Giới hạn số lần thử đăng nhập bằng mật khẩu | Đếm số lần sai theo IP và theo email (bảng `login_attempts` hoặc bộ nhớ đệm), khoá tạm vài phút sau khoảng 5–10 lần sai, trả 429 `TOO_MANY_ATTEMPTS`. Có thể thêm `limit_req` ở nginx cho `/api/v1/auth/` làm lớp ngoài |
 | Đổi mật khẩu | Yêu cầu mật khẩu cũ. Thu hồi mọi phiên khác của người dùng |
-| Quên và đặt lại mật khẩu qua email | Cần dịch vụ gửi mail và bảng token đặt lại có hạn ngắn |
 | Khoá, mở khoá tài khoản student và xem danh sách học sinh | Thuộc phần admin (#11). Dùng lại `SessionRepository.revoke_all_for_user` khi khoá |
 | Hạ admin thành student | Cần luật "không hạ admin cuối" giống `LAST_ADMIN`, có nhập lại mật khẩu, thu hồi phiên |
 | Xoá tài khoản | Cân nhắc khoá thay vì xoá; `created_by` của người khác sẽ thành `NULL` (`ON DELETE SET NULL`) |

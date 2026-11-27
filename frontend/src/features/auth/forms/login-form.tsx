@@ -15,7 +15,6 @@ import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
 import { AuthHeader, AuthSwitch, MockLoginHint, TextLink } from '../components/auth-shell';
 import { GoogleSignIn } from '../components/google-sign-in';
-import { SignedInNotice } from '../components/signed-in-notice';
 import { toAuthError, type AuthErrorCode } from '../types';
 import { useAuthForm } from '../use-auth-form';
 import { normalizeEmail, validateEmail, validateLoginPassword } from '../validation';
@@ -92,8 +91,6 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
         title="Đăng nhập"
         description="Chào bạn quay lại! Đăng nhập để tiếp tục ôn tập."
       />
-
-      <SignedInNotice />
 
       {alert && (
         <Alert

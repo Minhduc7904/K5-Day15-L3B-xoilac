@@ -23,6 +23,10 @@ class AuthChallengeRepository:
         query = select(EmailChallenge).where(EmailChallenge.purpose == purpose, EmailChallenge.email == email)
         return (await self._session.execute(query.with_for_update())).scalar_one()
 
+    async def lock_existing_email(self, purpose: str, email: str) -> EmailChallenge | None:
+        query = select(EmailChallenge).where(EmailChallenge.purpose == purpose, EmailChallenge.email == email)
+        return (await self._session.execute(query.with_for_update())).scalar_one_or_none()
+
     async def lock_challenge(self, purpose: str, digest: str) -> EmailChallenge | None:
         query = select(EmailChallenge).where(
             EmailChallenge.purpose == purpose, EmailChallenge.challenge_hash == digest

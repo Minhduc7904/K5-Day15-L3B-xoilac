@@ -20,7 +20,8 @@ import { normalizeEmail, validateEmail } from '../validation';
 export function ForgotPasswordForm() {
   const router = useRouter();
   const toast = useToast();
-  const [networkError, setNetworkError] = useState(false);
+  /** Thông báo khi chưa gửi được mã: lỗi mạng, gửi quá nhiều lần (429) hoặc máy chủ thư lỗi (503). */
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const form = useAuthForm({ email: '' }, (v) => ({ email: validateEmail(v.email) }));
 
@@ -32,7 +33,7 @@ export function ForgotPasswordForm() {
   }, []);
 
   const submit = form.handleSubmit(async ({ email }) => {
-    setNetworkError(false);
+    setSendError(null);
     const normalized = normalizeEmail(email);
     try {
       await authApi.forgotPassword(normalized);
@@ -46,7 +47,8 @@ export function ForgotPasswordForm() {
     } catch (error) {
       const authError = toAuthError(error);
       if (authError.code === 'VALIDATION') form.setServerErrors({ email: 'Email chưa đúng định dạng.' });
-      else setNetworkError(true);
+      else if (authError.code === 'NETWORK') setSendError('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại nhé.');
+      else setSendError(authError.message);
     }
   });
 
@@ -59,7 +61,7 @@ export function ForgotPasswordForm() {
         description="Nhập email bạn đã đăng ký. Mình sẽ gửi mã xác minh 6 số để bạn đặt lại mật khẩu."
       />
 
-      {networkError && (
+      {sendError && (
         <Alert
           tone="danger"
           title="Chưa gửi được mã"
@@ -69,7 +71,7 @@ export function ForgotPasswordForm() {
             </Button>
           }
         >
-          Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại nhé.
+          {sendError}
         </Alert>
       )}
 
