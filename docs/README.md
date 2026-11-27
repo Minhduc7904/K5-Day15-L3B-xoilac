@@ -15,6 +15,7 @@
 | Chạy frontend và deploy Vercel | [Runbook frontend](operations/deploy-frontend-vercel.md) |
 | Chạy PostgreSQL, MinIO và backend trên máy | [Chạy bộ khung local](operations/run-local-stack.md) |
 | Xem định dạng API và gọi thử endpoint mẫu | [API mẫu](api/sample-api.md) |
+| Nhập đề PDF và duyệt câu hỏi | [Pipeline nhập đề](ai/pdf-import/pipeline.md) · [API nhập đề](ai/pdf-import/api.md) |
 | Quản lý và tra cứu mẫu cấu trúc đề thi (#5) | [API mẫu cấu trúc đề](api/exam-templates-api.md) |
 | Chat tạo đề ôn, bản xem trước, đề nháp, sự kiện SSE (#4) | [API học sinh tạo đề ôn](api/user-exam-api.md) |
 | Kết nối EC2 và kiểm tra khả năng truy cập API | [Runbook EC2](operations/deploy-ec2.md) |

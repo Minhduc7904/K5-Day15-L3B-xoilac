@@ -1,16 +1,18 @@
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
-from app.core.database import get_session
+from app.core.database import get_session, get_sessionmaker
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
 from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.exam_template_repository import ExamTemplateRepository
+from app.repositories.pdf_imports import PdfImportRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
@@ -26,12 +28,14 @@ from app.service.exam_chat_sources import (
 from app.service.email_service import GmailEmailService
 from app.service.google_identity import GoogleIdentityService
 from app.service.password_service import PasswordService
+from app.service.pdf_import_models import PdfImportModels
 from app.service.storage_service import StorageService
-from app.usecase.exam_templates import ExamTemplateUseCase
 from app.service.token_service import TokenService
 from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.exam_chat import ExamChatUseCase, Requester
+from app.usecase.exam_templates import ExamTemplateUseCase
+from app.usecase.pdf_imports import PdfImportUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 from app.usecase.student_auth import StudentAuthUseCase
@@ -178,6 +182,35 @@ def require_role(*roles: str):
 
 AdminDep = Annotated[CurrentUser, Depends(require_role("admin"))]
 StudentDep = Annotated[CurrentUser, Depends(require_role("student"))]
+
+
+@lru_cache
+def get_pdf_import_models() -> PdfImportModels:
+    return PdfImportModels(get_settings())
+
+
+def get_pdf_import_usecase(
+    session: SessionDep, storage: StorageDep,
+    models: Annotated[PdfImportModels, Depends(get_pdf_import_models)],
+) -> PdfImportUseCase:
+    return PdfImportUseCase(PdfImportRepository(session), storage, models, get_settings().s3_bucket)
+
+
+def get_pdf_import_runner(
+    storage: StorageDep,
+    models: Annotated[PdfImportModels, Depends(get_pdf_import_models)],
+    sessions: Annotated[async_sessionmaker[AsyncSession], Depends(get_sessionmaker)],
+):
+    async def run(import_id: int) -> None:
+        async with sessions() as session:
+            usecase = PdfImportUseCase(PdfImportRepository(session), storage, models, get_settings().s3_bucket)
+            await usecase.process(import_id)
+
+    return run
+
+
+PdfImportUseCaseDep = Annotated[PdfImportUseCase, Depends(get_pdf_import_usecase)]
+PdfImportRunnerDep = Annotated[Callable[[int], Awaitable[None]], Depends(get_pdf_import_runner)]
 
 
 # ---------- issue #4: pipeline học sinh tạo đề ôn ----------

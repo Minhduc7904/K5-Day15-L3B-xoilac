@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     admin,
     admin_accounts,
+    admin_import,
     auth,
     exam_chat,
     exam_templates,
@@ -20,5 +21,6 @@ api_router.include_router(admin.router)
 api_router.include_router(admin_accounts.router)
 api_router.include_router(sample_items.router)
 api_router.include_router(sample_files.router)
+api_router.include_router(admin_import.router)
 api_router.include_router(exam_templates.router)
 api_router.include_router(exam_chat.router)

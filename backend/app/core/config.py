@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,6 +26,13 @@ class Settings(BaseSettings):
     admin_email: str = ""
     admin_password: SecretStr = SecretStr("")
     admin_name: str = ""
+
+    mistral_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    ocr_provider: Literal["mistral"] = "mistral"
+    ocr_model: str = "mistral-ocr-4-1"
+    pdf_import_extraction_model: str = "gpt-5.4-mini"
+    pdf_import_embedding_model: str = "text-embedding-3-small"
 
     email_provider: str = ""
     email_from: str = ""

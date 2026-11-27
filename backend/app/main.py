@@ -3,13 +3,18 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.errors import ApiError, api_error_handler
 from app.api.v1.google_auth import callback_router
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.usecase.pdf_imports import ImportErrorDetail
+
+
+async def pdf_import_error(_: Request, exc: ImportErrorDetail) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content={"detail": str(exc)})
 
 
 class OAuthCallbackAccessFilter(logging.Filter):
@@ -42,6 +47,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(api_router)
+    app.add_exception_handler(ImportErrorDetail, pdf_import_error)
     app.include_router(callback_router)
     return app
 
