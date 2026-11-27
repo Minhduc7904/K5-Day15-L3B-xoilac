@@ -37,6 +37,14 @@ import { BookOpen } from 'lucide-react';
 </button>
 ```
 
+## Linh vật và trạng thái chờ
+
+- `frontend/public/brand/mascot/running/` có 4 khung chạy cho màn hình tải. `app/loading.tsx` hiển thị linh vật khi Next.js đang chờ route. Các route đã sẵn sàng hiển thị ngay.
+- `frontend/public/brand/mascot/thinking/` có 4 khung suy nghĩ. Trong giao diện chat, render `<AgentThinking active={isAwaitingReply} />` từ `@/components/mascot/agent-thinking`. Đặt cờ khi gửi yêu cầu và tắt khi nhận phần phản hồi đầu tiên, yêu cầu lỗi hoặc bị hủy.
+- Mỗi thư mục có 4 tệp `frame-*.webp` trong suốt 256 × 256 và một `loop.webp` chứa cùng các khung theo thứ tự. Mỗi khung chạy kéo dài 120 ms, mỗi khung suy nghĩ kéo dài 800 ms. Component dùng khung đầu khi thiết bị bật `prefers-reduced-motion`.
+- Kiểm thử bằng route có nội dung tải bất đồng bộ và trạng thái chat mô phỏng. Kiểm tra nhãn chờ, 4 khung của mỗi vòng lặp và ảnh tĩnh ở chế độ giảm chuyển động.
+
+
 ## Quyết định và cách kiểm chứng
 
 Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, cả `/` và `/admin` trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
