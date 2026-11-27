@@ -33,6 +33,10 @@ flowchart LR
 
 Backend và frontend chạy trực tiếp trên máy ở giai đoạn này. Backend đọc cấu hình từ `backend/.env`.
 
+### Trên VPS
+
+`docker-compose.prod.yml` thêm `backend` và `nginx`. Chỉ nginx mở cổng 80; backend, PostgreSQL và MinIO chỉ nghe trên `127.0.0.1` hoặc mạng nội bộ Compose. GitHub Actions deploy mỗi lần merge vào `main` ([deploy-backend-ci-cd.md](../operations/deploy-backend-ci-cd.md)). Dữ liệu nền nạp một lần từ gói đã lọc ([seed-base-data.md](../operations/seed-base-data.md)).
+
 ## Quyết định và cách kiểm chứng
 
 | Quyết định | Lý do |

@@ -47,6 +47,8 @@ Dành cho thành viên nhóm cần dựng PostgreSQL, MinIO và backend trên m�
    uvicorn app.main:app --reload --port 8000
    ```
 
+Nếu có gói dữ liệu nền ở `data/private/seed` (biến `SEED_DIR`), hai container init nạp thêm câu hỏi, đề và ảnh đúng một lần; không có thì chỉ tạo bảng. Cách dựng gói: [seed-base-data.md](seed-base-data.md). Cổng PostgreSQL và MinIO chỉ mở trên `127.0.0.1`.
+
 Quay lui: `docker compose down` giữ dữ liệu; `docker compose down -v` xoá cả dữ liệu PostgreSQL và MinIO.
 
 ## Kiểm tra kết quả

@@ -1,0 +1,2 @@
+# Chỉ để chạy backend/scripts/build_seed.py trên máy nhóm (không cài trong image backend).
+pymysql>=1.1

@@ -1,0 +1,62 @@
+name: Deploy backend
+
+# Merge vào main: chạy CI trên bản vừa merge, nếu qua thì deploy lên VPS EC2.
+# CI lỗi thì job deploy không chạy. Sửa deploy/nginx/** cũng kích hoạt deploy và reload nginx.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "deploy/**"
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy lên EC2
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cấu hình SSH
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy (git sync, compose up, reload nginx, kiểm sức khoẻ, dọn Docker)
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+              -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" \
+              'bash -s' -- "$GITHUB_SHA" < deploy/remote-deploy.sh
+      - name: Kiểm tra từ bên ngoài
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          # Cổng 80 phải được mở trong Security Group. Chưa mở thì bước này báo lỗi nhưng bản deploy trên VPS đã qua kiểm tra nội bộ.
+          curl -fsS --retry 5 --retry-delay 5 --max-time 15 "http://$EC2_HOST/api/v1/health"
+      - name: Xoá khoá SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
