@@ -54,11 +54,13 @@ def to_api_error(e: AuthError, *, in_session_check: bool = False) -> ApiError:
     )
 
 
-async def api_error_handler(_: Request, exc: Exception) -> JSONResponse:
+async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, ApiError)
     response = JSONResponse({"detail": exc.detail, "code": exc.code}, status_code=exc.status_code)
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
         response.headers["WWW-Authenticate"] = "Bearer"
     if exc.clear_cookie:
-        clear_session_cookie(response, get_settings())
+        # Handler nằm ngoài hệ dependency nên tự lấy settings, có tính override của test.
+        settings = request.app.dependency_overrides.get(get_settings, get_settings)()
+        clear_session_cookie(response, settings)
     return response
