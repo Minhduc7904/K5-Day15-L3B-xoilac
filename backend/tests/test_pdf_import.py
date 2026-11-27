@@ -21,9 +21,9 @@ from app.repositories.pdf_imports import PdfImportRepository, question_chapters,
 from app.service.pdf_import_models import PdfImportModels, order_image_options
 from app.usecase.pdf_import_classification import classify_drafts
 from tests.conftest import FakeStorage
+from tests.test_auth import login, make_admin, register
 
 ROOT = "/api/v1/admin/pdf-imports"
-ADMIN = {"Authorization": "Bearer test-import"}
 FIGURE = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XufkAAAAASUVORK5CYII="
 )
@@ -115,7 +115,6 @@ class FixtureModels(PdfImportModels):
 
 @pytest.fixture
 async def pdf_api(tmp_path, monkeypatch):
-    monkeypatch.setenv("PDF_IMPORT_ADMIN_TOKEN", "test-import")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral")
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
     get_settings.cache_clear()
@@ -145,6 +144,7 @@ async def pdf_api(tmp_path, monkeypatch):
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_pdf_import_models] = lambda: FixtureModels(get_settings())
     try:
+        await make_admin(maker)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield client, maker, storage
     finally:
@@ -159,8 +159,10 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
     data = fixture_pdf(scanned=scanned)
     assert bool(PdfReader(BytesIO(data)).pages[0].extract_text()) is not scanned
     assert (await client.get(ROOT)).status_code == 401
-    assert (await client.get(ROOT, headers={"Authorization": "Bearer wrong"})).status_code == 401
-    client.headers.update(ADMIN)
+    assert (await register(client)).status_code == 201
+    assert (await client.get(ROOT)).status_code == 403
+    assert (await client.post(ROOT, files={"file": ("exam.pdf", data)})).status_code == 403
+    assert (await login(client, email="admin@example.com")).status_code == 200
     upload = await client.post(ROOT, files={"file": ("exam.pdf", data, "application/pdf")})
     assert upload.status_code == 202, upload.text
     assert upload.json()["status"] == "queued"
@@ -181,6 +183,11 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
         assert (await db.execute(select(questions))).all() == []
 
     review = f"{path}/drafts/{draft['id']}"
+    assert (await login(client)).status_code == 200
+    assert (await client.get(f"{path}/media/{media_id}/url")).status_code == 403
+    assert (await client.patch(review, json={"difficulty": "TH"})).status_code == 403
+    assert (await client.post(f"{review}/approve")).status_code == 403
+    assert (await login(client, email="admin@example.com")).status_code == 200
     assert (await client.post(f"{review}/approve")).status_code == 422
     saved = await client.patch(review, json={
         "chapterCodes": ["12C1"], "difficulty": "TH", "imageReviewed": True,
@@ -201,11 +208,13 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
     assert list(question["statements"][3]) == ["content", "order"]
     assert question["chapterCodes"] == ["12C1"]
     assert "correct_answer" not in question and "solution" not in question
+    assert (await client.post("/api/v1/auth/logout")).status_code == 204
+    assert (await client.get(ROOT)).status_code == 401
 
 
 async def test_invalid_pdf_and_rejected_draft_do_not_publish(pdf_api):
     client, sessions, _ = pdf_api
-    client.headers.update(ADMIN)
+    assert (await login(client, email="admin@example.com")).status_code == 200
     assert (await client.post(ROOT, files={"file": ("bad.pdf", b"invalid")})).status_code == 415
     assert (await client.post(ROOT, files={"file": ("bad.pdf", b"%PDF-broken")})).status_code == 422
     upload = await client.post(ROOT, files={"file": ("exam.pdf", fixture_pdf(scanned=False))})
@@ -313,7 +322,7 @@ async def test_ocr_failure_leaves_a_failed_session_without_drafts(pdf_api, monke
         raise ValueError("fixture internal provider payload")
 
     monkeypatch.setattr(FixtureModels, "recognize", fail_recognition)
-    client.headers.update(ADMIN)
+    assert (await login(client, email="admin@example.com")).status_code == 200
     response = await client.post(ROOT, files={"file": ("scan.pdf", fixture_pdf(scanned=True))})
     assert response.status_code == 202
     status = (await client.get(response.json()["statusUrl"])).json()

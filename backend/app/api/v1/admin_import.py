@@ -4,10 +4,7 @@ from secrets import token_bytes
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, UploadFile
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from app.api.deps import PdfImportRunnerDep, PdfImportUseCaseDep
-from app.core.config import Settings, get_settings
+from app.api.deps import PdfImportRunnerDep, PdfImportUseCaseDep, require_role
 from app.models.pdf_import import PdfDraft, PdfImport
 from app.schemas.pdf_import import DraftEdit
 from app.usecase.pdf_imports import MAX_PDF_BYTES
@@ -15,19 +12,7 @@ from app.usecase.pdf_imports import MAX_PDF_BYTES
 router = APIRouter(prefix="/admin/pdf-imports", tags=["pdf-import"])
 MEDIA_TTL_SECONDS = 300
 MEDIA_SIGNING_KEY = token_bytes(32)
-admin_bearer = HTTPBearer(auto_error=False)
-
-
-def require_admin(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(admin_bearer)],
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> None:
-    configured = settings.pdf_import_admin_token
-    token = configured.get_secret_value() if configured else ""
-    if not token:
-        raise HTTPException(503, "Chưa cấu hình quyền nhập PDF.")
-    if not credentials or not hmac.compare_digest(token.encode(), credentials.credentials.encode()):
-        raise HTTPException(401, "Cần token admin.", headers={"WWW-Authenticate": "Bearer"})
+require_admin = require_role("admin")
 
 
 def import_response(row: PdfImport, request: Request) -> dict:

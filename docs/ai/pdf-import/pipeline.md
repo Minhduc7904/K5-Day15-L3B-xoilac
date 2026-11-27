@@ -65,6 +65,14 @@ Các đề được đối chiếu theo bảng đáp án in trên tài liệu. S
 
 Gợi ý nhãn đôi khi sai chương dù có điểm tương đồng cao, nên vẫn cần admin xác nhận. Bản scan là bản raster hóa cùng đề. Chất lượng trên bản chụp giấy, bố cục lời giải khác và ngân hàng chương rộng hơn cần kiểm thêm.
 
+### Tích hợp Auth, migration và danh mục chương
+
+API nhập đề dùng chung kiểm tra vai trò admin của Auth. URL đọc hình và PDF vẫn hết hạn sau 5 phút. Issue #4 đọc câu đã xuất bản qua kho câu hỏi dùng chung.
+
+Revision Alembic `0007_pdf_import_auth` nối hai nhánh `0004` (Auth) và `0004_pdf_import_vectors` (nhập đề). Ba ca PostgreSQL local gồm DB trắng, DB đã chạy Auth và DB đã chạy nhập đề đều nâng cấp về cùng một head. Khi tích hợp #5 và #4, nối revision mới với head trên `main` tại thời điểm merge. Tại lần đối chiếu này, `0005_exam_templates` và `0006_exam_chat` đều còn trỏ về `0002`.
+
+Đã nạp và đọc lại đủ 103 mã chương từ `data/chapters.csv` trên PostgreSQL local. Cả 1.279 câu mẫu trong `data/question_bank.csv` dùng mã hợp lệ và quan hệ chương–chương con khớp danh mục. Danh mục trên VPS chưa được đối chiếu vì máy này chưa có host key SSH đã xác minh.
+
 ## Tài liệu liên quan
 
 - [API nhập đề PDF](api.md)

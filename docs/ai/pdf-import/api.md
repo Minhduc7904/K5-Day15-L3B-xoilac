@@ -4,7 +4,7 @@ Hợp đồng cho backend, frontend admin và kiểm thử Issue #3.
 
 ## Điều kiện gọi
 
-Base URL local là `http://localhost:8000/api/v1`. Các thao tác nhập và duyệt dùng bearer token riêng lấy từ `PDF_IMPORT_ADMIN_TOKEN`. Khi thiếu token cấu hình, các thao tác này trả `503`. URL xem đối tượng đã ký hết hạn sau 5 phút hoặc khi backend khởi động lại.
+Base URL local là `http://localhost:8000/api/v1`. Các thao tác nhập, duyệt và cấp URL xem tệp dùng phiên có vai trò admin theo Auth chung. URL xem đối tượng đã ký hết hạn sau 5 phút hoặc khi backend khởi động lại.
 
 ## Endpoint và hợp đồng
 
@@ -30,14 +30,14 @@ Ví dụ phản hồi tải lên
 
 | Mã | Điều kiện |
 | --- | --- |
-| 401 | Thiếu token admin hoặc token sai. |
-| 403 | Chữ ký URL xem tệp sai hoặc hết hạn. |
+| 401 | Thiếu phiên hoặc phiên không còn hợp lệ. |
+| 403 | Tài khoản thiếu quyền admin hoặc chữ ký URL xem tệp sai hoặc hết hạn. |
 | 404 | Phiên, câu hoặc hình không tồn tại trong phạm vi yêu cầu. |
 | 409 | Bản nháp đã có quyết định hoặc phiên chưa sẵn sàng. |
 | 413 | PDF vượt giới hạn. |
 | 415 | Đầu vào không phải PDF. |
 | 422 | PDF không đọc được hoặc câu chưa đạt điều kiện duyệt. |
-| 503 | Backend chưa cấu hình nhà cung cấp hoặc token admin. |
+| 503 | Backend chưa cấu hình nhà cung cấp OCR hoặc model tách đề. |
 
 Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa xác định hoặc hình bắt buộc bị thiếu cần được sửa trước khi duyệt. `suggestions` chứa nhãn đề xuất và danh sách `neighbors` gồm `questionId`, mã chương, độ khó và điểm cosine. Frontend gửi chương và độ khó đã xác nhận qua PATCH.
 
@@ -45,7 +45,7 @@ Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa
 
 Cờ `solution_review` báo chưa xác định được lời giải có nguồn. Nếu tài liệu đánh số lại giữa các phần, backend ghép theo cả mã phần và số câu. Các vị trí trùng trong cùng phần cần admin đối chiếu.
 
-Chạy PostgreSQL và MinIO local theo runbook. Cấu hình `MISTRAL_API_KEY`, `OPENAI_API_KEY` và `PDF_IMPORT_ADMIN_TOKEN` trong `backend/.env`. Giữ `OCR_PROVIDER=mistral` và chọn `OCR_MODEL` nếu cần thử model khác. Dùng bearer token admin khi gọi API hoặc chọn Authorize trong Swagger `/docs`. Chỉ tải PDF và dữ liệu tham chiếu được phép gửi cho nhà cung cấp.
+Chạy PostgreSQL và MinIO local theo runbook. Cấu hình `MISTRAL_API_KEY` và `OPENAI_API_KEY` trong `backend/.env`. Giữ `OCR_PROVIDER=mistral` và chọn `OCR_MODEL` nếu cần thử model khác. Đăng nhập tài khoản admin qua `POST /auth/login` và gửi cookie phiên theo hợp đồng Auth. Chỉ tải PDF và dữ liệu tham chiếu được phép gửi cho nhà cung cấp.
 
 1. Tải PDF, dùng mã phiên để theo dõi đến `ready_for_review`.
 2. Mở bản nháp Phần I câu 6 của mẫu, kiểm thứ tự A–D và dùng URL xem từng hình. Đối chiếu đáp án D với trang 7.
@@ -64,5 +64,6 @@ Issue #4 có thể dùng `PdfImportRepository.read_published_question(question_i
 
 - [Pipeline nhập đề PDF](pipeline.md)
 - [Chạy bộ khung local](../../operations/run-local-stack.md)
+- [API Auth](../../api/auth-api.md)
 - [API mẫu](../../api/sample-api.md)
 - [Issue #4](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/4)

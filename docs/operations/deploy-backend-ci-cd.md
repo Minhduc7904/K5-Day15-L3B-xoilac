@@ -51,6 +51,39 @@ ssh -i ./backend-key.pem ubuntu@<host> 'bash -s' < deploy/bootstrap-vps.sh
 
 Script cài Docker và Compose, thêm swap 2 GB (VPS chỉ có ~1,9 GB RAM), tạo `/opt/examind`, clone repo, sinh `prod.env` với mật khẩu ngẫu nhiên. Chạy lại an toàn. Việc nạp dữ liệu nền: [seed-base-data.md](seed-base-data.md).
 
+## Biến trong prod.env
+
+`/opt/examind/prod.env` (chmod 600, không nằm trong Git) được truyền vào compose bằng `--env-file`. `docker-compose.prod.yml` đưa các biến sau vào container:
+
+| Biến | Container | Mặc định nếu thiếu | Ghi chú |
+| --- | --- | --- | --- |
+| `POSTGRES_PASSWORD`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | tất cả | bắt buộc (`:?`) | Sinh ngẫu nhiên khi bootstrap |
+| `CORS_ORIGINS` | backend | `http://localhost:3000` | Chỉ cần khi frontend gọi thẳng backend khác origin |
+| `COOKIE_SECURE` | backend, db-init | `true` | nginx có TLS. Cookie phiên chỉ gửi qua HTTPS; ở db-init bật luật mật khẩu admin ≥ 12 ký tự |
+| `COOKIE_NAME` | backend | `examind_session` | |
+| `SESSION_TTL_HOURS` | backend | `168` | Hạn phiên (giờ) |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | db-init | rỗng (bỏ qua admin mặc định) | `ensure_admin` tạo admin ở lần deploy kế tiếp nếu chưa có. Mật khẩu ≥ 12 ký tự, không chứa `$`. Đã có thì không đổi gì |
+
+**VPS mới:** chạy bootstrap kèm email admin. Script sinh sẵn các biến trên, mật khẩu admin ngẫu nhiên khoảng 30 ký tự và không in ra màn hình:
+
+```bash
+ssh -i ./backend-key.pem ubuntu@<host> 'ADMIN_EMAIL=<email-admin> bash -s' < deploy/bootstrap-vps.sh
+```
+
+**VPS đang chạy:** cũng chạy lại lệnh trên. Script chỉ thêm biến còn thiếu, không đổi giá trị đã có. Hoặc thêm tay qua SSH:
+
+1. `ssh -i ./backend-key.pem ubuntu@<host>`
+2. `nano /opt/examind/prod.env`, thêm `COOKIE_SECURE=true`, `ADMIN_EMAIL=...`, `ADMIN_PASSWORD=...` (ngẫu nhiên, dài, vd `openssl rand -base64 24 | tr -d '$/+='`), `ADMIN_NAME=...`. Giữ `chmod 600`.
+3. Merge hoặc chạy lại workflow Deploy backend. Kiểm admin đã tạo:
+
+   ```bash
+   cd /opt/examind/app && docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml logs db-init | grep -i admin
+   ```
+
+   Mong đợi `Đã tạo admin mặc định ...` (lần đầu) hoặc `Admin mặc định đã có, không thay đổi`. Xem mật khẩu trên VPS: `grep '^ADMIN_PASSWORD=' /opt/examind/prod.env`. Không chép mật khẩu ra ngoài VPS ngoài nơi lưu trữ an toàn của nhóm.
+
+Nếu `ADMIN_PASSWORD` dưới 12 ký tự hoặc sai định dạng, `db-init` thoát mã 2, backend không khởi động và deploy quay về commit trước. Email đã thuộc một tài khoản student thì chỉ cảnh báo trong log, không làm deploy fail. Cách thêm admin khác và cứu hộ: [backend-auth.md](../architecture/backend-auth.md#cấp-tài-khoản-admin).
+
 ## Kiểm tra kết quả
 
 ```bash
