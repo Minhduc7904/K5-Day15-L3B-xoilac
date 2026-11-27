@@ -2,7 +2,7 @@
  * Lớp gọi API của feature auth. Mọi trang auth chỉ gọi qua `authApi`.
  * Mặc định dùng mock (`NEXT_PUBLIC_MOCK_MODE` khác `false`). Đổi sang backend thật chỉ cần tắt cờ mock.
  *
- * login, register, logout, me: theo hợp đồng có sẵn của #8 (docs/api/auth-api.md).
+ * login, register, logout, me: theo hợp đồng của #8 ở PR #17 (đã revert ở #18, xem docs/architecture/frontend-auth.md).
  * forgotPassword, verifyOtp, resetPassword: hợp đồng ĐỀ XUẤT, backend chưa có endpoint.
  */
 import { isAxiosError } from 'axios';

@@ -6,7 +6,7 @@ Dành cho người phát triển frontend cần sửa hoặc nối API cho các 
 
 Issue #16 yêu cầu các trang auth đủ trạng thái: đang gửi, thành công, sai thông tin, lỗi từng trường, tài khoản bị khoá, phiên hết hạn và lỗi mạng. Nhãn phải gắn với ô nhập, focus chuyển tới trường sai đầu tiên, `autocomplete` đúng loại, và chỉ gọi API qua lớp API chung của feature.
 
-Backend hiện chỉ có `register`, `login`, `logout` và `me` ([API xác thực](../api/auth-api.md)). Luồng quên mật khẩu bằng OTP **chưa có ở backend**, nên frontend dùng hợp đồng đề xuất ở mục dưới.
+Frontend bám hợp đồng `register`, `login`, `logout` và `me` của backend auth ở [PR #17](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/pull/17). PR này đã bị revert ở [PR #18](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/pull/18), nên hiện **backend chưa có endpoint auth nào** và frontend chạy hoàn toàn bằng mock. Luồng quên mật khẩu bằng OTP cũng chưa có, frontend dùng hợp đồng đề xuất ở mục dưới. Khi backend auth quay lại, đối chiếu lại `features/auth/api.ts` với hợp đồng mới.
 
 ## Thành phần và trách nhiệm
 
@@ -97,7 +97,7 @@ Lệnh: `npm run typecheck` và `npm run build` trong `frontend/` đều qua.
 
 ## Tài liệu liên quan
 
-- [API xác thực](../api/auth-api.md)
+- [PR #17: backend auth (đã revert)](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/pull/17)
 - [Kiến trúc frontend](frontend-base.md)
 - [Design system frontend](frontend-design-system.md)
 - [Issue #16](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/16)

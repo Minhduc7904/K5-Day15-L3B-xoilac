@@ -1,5 +1,5 @@
 /**
- * Mock API auth chạy trong trình duyệt, theo bảng mock trong docs/api/auth-api.md.
+ * Mock API auth chạy trong trình duyệt, xem docs/architecture/frontend-auth.md.
  * Trạng thái lưu ở sessionStorage để giữ đăng nhập khi tải lại trang trong cùng tab.
  * Chỉ dùng tài khoản và mật khẩu mẫu, không dùng dữ liệu thật.
  */

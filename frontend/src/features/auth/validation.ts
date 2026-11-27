@@ -1,4 +1,4 @@
-/** Kiểm dữ liệu phía client, bám ràng buộc trong docs/api/auth-api.md. Backend vẫn kiểm lại. */
+/** Kiểm dữ liệu phía client, bám ràng buộc của backend auth (PR #17). Backend vẫn kiểm lại. */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const RESERVED_TLDS = ['.local', '.test', '.invalid', '.localhost', '.example'];

@@ -1,4 +1,4 @@
-/** Khớp `UserOut` trong docs/api/auth-api.md. */
+/** Khớp `UserOut` của backend auth (PR #17). */
 export interface User {
   user_id: number;
   email: string;

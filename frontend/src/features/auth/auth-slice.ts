@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { User } from './types';
 
-/** Chỉ lưu `UserOut`, không lưu token (theo gợi ý trong docs/api/auth-api.md). */
+/** Chỉ lưu `UserOut`, không lưu token (phiên do cookie HttpOnly của backend giữ). */
 export interface AuthState {
   user: User | null;
   /** `unknown` cho tới khi splash kiểm xong phiên. */
