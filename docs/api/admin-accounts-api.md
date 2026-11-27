@@ -48,7 +48,7 @@ Tạo một admin mới. `created_by` được ghi là admin đang thao tác.
 
 ```json
 // request
-{"email": "admin2@example.com", "password": "<mật khẩu của admin mới>", "display_name": "Admin 2", "current_password": "<mật khẩu của bạn>"}
+{"email": "admin2@example.com", "password": "<mat-khau-admin-moi>", "display_name": "Admin 2", "current_password": "<mat-khau-cua-ban>"}
 // 201
 {"user_id": 2, "email": "admin2@example.com", "display_name": "Admin 2", "status": "active", "created_at": "2026-11-27T17:14:27.032724Z", "created_by": 1, "last_login_at": null}
 ```
@@ -68,7 +68,7 @@ Khoá (`disabled`) hoặc mở khoá (`active`) một admin khác.
 
 ```json
 // request
-{"status": "disabled", "current_password": "<mật khẩu của bạn>"}
+{"status": "disabled", "current_password": "<mat-khau-cua-ban>"}
 // 200
 {"user_id": 2, "email": "admin2@example.com", "display_name": "Admin 2", "status": "disabled", "created_at": "2026-11-27T17:14:27.032724Z", "created_by": 1, "last_login_at": "2026-11-27T17:14:27.573713Z"}
 ```
@@ -101,12 +101,12 @@ Thứ tự kiểm: mật khẩu xác nhận → tài khoản đích là admin �
 
 ## Hướng dẫn mock cho frontend
 
-Tài khoản demo giống [auth-api.md](auth-api.md#hướng-dẫn-mock-cho-frontend): admin `admin@example.com`, mật khẩu mẫu `admin-demo-123`, **chỉ dùng cho mock**. Mock theo bảng sau, với trạng thái giữ trong bộ nhớ:
+Tài khoản mock giống [auth-api.md](auth-api.md#hướng-dẫn-mock-cho-frontend): admin `admin@example.com`, mật khẩu mock `mock-admin`. Đây là **giá trị mock, chỉ dùng phía frontend ở chế độ mock**, không tồn tại trên backend thật. Mock theo bảng sau, với trạng thái giữ trong bộ nhớ:
 
 | Request | Mock trả |
 | --- | --- |
 | `GET /api/v1/admin/accounts` | 200, mảng hai admin như ví dụ ở trên |
-| `POST /api/v1/admin/accounts` với `current_password` = `admin-demo-123`, email mới | 201, `AdminAccountOut` với `created_by: 1`, `last_login_at: null` |
+| `POST /api/v1/admin/accounts` với `current_password` = `mock-admin`, email mới | 201, `AdminAccountOut` với `created_by: 1`, `last_login_at: null` |
 | `POST` với `current_password` khác | 401 `{"detail": "Mật khẩu xác nhận không đúng", "code": "REAUTH_FAILED"}` |
 | `POST` với email `admin@example.com` hoặc `hs01@example.com` | 409 `{"detail": "Email này đã được đăng ký", "code": "EMAIL_TAKEN"}` |
 | `PATCH /api/v1/admin/accounts/2/status` hợp lệ | 200, `AdminAccountOut` với `status` mới |

@@ -34,7 +34,7 @@ Công khai. Tạo tài khoản **student** và đăng nhập luôn.
 
 ```json
 // request
-{"email": " HS01@Example.com ", "password": "hs01-demo", "display_name": "Học sinh 01"}
+{"email": " HS01@Example.com ", "password": "<mat-khau-cua-ban>", "display_name": "Học sinh 01"}
 // 201 + set-cookie: examind_session=<token>; HttpOnly; Max-Age=604800; Path=/; SameSite=lax
 {"user_id": 1, "email": "hs01@example.com", "role": "student", "status": "active", "display_name": "Học sinh 01", "created_at": "2026-11-27T15:52:23.845134Z"}
 ```
@@ -54,7 +54,7 @@ Công khai. Mở một phiên mới; các phiên cũ của cùng người dùng 
 
 ```json
 // request
-{"email": "hs01@example.com", "password": "hs01-demo"}
+{"email": "hs01@example.com", "password": "<mat-khau-cua-ban>"}
 // 200 + set-cookie như trên
 {"user_id": 1, "email": "hs01@example.com", "role": "student", "status": "active", "display_name": null, "created_at": "2026-11-27T15:52:23.845134Z"}
 ```
@@ -145,12 +145,12 @@ Trong test, tạo người dùng rồi đăng nhập qua API như `tests/test_au
 
 ## Hướng dẫn mock cho frontend
 
-Hai tài khoản demo dưới đây **chỉ dùng cho mock** và cho DB local. Email dùng tên miền `example.com` dành cho tài liệu, mật khẩu là giá trị mẫu, không dùng trên môi trường thật.
+Hai tài khoản dưới đây là **giá trị mock, chỉ dùng phía frontend ở chế độ mock** (`NEXT_PUBLIC_MOCK_MODE=true`). Backend thật không có sẵn tài khoản hay mật khẩu nào: không dùng các giá trị này cho DB local, EC2 hay bất kỳ môi trường thật nào. Email dùng tên miền `example.com` dành cho tài liệu.
 
-| Vai trò | Email | Mật khẩu mẫu |
+| Vai trò | Email | Mật khẩu mock (chỉ chế độ mock) |
 | --- | --- | --- |
-| student | `hs01@example.com` | `hs01-demo` |
-| admin | `admin@example.com` | `admin-demo-123` |
+| student | `hs01@example.com` | `mock-hs01` |
+| admin | `admin@example.com` | `mock-admin` |
 
 Mock theo bảng sau (đường dẫn tương đối, cùng origin):
 
@@ -175,29 +175,32 @@ Mock theo bảng sau (đường dẫn tương đối, cùng origin):
 
 Gợi ý cho Redux: chỉ lưu `UserOut` trong store, không lưu token. Khi nhận 401 với `code` bắt đầu bằng `SESSION_` thì xoá user khỏi store và chuyển tới trang đăng nhập; 401 `REAUTH_FAILED` chỉ là sai mật khẩu xác nhận, giữ phiên. Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền. Mock cho trang quản lý admin: [admin-accounts-api.md](admin-accounts-api.md#hướng-dẫn-mock-cho-frontend).
 
-Muốn có hai tài khoản này trên DB local thật: đặt `ADMIN_EMAIL=admin@example.com` và `ADMIN_PASSWORD` trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký `hs01@example.com` qua API ([run-local-stack.md](../operations/run-local-stack.md)).
+Muốn có tài khoản tương tự trên DB local thật: đặt `ADMIN_EMAIL` và `ADMIN_PASSWORD` (mật khẩu của riêng bạn, không dùng giá trị mock) trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký một học sinh qua API ([run-local-stack.md](../operations/run-local-stack.md)).
 
 ## Luồng kiểm thử
 
 Đã chạy ngày 2026-11-27 trên Windows 11, backend chạy trực tiếp, PostgreSQL 16 trong Docker. `-c`/`-b` dùng cookie jar như trình duyệt. Trong kết quả, token được thay bằng `<token>`.
 
+Đặt mật khẩu vào biến môi trường của phiên shell trước khi chạy (không ghi vào file, không commit). PowerShell: `$env:HS01_PASSWORD='...'`.
+
 ```bash
 B=http://localhost:8000/api/v1
+export HS01_PASSWORD='<mat-khau-cua-ban>' ADMIN_PASSWORD='<mat-khau-admin>'
 curl -s -i -c jar.txt -b jar.txt -X POST $B/auth/register -H "content-type: application/json" \
-  -d '{"email":" HS01@Example.com ","password":"hs01-demo","role":"admin"}'
+  -d "{\"email\":\" HS01@Example.com \",\"password\":\"$HS01_PASSWORD\",\"role\":\"admin\"}"
 # 201, set-cookie examind_session=<token>; HttpOnly; Max-Age=604800; Path=/; SameSite=lax
 # {"user_id":1,"email":"hs01@example.com","role":"student",...}   ← role bị bỏ qua
 curl -s -i -c jar.txt -b jar.txt $B/auth/me                # 200 UserOut
 curl -s -i -c jar.txt -b jar.txt -X POST $B/auth/logout    # 204, set-cookie examind_session=""; Max-Age=0
 curl -s -i -c jar.txt -b jar.txt $B/auth/me                # 401 {"detail":"Chưa đăng nhập","code":"SESSION_MISSING"}
 curl -s -i -c jar.txt -b jar.txt -X POST $B/auth/login -H "content-type: application/json" \
-  -d '{"email":"hs01@example.com","password":"hs01-demo"}'  # 200, đặt cookie mới
+  -d "{\"email\":\"hs01@example.com\",\"password\":\"$HS01_PASSWORD\"}"  # 200, đặt cookie mới
 curl -s -i -c jar.txt -b jar.txt $B/admin/ping             # 403 FORBIDDEN_ROLE
 
 # Tạo admin (trong backend/). Lần chạy thứ hai báo đã có và thoát mã 1.
-ADMIN_PASSWORD='admin-demo-123' python -m app.cli.create_admin --email admin@example.com --name "Quản trị"
+python -m app.cli.create_admin --email admin@example.com --name "Quản trị"   # đọc $ADMIN_PASSWORD
 curl -s -i -c admin.txt -b admin.txt -X POST $B/auth/login -H "content-type: application/json" \
-  -d '{"email":"admin@example.com","password":"admin-demo-123"}'  # 200, role admin
+  -d "{\"email\":\"admin@example.com\",\"password\":\"$ADMIN_PASSWORD\"}"  # 200, role admin
 curl -s -i -c admin.txt -b admin.txt $B/admin/ping         # 200 {"status":"ok","user_id":2,"role":"admin"}
 ```
 
