@@ -38,3 +38,8 @@ data-btc/
 
 # Du lieu day du cua trung tam: chi de o may, khong commit (repo public)
 data/private/
+
+# Backend / frontend
+.next/
+.pytest_cache/
+*.egg-info/

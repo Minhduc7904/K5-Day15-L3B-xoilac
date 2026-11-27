@@ -4,6 +4,10 @@
 | --- | --- |
 | Chạy bản thử và hiểu cấu trúc repo | [README dự án](../README.md) |
 | Nắm phạm vi, luồng AI và tiêu chí nghiệm thu | [Đặc tả dự án](../spec.md) |
+| Hiểu các thành phần và luồng dữ liệu của hệ thống | [Tổng quan hệ thống](architecture/system-overview.md) |
+| Viết tính năng mới trong backend | [Các lớp backend](architecture/backend-layers.md) |
+| Chạy PostgreSQL, MinIO và backend trên máy | [Chạy bộ khung local](operations/run-local-stack.md) |
+| Xem định dạng API và gọi thử endpoint mẫu | [API mẫu](api/sample-api.md) |
 | Kết nối EC2 và kiểm tra khả năng truy cập API | [Runbook EC2](operations/deploy-ec2.md) |
 | Cấu hình nhà cung cấp model cho bản thử | [Kết nối model](connect-model.md) |
 | Ghi nhận cách nhóm dùng AI | [Nhật ký sử dụng AI](ai-usage.md) |
