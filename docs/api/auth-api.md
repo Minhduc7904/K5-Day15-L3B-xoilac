@@ -63,7 +63,7 @@ Công khai. Mở một phiên mới; các phiên cũ của cùng người dùng 
 
 ### POST /auth/logout
 
-Cần phiên. Thu hồi **phiên hiện tại** ngay lập tức và xoá cookie. Phản hồi là `204` không có body, kèm `set-cookie: examind_session=""; Max-Age=0; ...`. Sau đó, dùng lại token cũ sẽ nhận 401 `SESSION_REVOKED`.
+**Idempotent, không cần phiên hợp lệ.** Luôn trả `204` không có body, kèm `set-cookie: examind_session=""; Max-Age=0; ...`. Nếu token (cookie hoặc Bearer) khớp một phiên chưa thu hồi, kể cả phiên đã hết hạn, thì phiên đó bị thu hồi ngay. Không có phiên, phiên đã hết hạn, đã thu hồi hay token không hợp lệ đều vẫn trả 204, nên frontend không phải xử lý lỗi khi đăng xuất. Sau đó, dùng lại token cũ sẽ nhận 401 `SESSION_REVOKED`.
 
 ### GET /auth/me
 

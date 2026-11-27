@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Request, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.cookies import clear_session_cookie, set_session_cookie
-from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep
+from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep, get_session_token
 from app.api.errors import to_api_error
 from app.schemas.auth import ErrorOut, LoginIn, RegisterIn, UserOut
 from app.usecase.auth import AuthError
@@ -55,10 +57,15 @@ async def login(body: LoginIn, request: Request, response: Response, usecase: Au
     return user
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, responses=_SESSION_ERRORS)
-async def logout(current: CurrentUserDep, usecase: AuthUseCaseDep, settings: SettingsDep) -> Response:
-    """Thu hồi phiên hiện tại ngay và xoá cookie."""
-    await usecase.logout(current)
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    usecase: AuthUseCaseDep,
+    settings: SettingsDep,
+    token: Annotated[str | None, Depends(get_session_token)],
+) -> Response:
+    """Idempotent: luôn 204 và xoá cookie, kể cả khi không có phiên hoặc phiên đã hết hạn, đã thu hồi,
+    không hợp lệ. Thu hồi phiên ngay nếu nó còn."""
+    await usecase.logout(token)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookie(response, settings)
     return response

@@ -237,9 +237,34 @@ async def test_logout_revokes_session_immediately(client, db):
         assert (await s.execute(select(UserSession.revoked_at))).scalar_one() is not None
 
 
-async def test_logout_requires_session(client):
+async def test_logout_without_session_is_204(client):
     r = await client.post(f"{API}/auth/logout")
-    assert r.status_code == 401 and r.json()["code"] == "SESSION_MISSING"
+    assert r.status_code == 204
+    assert "Max-Age=0" in set_cookie_header(r)
+
+
+async def test_logout_is_idempotent_for_dead_sessions(client, db):
+    """Phiên đã thu hồi, token lạ, phiên hết hạn: đều 204 và xoá cookie (frontend không phải xử lý 401)."""
+    await register(client)
+    token = client.cookies[COOKIE]
+    assert (await client.post(f"{API}/auth/logout")).status_code == 204
+    # Gọi lại bằng token đã thu hồi.
+    again = await client.post(f"{API}/auth/logout", headers={"Authorization": f"Bearer {token}"})
+    assert again.status_code == 204 and "Max-Age=0" in set_cookie_header(again)
+    # Token không khớp phiên nào.
+    bogus = await client.post(f"{API}/auth/logout", headers={"Authorization": "Bearer khong-ton-tai"})
+    assert bogus.status_code == 204
+
+
+async def test_logout_expired_session_is_204_and_revokes(client, db):
+    await register(client)
+    async with db() as s:
+        await s.execute(update(UserSession).values(expires_at=datetime.now(UTC) - timedelta(seconds=1)))
+        await s.commit()
+    r = await client.post(f"{API}/auth/logout")
+    assert r.status_code == 204 and "Max-Age=0" in set_cookie_header(r)
+    async with db() as s:
+        assert (await s.execute(select(UserSession.revoked_at))).scalar_one() is not None
 
 
 async def test_logout_only_revokes_current_session(client):

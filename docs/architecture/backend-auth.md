@@ -140,11 +140,14 @@ sequenceDiagram
   participant A as api/v1/auth.py
   participant U as AuthUseCase
   participant DB as PostgreSQL
-  C->>A: POST /api/v1/auth/logout (cookie)
-  A->>U: get_current_user(token) (như trên)
-  A->>U: logout(current)
-  U->>DB: UPDATE sessions SET revoked_at = now WHERE session_id = current.session_id
-  A-->>C: 204 + xoá cookie
+  C->>A: POST /api/v1/auth/logout (cookie hoặc Bearer, có thể không có)
+  A->>U: logout(token)
+  alt token khớp một phiên chưa thu hồi (kể cả đã hết hạn)
+    U->>DB: UPDATE sessions SET revoked_at = now WHERE session_id = ...
+  else không có token, token lạ, phiên đã thu hồi
+    U-->>A: không làm gì
+  end
+  A-->>C: luôn 204 + xoá cookie
   Note over C,DB: Request sau dùng lại token cũ sẽ nhận 401 SESSION_REVOKED
 ```
 
@@ -186,7 +189,8 @@ Cookie luôn có `HttpOnly`, `SameSite=Lax`, `Path=/`. JavaScript trên trình d
 | --- | --- | --- | --- | --- |
 | `GET /health`, `/health/live` | ✓ | ✓ | ✓ | không |
 | `POST /auth/register`, `/auth/login` | ✓ | ✓ | ✓ | không |
-| `POST /auth/logout`, `GET /auth/me` | 401 | ✓ | ✓ | `CurrentUserDep` |
+| `POST /auth/logout` | ✓ (204, idempotent) | ✓ | ✓ | `get_session_token` (không bắt buộc phiên) |
+| `GET /auth/me` | 401 | ✓ | ✓ | `CurrentUserDep` |
 | `GET /admin/ping` (mẫu) | 401 | 403 | ✓ | `AdminDep` |
 | `GET /admin/accounts` | 401 | 403 | ✓ | `AdminDep` |
 | `POST /admin/accounts`, `PATCH /admin/accounts/{id}/status` | 401 | 403 | ✓ kèm `current_password` | `AdminDep` + nhập lại mật khẩu ở usecase |

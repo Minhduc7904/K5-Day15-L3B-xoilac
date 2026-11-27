@@ -178,9 +178,17 @@ class AuthUseCase:
         await self._sessions.touch(row, self._now())
         return CurrentUser(user=user, session_id=row.session_id)
 
-    async def logout(self, current: CurrentUser) -> None:
-        """Thu hồi phiên của request hiện tại (đã qua get_current_user). Có hiệu lực ngay."""
-        await self._sessions.revoke(current.session_id, self._now())
+    async def logout(self, token: str | None) -> None:
+        """Đăng xuất idempotent: không bao giờ lỗi. Thu hồi phiên nếu token khớp một phiên chưa thu hồi
+        (kể cả phiên đã hết hạn hoặc của tài khoản bị khoá). Không có token hoặc token lạ: không làm gì."""
+        if not token:
+            return
+        found = await self._sessions.get_with_user(self._tokens.hash(token))
+        if found is None:
+            return
+        row, _ = found
+        if row.revoked_at is None:
+            await self._sessions.revoke(row.session_id, self._now())
 
     async def _load_session(self, token: str | None) -> tuple[UserSession, User]:
         if not token:
