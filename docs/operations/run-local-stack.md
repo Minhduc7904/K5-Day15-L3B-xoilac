@@ -24,16 +24,27 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
 
 ## Các bước thực hiện
 
-1. Dựng hạ tầng:
+1. Đặt admin mặc định. Compose đọc file `.env` ở **thư mục gốc** repo (cùng file với `MODEL_PROVIDER`, chép từ `.env.example`). Thêm hoặc sửa ba dòng:
+
+   ```bash
+   ADMIN_EMAIL=admin@example.com
+   ADMIN_NAME=Quản trị
+   ADMIN_PASSWORD=<tự đặt, 6–128 ký tự; prod cần ≥ 12>
+   ```
+
+   Không commit `.env`. Trong mật khẩu tránh ký tự `$`, vì compose coi `$` là chỗ thay biến (nếu cần thì viết `$$`). Bỏ trống `ADMIN_EMAIL` hoặc `ADMIN_PASSWORD` thì không có admin mặc định.
+
+2. Dựng hạ tầng:
 
    ```bash
    docker compose up -d
    docker compose ps -a
+   docker compose logs db-init
    ```
 
-   Mong đợi: `postgres` và `minio` healthy; `db-init` và `minio-init` ở trạng thái `Exited (0)`. Hai container này chạy một lần rồi thoát, chạy lại không tạo trùng. Lần đầu `db-init` build image backend nên mất vài phút.
+   Mong đợi: `postgres` và `minio` healthy; `db-init` và `minio-init` ở trạng thái `Exited (0)`. Hai container này chạy một lần rồi thoát, chạy lại không tạo trùng. Lần đầu `db-init` build image backend nên mất vài phút. Log `db-init` có dòng `Đã tạo admin mặc định user_id=1 email=admin@example.com`; các lần sau là `Admin mặc định đã có, không thay đổi`. `db-init` ở trạng thái `Exited (1)` hoặc `Exited (2)` nghĩa là cấu hình admin sai, xem bảng xử lý lỗi.
 
-2. Cài backend:
+3. Cài backend:
 
    ```bash
    cd backend
@@ -43,16 +54,20 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
    copy .env.example .env          # macOS/Linux: cp .env.example .env
    ```
 
-3. Chạy backend:
+   `backend/.env` cũng có `ADMIN_*` (để trống mật khẩu) cho trường hợp chạy `python -m app.cli.ensure_admin` trực tiếp trên máy, vd khi dùng PostgreSQL ngoài compose. Lệnh này cho cùng kết quả như trong `db-init`.
+
+4. Chạy backend:
 
    ```bash
    uvicorn app.main:app --reload --port 8000
    ```
 
-4. Tạo tài khoản admin (một lần, trong `backend/`). Đăng ký công khai chỉ tạo học sinh, nên đây là cách duy nhất để có admin:
+5. Thêm admin khác: đăng nhập bằng admin mặc định rồi gọi `POST /api/v1/admin/accounts` kèm mật khẩu của chính mình ([admin-accounts-api.md](../api/admin-accounts-api.md)). Đổi `ADMIN_PASSWORD` sau lần tạo đầu **không** đổi mật khẩu của admin đã có.
+
+6. Cứu hộ khi mọi admin đều bị khoá hoặc quên mật khẩu: tạo một admin mới bằng tay (trong `backend/`), đăng nhập bằng admin đó rồi mở khoá các admin khác qua API.
 
    ```bash
-   python -m app.cli.create_admin --email admin@example.com --name "Quản trị"
+   python -m app.cli.create_admin --email rescue@example.com --name "Cứu hộ"
    ```
 
    Lệnh hỏi mật khẩu hai lần (6–128 ký tự) và không nhận mật khẩu qua tham số. Khi chạy không tương tác (script, `docker exec` không có `-t`), đặt biến `ADMIN_PASSWORD` cho riêng lệnh đó, vd `ADMIN_PASSWORD='...' python -m app.cli.create_admin --email ...` (PowerShell: `$env:ADMIN_PASSWORD='...'`, chạy xong thì `Remove-Item Env:ADMIN_PASSWORD`). Trên Windows, `getpass` đọc thẳng từ console, nên chuyển hướng stdin sẽ làm lệnh treo; trường hợp đó dùng `ADMIN_PASSWORD`.
@@ -83,10 +98,11 @@ curl http://localhost:8000/api/v1/sample-files/<key trả về ở lệnh trên>
 - Bản ghi tạo ra đọc lại được qua `GET /sample-items` (ORM và PostgreSQL).
 - Tệp tải lên tải lại đúng nội dung (MinIO).
 - Đăng ký, đăng nhập và phân quyền: chạy luồng curl ở [auth-api.md](../api/auth-api.md#luồng-kiểm-thử).
+- Admin mặc định và quản lý admin: luồng curl ở [admin-accounts-api.md](../api/admin-accounts-api.md#luồng-kiểm-thử).
 
 Test tự động không cần Docker (dùng SQLite và MinIO giả): `cd backend && pytest`.
 
-Giới hạn xác minh: các bước trên đã chạy trên Windows 11 với Docker 29.3 ngày 2026-11-27; chưa thử macOS/Linux.
+Giới hạn xác minh: các bước trên đã chạy trên Windows 11 với Docker 29.3 ngày 2026-11-27; phần admin mặc định (bước 1–2, 5–6) chạy với Docker 28.4 ngày 2026-11-28. Chưa thử macOS/Linux.
 
 ## Xử lý lỗi
 
@@ -96,6 +112,9 @@ Giới hạn xác minh: các bước trên đã chạy trên Windows 11 với Do
 | `health` báo `database: false` | Kiểm `DATABASE_URL`; cổng 5432 có bị chương trình khác chiếm không |
 | `docker compose` không kéo được MinIO | `minio/minio` đã bị gỡ khỏi Docker Hub; compose dùng `bitnamilegacy/minio` |
 | `db-init` lỗi khi cài thư viện (timeout) | Mạng yếu; chạy lại `docker compose build db-init` rồi `docker compose up -d` |
+| `db-init` `Exited (1)`, log `CẢNH BÁO: ... không phải admin` | `ADMIN_EMAIL` đang là tài khoản student. Lệnh không nâng quyền; đổi `ADMIN_EMAIL` sang email khác rồi `docker compose up -d` |
+| `db-init` `Exited (2)`, log `Lỗi admin mặc định: ...` | Email sai định dạng (`.local`, `.test` cũng bị từ chối) hoặc mật khẩu sai độ dài (prod: ≥ 12 ký tự) |
+| Không đăng nhập được admin mặc định sau khi đổi `ADMIN_PASSWORD` | `ensure_admin` không ghi đè mật khẩu của admin đã có. Dùng mật khẩu cũ, hoặc trên máy dev `docker compose down -v` để dựng lại từ đầu (mất dữ liệu) |
 
 ## Tài liệu liên quan
 

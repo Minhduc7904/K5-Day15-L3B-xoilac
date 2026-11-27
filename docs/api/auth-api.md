@@ -1,6 +1,6 @@
 # API xác thực
 
-Tài liệu này mô tả các endpoint đăng ký, đăng nhập, đăng xuất và lấy người dùng hiện tại của issue #8, cùng endpoint admin mẫu. Người đọc là frontend #9 (gọi và mock API) và backend #3, #4, #5, #11 (áp dụng quyền). Cơ chế bên trong nằm ở [backend-auth.md](../architecture/backend-auth.md).
+Tài liệu này mô tả các endpoint đăng ký, đăng nhập, đăng xuất và lấy người dùng hiện tại của issue #8, cùng endpoint admin mẫu. Người đọc là frontend #9 (gọi và mock API) và backend #3, #4, #5, #11 (áp dụng quyền). Cơ chế bên trong nằm ở [backend-auth.md](../architecture/backend-auth.md). Tạo và quản lý tài khoản admin nằm ở [API quản lý tài khoản admin](admin-accounts-api.md).
 
 ## Điều kiện gọi
 
@@ -103,6 +103,8 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
   {"detail": [{"type": "string_too_short", "loc": ["body", "password"], "msg": "String should have at least 6 characters", "input": "12345", "ctx": {"min_length": 6}}]}
   ```
 
+- Không phải mọi 401 đều là mất phiên. API quản lý admin trả 401 `REAUTH_FAILED` khi mật khẩu xác nhận sai, lúc đó phiên vẫn còn ([admin-accounts-api.md](admin-accounts-api.md#lỗi-và-trường-hợp-biên)). Frontend phân nhánh theo `code`: chỉ `SESSION_MISSING`, `SESSION_INVALID`, `SESSION_EXPIRED`, `SESSION_REVOKED` mới chuyển tới trang đăng nhập.
+
 ## Áp dụng quyền cho #3, #4, #5, #11
 
 Dùng các dependency trong `app/api/deps.py`. Không tự đọc cookie hay header trong router.
@@ -171,9 +173,9 @@ Mock theo bảng sau (đường dẫn tương đối, cùng origin):
 {"user_id": 2, "email": "admin@example.com", "role": "admin", "status": "active", "display_name": "Quản trị", "created_at": "2026-11-27T15:52:41.085593Z"}
 ```
 
-Gợi ý cho Redux: chỉ lưu `UserOut` trong store, không lưu token. Khi nhận 401 thì xoá user khỏi store và chuyển tới trang đăng nhập. Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền.
+Gợi ý cho Redux: chỉ lưu `UserOut` trong store, không lưu token. Khi nhận 401 với `code` bắt đầu bằng `SESSION_` thì xoá user khỏi store và chuyển tới trang đăng nhập; 401 `REAUTH_FAILED` chỉ là sai mật khẩu xác nhận, giữ phiên. Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền. Mock cho trang quản lý admin: [admin-accounts-api.md](admin-accounts-api.md#hướng-dẫn-mock-cho-frontend).
 
-Muốn có hai tài khoản này trên DB local thật: đăng ký `hs01@example.com` qua API, rồi tạo admin bằng CLI ([run-local-stack.md](../operations/run-local-stack.md)).
+Muốn có hai tài khoản này trên DB local thật: đặt `ADMIN_EMAIL=admin@example.com` và `ADMIN_PASSWORD` trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký `hs01@example.com` qua API ([run-local-stack.md](../operations/run-local-stack.md)).
 
 ## Luồng kiểm thử
 
