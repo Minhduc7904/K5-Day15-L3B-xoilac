@@ -141,7 +141,7 @@ class AuthUseCase:
         created_by: int | None = None,
     ) -> User:
         """Tạo tài khoản. Chỉ được gọi từ: register (student), CLI create_admin / ensure_admin (admin,
-        created_by=None) và AdminAccountsUseCase.create_admin (admin, created_by = admin đang thao tác)."""
+        created_by=None) và UserManagementUseCase.create_user (#20, created_by = admin đang thao tác)."""
         if role not in ROLES:
             raise InvalidInput(f"Vai trò không hợp lệ: {role}")
         if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:

@@ -11,10 +11,12 @@ from app.core.database import get_session
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
+from app.service.noop_notifier import NoopRealtimeNotifier
 from app.service.password_service import PasswordService
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
-from app.usecase.admin_accounts import AdminAccountsUseCase
+from app.usecase.ports import RealtimeNotifier
+from app.usecase.user_management import UserManagementUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
@@ -73,17 +75,31 @@ def get_auth_usecase(
 AuthUseCaseDep = Annotated[AuthUseCase, Depends(get_auth_usecase)]
 
 
-def get_admin_accounts_usecase(
+@lru_cache
+def get_realtime_notifier() -> RealtimeNotifier:
+    """Tạm thời không làm gì; phần socket (#20) thay bằng bản cài đặt python-socketio."""
+    return NoopRealtimeNotifier()
+
+
+RealtimeNotifierDep = Annotated[RealtimeNotifier, Depends(get_realtime_notifier)]
+
+
+def get_user_management_usecase(
     session: SessionDep,
     auth: AuthUseCaseDep,
     passwords: Annotated[PasswordService, Depends(get_password_service)],
-) -> AdminAccountsUseCase:
-    return AdminAccountsUseCase(
-        auth=auth, users=UserRepository(session), sessions=SessionRepository(session), passwords=passwords
+    notifier: RealtimeNotifierDep,
+) -> UserManagementUseCase:
+    return UserManagementUseCase(
+        auth=auth,
+        users=UserRepository(session),
+        sessions=SessionRepository(session),
+        passwords=passwords,
+        notifier=notifier,
     )
 
 
-AdminAccountsUseCaseDep = Annotated[AdminAccountsUseCase, Depends(get_admin_accounts_usecase)]
+UserManagementUseCaseDep = Annotated[UserManagementUseCase, Depends(get_user_management_usecase)]
 
 # auto_error=False: thiếu header không báo lỗi ở đây; cookie vẫn được xét. Hiện nút Authorize trong Swagger.
 _bearer = HTTPBearer(auto_error=False, description="Token phiên (dùng cho curl/Swagger). Cookie được ưu tiên.")

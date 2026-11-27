@@ -1,7 +1,8 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,28 +68,42 @@ class UserRepository:
             raise DuplicateRootError from e
         await self._session.refresh(user)
 
-    async def list_by_role(self, role: str) -> Sequence[User]:
-        result = await self._session.execute(select(User).where(User.role == role).order_by(User.user_id))
-        return result.scalars().all()
-
-    # Các hàm dưới KHÔNG commit: usecase gom nhiều thay đổi vào một transaction rồi gọi commit()/rollback().
-
-    async def lock_by_role(self, role: str) -> Sequence[User]:
-        """SELECT ... FOR UPDATE mọi tài khoản của vai trò, theo thứ tự user_id để hai transaction
-        khoá cùng thứ tự (tránh deadlock). populate_existing: đọc lại status mới nhất sau khi chờ khoá,
-        không dùng bản cũ trong identity map. SQLite (test) bỏ qua FOR UPDATE."""
-        result = await self._session.execute(
-            select(User)
-            .where(User.role == role)
-            .order_by(User.user_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
+    async def search(
+        self, role: str | None, status: str | None, q: str | None, offset: int, limit: int
+    ) -> tuple[Sequence[User], int]:
+        """Lọc theo vai trò, trạng thái và chuỗi q (khớp một phần email hoặc display_name, không phân biệt hoa
+        thường). Trả (trang kết quả theo user_id tăng dần, tổng số dòng khớp)."""
+        conditions = []
+        if role:
+            conditions.append(User.role == role)
+        if status:
+            conditions.append(User.status == status)
+        if q:
+            # Thoát ký tự đại diện của LIKE để q là chuỗi thường (vd "50%" không khớp mọi thứ).
+            escaped = q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            conditions.append(
+                or_(
+                    func.lower(User.email).like(pattern, escape="\\"),
+                    func.lower(func.coalesce(User.display_name, "")).like(pattern, escape="\\"),
+                )
+            )
+        total = (await self._session.execute(select(func.count()).select_from(User).where(*conditions))).scalar_one()
+        rows = await self._session.execute(
+            select(User).where(*conditions).order_by(User.user_id).offset(offset).limit(limit)
         )
-        return result.scalars().all()
+        return rows.scalars().all(), total
 
-    async def set_status(self, user: User, status: str) -> None:
-        user.status = status
-        await self._session.flush()
+    async def update(self, user: User, values: Mapping[str, Any]) -> None:
+        """Ghi các trường đã được usecase kiểm. Commit ngay; trùng email (đua nhau) → DuplicateEmailError."""
+        for key, value in values.items():
+            setattr(user, key, value)
+        try:
+            await self._session.commit()
+        except IntegrityError as e:
+            await self._session.rollback()
+            raise DuplicateEmailError from e
+        await self._session.refresh(user)
 
     async def commit(self) -> None:
         await self._session.commit()

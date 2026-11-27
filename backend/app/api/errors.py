@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 
 from app.api.cookies import clear_session_cookie
 from app.core.config import get_settings
-from app.usecase.admin_accounts import AccountNotFound, CannotModifySelf, EmailBelongsToNonAdmin, LastAdmin, ReauthFailed
 from app.usecase.auth import (
     AccountDisabled,
     AuthError,
@@ -20,6 +19,7 @@ from app.usecase.auth import (
     SessionMissing,
     SessionRevoked,
 )
+from app.usecase.user_management import CannotModifyRoot, CannotModifySelf, UserNotFound
 
 _STATUS: dict[type[AuthError], int] = {
     EmailAlreadyRegistered: status.HTTP_409_CONFLICT,
@@ -31,12 +31,10 @@ _STATUS: dict[type[AuthError], int] = {
     SessionRevoked: status.HTTP_401_UNAUTHORIZED,
     RoleForbidden: status.HTTP_403_FORBIDDEN,
     InvalidInput: 422,
-    # Quản lý admin. REAUTH_FAILED là 401 nhưng KHÔNG phải mất phiên: frontend phân nhánh theo `code`.
-    ReauthFailed: status.HTTP_401_UNAUTHORIZED,
-    CannotModifySelf: status.HTTP_409_CONFLICT,
-    LastAdmin: status.HTTP_409_CONFLICT,
-    AccountNotFound: status.HTTP_404_NOT_FOUND,
-    EmailBelongsToNonAdmin: status.HTTP_409_CONFLICT,
+    # Quản lý người dùng (#20).
+    UserNotFound: status.HTTP_404_NOT_FOUND,
+    CannotModifyRoot: status.HTTP_403_FORBIDDEN,
+    CannotModifySelf: status.HTTP_403_FORBIDDEN,
 }
 
 # Phiên trong cookie không còn dùng được: xoá cookie để trình duyệt khỏi gửi lại.

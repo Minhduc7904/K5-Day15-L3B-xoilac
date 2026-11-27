@@ -24,15 +24,15 @@ Không bao giờ in mật khẩu hay hash.
 import asyncio
 import sys
 
-from app.cli.common import NAME_MAX, SessionFactory, build_admin_accounts, default_session, utf8_console, validate_email
+from app.cli.common import NAME_MAX, SessionFactory, build_default_admin, default_session, utf8_console, validate_email
 from app.core.config import Settings, get_settings
-from app.usecase.admin_accounts import EmailBelongsToNonAdmin, EnsureResult
+from app.usecase.default_admin import EmailBelongsToNonAdmin, EnsureResult
 from app.usecase.auth import InvalidInput
 
 
 async def _ensure(email: str, password: str, name: str | None, settings: Settings, factory: SessionFactory) -> int:
     async with factory() as session:
-        usecase = build_admin_accounts(session, settings)
+        usecase = build_default_admin(session, settings)
         try:
             result, user = await usecase.ensure_default_admin(email, password, name, strict=settings.cookie_secure)
         except EmailBelongsToNonAdmin:
