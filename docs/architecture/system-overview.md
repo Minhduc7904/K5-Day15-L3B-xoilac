@@ -33,6 +33,13 @@ flowchart LR
 
 Backend đọc cấu hình local từ `backend/.env`. Frontend có cấu hình cho Axios và hai entry point riêng.
 
+### Xác thực (issue #8)
+
+- Hai vai trò `student` và `admin`. Đăng ký công khai chỉ tạo `student`. `admin` tạo bằng lệnh `python -m app.cli.create_admin` chạy trên máy chủ.
+- Phiên là token opaque nằm trong cookie `examind_session` (HttpOnly, SameSite=Lax). PostgreSQL chỉ lưu SHA-256 của token (bảng `sessions`, migration `0003_auth`). Đăng xuất hoặc khoá tài khoản có hiệu lực ngay.
+- Frontend gọi backend qua rewrites `/api/*` của Next.js nên cùng origin: cookie đi kèm tự động, không cần CORS. `CORS_ORIGINS` mặc định rỗng, chỉ đặt khi dev gọi thẳng backend.
+- Endpoint kiểm quyền bằng dependency trong `app/api/deps.py`. Chi tiết: [backend-auth.md](backend-auth.md), hợp đồng HTTP: [auth-api.md](../api/auth-api.md).
+
 ### Trên VPS
 
 `docker-compose.prod.yml` thêm `backend` và `nginx`. Chỉ nginx mở cổng 80; backend, PostgreSQL và MinIO chỉ nghe trên `127.0.0.1` hoặc mạng nội bộ Compose. GitHub Actions deploy mỗi lần merge vào `main` ([deploy-backend-ci-cd.md](../operations/deploy-backend-ci-cd.md)). Dữ liệu nền nạp một lần từ gói đã lọc ([seed-base-data.md](../operations/seed-base-data.md)).
@@ -50,5 +57,6 @@ Kiểm chứng: làm theo [run-local-stack.md](../operations/run-local-stack.md)
 ## Tài liệu liên quan
 
 - [Các lớp backend](backend-layers.md)
+- [Xác thực và phân quyền backend](backend-auth.md)
 - [Chạy bộ khung local](../operations/run-local-stack.md)
 - [API mẫu](../api/sample-api.md)
