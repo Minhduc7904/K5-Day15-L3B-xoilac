@@ -7,14 +7,17 @@ Học sinh chat với agent để nhận đề xuất cấu trúc đề (bản x
 - Base URL local: `http://localhost:8000/api/v1`. Tài liệu tự sinh: `http://localhost:8000/docs`.
 - Dữ liệu gửi dạng JSON. Tin nhắn chat trả về luồng **SSE** (`text/event-stream`).
 - Cần migration `0006_exam_chat` (`alembic upgrade head`) và dữ liệu nền (bảng `questions`, `chapters`, `statements`).
-- **Chưa có xác thực.** Khi tạo phiên, client gửi `student_ref` (mã học sinh). Khi Auth #8 xong, học sinh lấy từ phiên đăng nhập và mỗi học sinh chỉ đọc được phiên của mình, kể cả kết nối SSE.
+- **Quyền.** Chưa có Auth (#8): khi tạo phiên, client gửi `student_ref` (mã học sinh) và chưa kiểm chủ sở hữu. Khi Auth #8 merge (chỉ đổi `get_requester()` trong `backend/app/api/deps.py`): mọi route cần đăng nhập vai trò học sinh, `student_ref` lấy từ tài khoản (bỏ qua giá trị client gửi), và học sinh **chỉ thấy phiên của chính mình**. Phiên của người khác, kể cả khi mở SSE, trả `404` như không tồn tại. Phần này đã có test (`tests/test_exam_chat_ownership.py`).
 
 ## Khái niệm
 
-**Bản xem trước** (`preview`): một phiên có đúng một bản, chứa cấu trúc đề:
+**Bản xem trước** (`preview`): một phiên có đúng một bản, ở một trong hai chế độ, phân biệt bằng `mode` của preview và `structure.kind`.
+
+**Chế độ ôn theo chương** (`mode = CHAPTER`, `structure.kind = "CHAPTER"`): chương yếu từ lịch sử làm bài, hoặc chương học sinh chọn. Học sinh chỉnh tự do.
 
 ```json
 {
+  "kind": "CHAPTER",
   "chapters": [{"code": "12C1", "count": 10}],
   "difficulty_weights": {"NB": 0.2, "TH": 0.4, "VD": 0.4},
   "excluded_difficulties": []
@@ -22,6 +25,23 @@ Học sinh chat với agent để nhận đề xuất cấu trúc đề (bản x
 ```
 
 Số câu mỗi mức của từng chương được chia từ `count` theo `difficulty_weights` (bỏ mức trong `excluded_difficulties`). Tối đa 50 câu, 5 chương.
+
+**Chế độ ôn theo mẫu kỳ thi** (`mode = EXAM_TEMPLATE`, `structure.kind = "EXAM_TEMPLATE"`): bản chụp của một mẫu **đã duyệt** từ #5. Mẫu cố định các phần, loại câu, số câu và phân bố độ khó. Học sinh **chỉ được thu hẹp chương** trong phạm vi mẫu; chỉnh khác bị từ chối kèm lý do (xem "Lỗi").
+
+```json
+{
+  "kind": "EXAM_TEMPLATE",
+  "template_id": 7, "template_name": "Cuối kỳ 1 lớp 12", "exam_type": "CK1", "grade": 12,
+  "version_label": "2025", "duration_minutes": 90, "source": "Ma trận đề của tổ Toán",
+  "sections": [
+    {"order": 1, "title": "Phần I. Trắc nghiệm", "question_type": "SINGLE_CHOICE", "count": 6,
+     "points_per_question": 0.25, "difficulty_distribution": {"TH": 4, "VD": 2},
+     "allowed_chapters": ["12C1", "12C4"], "chapters": null}
+  ]
+}
+```
+
+`allowed_chapters` là phạm vi của mẫu (`null` là không giới hạn chương, khi đó lọc theo khối của mẫu). `chapters` là phạm vi học sinh đã thu hẹp (`null` là dùng cả phạm vi mẫu). `difficulty_distribution` là `null` thì lấy mọi mức độ khó.
 
 **Trạng thái bản xem trước:**
 
@@ -51,11 +71,13 @@ Số câu mỗi mức của từng chương được chia từ `count` theo `dif
 ### POST /exam-chat/sessions
 
 ```json
-// request
+// request (chưa có Auth: bắt buộc student_ref; đã đăng nhập: gửi {} và student_ref lấy từ tài khoản)
 {"student_ref": "HS01"}
 // response 201
 {"session_id": 1, "student_ref": "HS01", "created_at": "2026-11-28T01:00:00Z"}
 ```
+
+Chưa đăng nhập mà thiếu `student_ref` trả `422`.
 
 ### POST /exam-chat/sessions/{id}/messages (SSE)
 
@@ -102,7 +124,10 @@ Agent hiểu các loại tin nhắn (bằng quy tắc, chưa gọi model):
 | Ôn chương hay sai, có thể kèm số câu | Tính tỉ lệ đúng theo chương từ lịch sử làm bài, đề xuất chương yếu nhất (hai chương nếu cách nhau ≤ 10 điểm %) kèm số liệu sai/tổng |
 | Nêu mã chương, số câu, độ khó ("đổi sang 12C4, 6 câu, không lấy vận dụng cao", "giảm còn 8 câu") | Sửa bản xem trước hiện tại, hoặc tạo mới nếu chưa có |
 | Xác nhận ("xác nhận", "tạo đề", có thể kèm cấu trúc) | Xác nhận và dựng đề nháp |
-| Theo kỳ thi | Hỏi lại nếu thiếu loại kỳ thi; chưa có mẫu đã duyệt thì nói rõ và đề nghị ôn theo chương |
+| Theo kỳ thi ("ôn thi cuối kỳ 1 lớp 12", "đề thi tốt nghiệp THPT 2025") | Nhận diện loại kỳ thi (`GK1`, `GK2`, `CK1`, `CK2`, `THPT`, `HSA`, `TSA`), khối, năm, rồi tra mẫu đã duyệt: **0 mẫu** thì nói chưa có cấu trúc đã xác thực và đề nghị ôn theo chương; **nhiều mẫu** thì liệt kê và hỏi thêm khối hoặc năm; **1 mẫu** thì tạo bản xem trước theo mẫu. Thiếu loại kỳ thi (vd "cuối kỳ" mà không nói học kỳ) thì hỏi lại |
+| Đang ở bản theo mẫu, nhắn thu hẹp chương ("chỉ ôn 12C4") | Thu hẹp phạm vi chương trong giới hạn mẫu |
+| Đang ở bản theo mẫu, nhắn đổi số câu hoặc độ khó | Từ chối vì xung đột ràng buộc của mẫu, giữ nguyên bản xem trước, gợi ý chuyển sang ôn theo chương |
+| "ôn theo chương ...", hoặc ôn chương hay sai | Chuyển sang chế độ ôn theo chương |
 | Chưa có lịch sử, lịch sử mâu thuẫn, chương không có trong danh mục, vượt 50 câu | Nói rõ, hỏi lại, không đoán và không bịa câu |
 | Bỏ qua hướng dẫn, đòi đáp án, sửa điểm, xin đáp án để chép, ngoài môn Toán | Từ chối và gợi ý việc làm được |
 
@@ -136,6 +161,8 @@ Chỉnh từ giao diện, cùng luật với chat. Trường bỏ trống là gi
 
 Phản hồi `200` là bản xem trước mới (`status = EDITED`, `version` tăng 1).
 
+Với bản theo mẫu kỳ thi, chỉ `chapter_codes` được nhận (thu hẹp chương, phải nằm trong phạm vi mẫu và không vượt khối của mẫu). `total` khác tổng của mẫu, `chapter_counts` và các trường độ khó trả `422` với `detail.code = "TEMPLATE_CONFLICT"`.
+
 ### POST /exam-chat/sessions/{id}/preview/confirm
 
 ```json
@@ -152,44 +179,70 @@ Phản hồi `200` là bản xem trước mới (`status = EDITED`, `version` t�
 Một câu trong `items`:
 
 ```json
-{"order": 1, "question_id": 20, "code": "Q00020", "chapter": "12C4", "difficulty": "TH",
- "type": "SINGLE_CHOICE", "content": "...", "statements": [{"order": 1, "content": "..."}]}
+{"order": 1, "question_id": 20, "code": "Q00020", "chapter": "12C4", "chapter_codes": ["12C4"],
+ "difficulty": "TH", "type": "SINGLE_CHOICE", "content": "...", "statements": [{"order": 1, "content": "..."}],
+ "section_order": null, "section_title": null, "points": null}
+```
+
+Đề theo mẫu kỳ thi có thêm `section_order`, `section_title`, `points` cho từng câu. Câu của mỗi phần đúng `question_type` của phần đó, trong phạm vi chương của phần, đúng phân bố độ khó của mẫu. `chapter` là chương gốc của câu.
+
+Một mục trong `shortages`:
+
+```json
+// đề theo chương
+{"chapter": "12C4", "difficulty": "TH", "requested": 4, "available": 3,
+ "section_order": null, "section_title": null, "question_type": null}
+// đề theo mẫu kỳ thi (difficulty null: phần không quy định độ khó)
+{"chapter": "12C4", "difficulty": null, "requested": 2, "available": 1,
+ "section_order": 3, "section_title": "Phần III. Trả lời ngắn", "question_type": "SHORT_ANSWER"}
 ```
 
 ## Lỗi và trường hợp biên
 
 | Mã | Khi nào |
 | --- | --- |
-| 404 | Không có phiên; phiên chưa có bản xem trước; chưa có đề nháp |
+| 404 | Không có phiên; phiên của học sinh khác (khi đã có Auth); phiên chưa có bản xem trước; chưa có đề nháp |
 | 409 | `version` lệch (`detail.current_version` là bản mới nhất); xác nhận bản đã `BUILT` |
-| 422 | Sai kiểu dữ liệu, tin nhắn rỗng; cấu trúc vi phạm luật (`detail.errors`: chương không có trong danh mục, quá 50 câu, loại hết mức độ khó, chương lặp) |
+| 422 `INVALID_STRUCTURE` | Cấu trúc ôn theo chương vi phạm luật (`detail.errors`: chương không có trong danh mục, quá 50 câu, loại hết mức độ khó, chương lặp) |
+| 422 `TEMPLATE_CONFLICT` | Chỉnh bản theo mẫu kỳ thi ngoài phần được phép (`detail.errors` nêu lý do: mẫu cố định số câu, độ khó; chương ngoài phạm vi mẫu; chương vượt khối) |
+| 422 | Sai kiểu dữ liệu, tin nhắn rỗng; tạo phiên khi chưa đăng nhập mà thiếu `student_ref` |
 
 ## Luồng kiểm thử
 
-Test tự động: `cd backend && pytest tests/test_exam_chat_api.py tests/test_exam_chat_rules.py` (SQLite trong bộ nhớ, ngân hàng và lịch sử tự dựng). Ca trọn luồng đã kiểm:
+Test tự động: `cd backend && pytest` (SQLite trong bộ nhớ, ngân hàng, lịch sử và mẫu kỳ thi tự dựng). Theo file:
+
+| File | Kiểm gì |
+| --- | --- |
+| `tests/test_exam_chat_rules.py` | Luật thuần: chia câu, chỉnh bản xem trước, đọc tin nhắn, nhận diện kỳ thi |
+| `tests/test_exam_chat_api.py` | Ôn theo chương qua HTTP: SSE, chỉnh qua chat và API, `version`, dựng đề, các ca hỏi lại và từ chối |
+| `tests/test_exam_chat_template.py` | Ôn theo mẫu kỳ thi: một mẫu, nhiều mẫu, thiếu loại kỳ thi, dựng đề theo phần và loại câu, báo thiếu theo phần, chỉnh xung đột bị từ chối (chat và API), thu hẹp chương, chuyển về ôn theo chương, nối với tra cứu #5 |
+| `tests/test_exam_chat_ownership.py` | Chủ sở hữu: học sinh khác nhận 404 ở mọi route kể cả SSE, không mạo danh qua `student_ref` |
+| `tests/test_agent_parity.py` | Đối chiếu với `codebase/agent.py` trên 13 câu thử trong `eval/benchmark.csv`, cùng dữ liệu `data/*.csv`: so loại kết quả, từng dòng cấu trúc (chương, số câu, phân bố độ khó) và đúng tập mã câu của đề nháp |
+
+Ca trọn luồng tiêu biểu:
 
 1. HS01 nhắn "Ra đề ôn chương em hay sai" → SSE có `message`, `preview` (12C1, 10 câu, `PROPOSED`), `done`; chưa có mã câu.
 2. "giảm còn 4 câu" → `EDITED`, version 2.
 3. `PATCH` với version 1 → `409`; với version 2 đổi sang 12C4 chỉ TH → version 3.
 4. "Em xác nhận, tạo đề nháp" → dùng bản đã sửa qua API, đề nháp 3 câu 12C4 và `shortages` báo thiếu 1 câu; không có đáp án.
-5. Các ca hỏi lại hoặc từ chối không tạo bản xem trước hay mã câu.
+5. "Em muốn ôn thi cuối kỳ 1 lớp 12" → bản xem trước theo mẫu (3 phần). "giảm còn 8 câu" bị từ chối, version giữ nguyên. "xác nhận" → đề nháp theo từng phần, đúng loại câu, báo thiếu ở phần trả lời ngắn.
 
 Chưa kiểm với PostgreSQL thật và dữ liệu nền. Đã kiểm SQL của migration bằng `alembic upgrade 0002:0006_exam_chat --sql`.
 
 ## Phần còn chờ
 
-| Phần | Chờ | Hiện tại |
-| --- | --- | --- |
-| Lịch sử làm bài thật | Chưa có bảng kết quả làm bài | `NoHistory`: agent nói chưa có lịch sử và hỏi chương |
-| Ôn theo mẫu kỳ thi | #5 merge | `NoTemplates`: agent nói chưa có cấu trúc đã xác thực |
-| Diễn đạt bằng model thật | Chốt nhà cung cấp và key | Trả văn bản dựng bằng code, chia theo dòng |
-| Quyền học sinh | Auth #8 | `student_ref` do client gửi |
-| Định nghĩa "câu đã duyệt" | #3, #11 | `visibility = 'PUBLISHED'` |
+| Phần | Chờ | Hiện tại | Đổi ở đâu |
+| --- | --- | --- | --- |
+| Tra mẫu kỳ thi thật | #5 merge | `NoTemplates`: agent nói chưa có cấu trúc đã xác thực. Toàn bộ nhánh theo mẫu đã làm và test với mẫu giả | `get_exam_template_source()` dùng `TemplateLookupSource(ExamTemplateUseCase.lookup)` |
+| Quyền học sinh | Auth #8 | `get_requester()` trả `None`, `student_ref` do client gửi. Luật chủ sở hữu đã có và đã test | `get_requester()` lấy từ `StudentDep` |
+| Lịch sử làm bài thật | Chưa có bảng kết quả làm bài | `NoHistory`: agent nói chưa có lịch sử và hỏi chương | `get_student_history()` |
+| Diễn đạt bằng model thật | Chốt nhà cung cấp và key | Trả văn bản dựng bằng code, chia theo dòng | `get_reply_writer()` |
+| Định nghĩa "câu đã duyệt" | #3, #11 | `visibility = 'PUBLISHED'` | `APPROVED_VISIBILITY` trong `question_bank_repository.py` |
 
-Ba nguồn đầu là chỗ cắm trong `backend/app/api/deps.py` (`get_student_history`, `get_exam_template_source`, `get_reply_writer`).
+Các hàm `get_*` ở trên nằm trong `backend/app/api/deps.py`, docstring có sẵn đoạn code thay thế. Khi `users` (#8) đã có trên `main`, nên thêm khoá ngoại `exam_chat_sessions.user_id → users.user_id`.
 
 ## Tài liệu liên quan
 
 - [Các lớp backend](../architecture/backend-layers.md)
 - API mẫu cấu trúc đề: `docs/api/exam-templates-api.md` (#5, hiện ở nhánh `feat/issue-5-exam-templates`, chưa merge)
-- Mã: `backend/app/api/v1/exam_chat.py`, `backend/app/usecase/exam_chat.py`, `backend/app/usecase/exam_preview_rules.py`, `backend/app/usecase/exam_chat_intent.py`
+- Mã: `backend/app/api/v1/exam_chat.py`, `backend/app/usecase/exam_chat.py`, `backend/app/usecase/exam_preview_rules.py`, `backend/app/usecase/exam_template_plan.py`, `backend/app/usecase/exam_chat_intent.py`, `backend/app/service/exam_chat_sources.py`

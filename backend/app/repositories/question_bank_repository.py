@@ -72,30 +72,62 @@ class QuestionBankRepository:
         rows = await self._session.execute(select(chapters.c.code, chapters.c.name).where(chapters.c.code.is_not(None)))
         return {code: name for code, name in rows.all()}
 
-    def _pool(self, chapter_code: str, difficulty: str, exclude: Sequence[int]):
-        parent = aliased(chapters)
-        stmt = (
-            select(questions.c.question_id)
-            .join(questions_chapters, questions_chapters.c.question_id == questions.c.question_id)
-            .join(chapters, chapters.c.chapter_id == questions_chapters.c.chapter_id)
-            .outerjoin(parent, parent.c.chapter_id == chapters.c.parent_chapter_id)
-            .where(
-                questions.c.visibility == APPROVED_VISIBILITY,
-                questions.c.difficulty == difficulty,
-                or_(chapters.c.code == chapter_code, parent.c.code == chapter_code),
+    def _pool(
+        self,
+        *,
+        chapter_codes: Sequence[str] | None,
+        difficulty: str | None,
+        question_type: str | None,
+        grade: int | None,
+        exclude: Sequence[int],
+    ):
+        """Truy vấn mã các câu đã duyệt thoả điều kiện. Điều kiện None là không lọc theo điều kiện đó."""
+        stmt = select(questions.c.question_id).where(questions.c.visibility == APPROVED_VISIBILITY)
+        if chapter_codes:
+            parent = aliased(chapters)
+            codes = list(chapter_codes)
+            stmt = (
+                stmt.join(questions_chapters, questions_chapters.c.question_id == questions.c.question_id)
+                .join(chapters, chapters.c.chapter_id == questions_chapters.c.chapter_id)
+                .outerjoin(parent, parent.c.chapter_id == chapters.c.parent_chapter_id)
+                .where(or_(chapters.c.code.in_(codes), parent.c.code.in_(codes)))
             )
-            .distinct()
-        )
+        if difficulty is not None:
+            stmt = stmt.where(questions.c.difficulty == difficulty)
+        if question_type is not None:
+            stmt = stmt.where(questions.c.type == question_type)
+        if grade is not None:
+            stmt = stmt.where(questions.c.grade == grade)
         if exclude:
             stmt = stmt.where(questions.c.question_id.not_in(list(exclude)))
-        return stmt
+        return stmt.distinct()
 
-    async def pick(self, chapter_code: str, difficulty: str, n: int, exclude: Sequence[int] = ()) -> PickResult:
-        """Chọn tối đa n câu đã duyệt thuộc chương (hoặc chương con) với độ khó cho trước, thứ tự ổn định."""
-        pool = self._pool(chapter_code, difficulty, exclude).subquery()
+    async def _pick(self, n: int, **filters) -> PickResult:
+        pool = self._pool(**filters).subquery()
         available = (await self._session.execute(select(func.count()).select_from(pool))).scalar_one()
         ids = (await self._session.execute(select(pool.c.question_id).order_by(pool.c.question_id).limit(n))).scalars()
         return PickResult(question_ids=list(ids), available=available)
+
+    async def pick(self, chapter_code: str, difficulty: str, n: int, exclude: Sequence[int] = ()) -> PickResult:
+        """Chọn tối đa n câu đã duyệt thuộc chương (hoặc chương con) với độ khó cho trước, thứ tự ổn định."""
+        return await self._pick(n, chapter_codes=[chapter_code], difficulty=difficulty, question_type=None,
+                                grade=None, exclude=exclude)
+
+    async def pick_for_section(
+        self,
+        *,
+        question_type: str,
+        n: int,
+        chapter_codes: Sequence[str] | None = None,
+        difficulty: str | None = None,
+        grade: int | None = None,
+        exclude: Sequence[int] = (),
+    ) -> PickResult:
+        """Chọn câu cho một phần của mẫu kỳ thi: đúng loại câu, trong các chương cho phép, đúng mức độ khó.
+
+        Mẫu không giới hạn chương thì lọc theo khối (questions.grade) nếu mẫu có khối."""
+        return await self._pick(n, chapter_codes=chapter_codes, difficulty=difficulty, question_type=question_type,
+                                grade=None if chapter_codes else grade, exclude=exclude)
 
     async def load_items(self, question_ids: Sequence[int]) -> dict[int, dict]:
         """Nội dung câu và lựa chọn để hiển thị. KHÔNG đọc đáp án, lời giải hay cờ đúng/sai."""
@@ -108,9 +140,23 @@ class QuestionBankRepository:
         )
         items = {
             qid: {"question_id": qid, "code": question_code(qid), "content": content, "type": qtype,
-                  "difficulty": diff, "statements": []}
+                  "difficulty": diff, "chapter_codes": [], "statements": []}
             for qid, content, qtype, diff in rows.all()
         }
+        if not items:
+            return {}
+        # Chương gốc của câu (câu gắn chương con thì lấy mã chương cha), để đề theo mẫu hiển thị được chương.
+        parent = aliased(chapters)
+        ch = await self._session.execute(
+            select(questions_chapters.c.question_id, func.coalesce(parent.c.code, chapters.c.code))
+            .join(chapters, chapters.c.chapter_id == questions_chapters.c.chapter_id)
+            .outerjoin(parent, parent.c.chapter_id == chapters.c.parent_chapter_id)
+            .where(questions_chapters.c.question_id.in_(list(items)))
+            .order_by(questions_chapters.c.question_id, chapters.c.chapter_id)
+        )
+        for qid, code in ch.all():
+            if code and code not in items[qid]["chapter_codes"]:
+                items[qid]["chapter_codes"].append(code)
         st = await self._session.execute(
             select(statements.c.question_id, statements.c.content, statements.c.order)
             .where(statements.c.question_id.in_(list(items)))

@@ -1,15 +1,20 @@
 """Schema request/response cho pipeline học sinh tạo đề ôn (issue #4)."""
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.usecase.exam_preview_rules import PreviewEdit, PreviewStructure
+from app.usecase.exam_template_plan import TemplatePreviewStructure
+
+# Bản xem trước ở một trong hai dạng, phân biệt bằng trường "kind" (CHAPTER | EXAM_TEMPLATE).
+AnyStructure = Annotated[PreviewStructure | TemplatePreviewStructure, Field(discriminator="kind")]
 
 
 class SessionCreate(BaseModel):
-    # Tạm thời client gửi mã học sinh. Khi có Auth (#8), lấy từ tài khoản đăng nhập và bỏ trường này.
-    student_ref: str = Field(min_length=1, max_length=64)
+    """Đã đăng nhập (Auth #8) thì bỏ trống: học sinh lấy từ phiên đăng nhập. Chưa có Auth thì bắt buộc."""
+
+    student_ref: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class SessionOut(BaseModel):
@@ -39,7 +44,7 @@ class PreviewOut(BaseModel):
 
     session_id: int
     mode: Literal["CHAPTER", "EXAM_TEMPLATE"]
-    structure: PreviewStructure
+    structure: AnyStructure
     status: Literal["PROPOSED", "EDITED", "CONFIRMED", "BUILT"]
     version: int
     reason: str | None
@@ -47,7 +52,9 @@ class PreviewOut(BaseModel):
 
 
 class PreviewUpdate(BaseModel):
-    """Chỉnh bản xem trước từ giao diện. version là bản client đang thấy; lệch thì 409."""
+    """Chỉnh bản xem trước từ giao diện. version là bản client đang thấy; lệch thì 409.
+
+    Với bản theo mẫu kỳ thi chỉ được thu hẹp chương (edit.chapter_codes); trường khác trả 422 kèm lý do."""
 
     version: int = Field(ge=1)
     edit: PreviewEdit
@@ -68,18 +75,27 @@ class DraftItem(BaseModel):
     order: int
     question_id: int
     code: str
-    chapter: str
+    chapter: str | None
+    chapter_codes: list[str] = Field(default_factory=list)
     difficulty: str | None
     type: str
     content: str
     statements: list[DraftStatement]
+    section_order: int | None = None      # chỉ có ở đề theo mẫu kỳ thi
+    section_title: str | None = None
+    points: float | None = None
 
 
 class Shortage(BaseModel):
-    chapter: str
-    difficulty: str
+    """Phần ngân hàng không đủ câu. Đề theo chương: chapter + difficulty. Đề theo mẫu: thêm section_*, question_type."""
+
+    chapter: str | None = None
+    difficulty: str | None = None
     requested: int
     available: int
+    section_order: int | None = None
+    section_title: str | None = None
+    question_type: str | None = None
 
 
 class DraftOut(BaseModel):
@@ -89,7 +105,7 @@ class DraftOut(BaseModel):
     session_id: int
     preview_version: int
     title: str
-    structure: PreviewStructure
+    structure: AnyStructure
     items: list[DraftItem]
     shortages: list[Shortage]
     created_at: datetime

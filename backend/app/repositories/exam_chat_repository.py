@@ -13,8 +13,8 @@ class ExamChatRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create_session(self, student_ref: str) -> ExamChatSession:
-        item = ExamChatSession(student_ref=student_ref)
+    async def create_session(self, student_ref: str, user_id: int | None = None) -> ExamChatSession:
+        item = ExamChatSession(student_ref=student_ref, user_id=user_id)
         self._session.add(item)
         await self._session.commit()
         await self._session.refresh(item)

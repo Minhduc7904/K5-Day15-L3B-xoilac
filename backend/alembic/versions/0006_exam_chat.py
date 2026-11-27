@@ -22,10 +22,13 @@ def upgrade() -> None:
     op.create_table(
         "exam_chat_sessions",
         sa.Column("session_id", sa.Integer(), primary_key=True),
+        # Chủ phiên (Auth #8). Chưa đặt khoá ngoại tới users vì bảng đó thuộc migration của #8.
+        sa.Column("user_id", sa.Integer(), nullable=True),
         sa.Column("student_ref", sa.String(64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
+    op.create_index("ix_exam_chat_sessions_user_id", "exam_chat_sessions", ["user_id"])
     op.create_index("ix_exam_chat_sessions_student_ref", "exam_chat_sessions", ["student_ref"])
 
     op.create_table(
@@ -77,4 +80,5 @@ def downgrade() -> None:
     op.drop_index("ix_exam_chat_messages_session_id", table_name="exam_chat_messages")
     op.drop_table("exam_chat_messages")
     op.drop_index("ix_exam_chat_sessions_student_ref", table_name="exam_chat_sessions")
+    op.drop_index("ix_exam_chat_sessions_user_id", table_name="exam_chat_sessions")
     op.drop_table("exam_chat_sessions")

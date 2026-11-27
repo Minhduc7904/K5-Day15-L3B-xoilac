@@ -29,6 +29,7 @@ class ChapterCount(BaseModel):
 class PreviewStructure(BaseModel):
     """Cấu trúc đề học sinh đang xem: chương và số câu mỗi chương, cách trộn độ khó."""
 
+    kind: Literal["CHAPTER"] = "CHAPTER"
     chapters: list[ChapterCount] = Field(min_length=1, max_length=MAX_CHAPTERS)
     difficulty_weights: dict[Difficulty, float] = Field(default_factory=lambda: dict(DEFAULT_WEIGHTS))
     excluded_difficulties: list[Difficulty] = Field(default_factory=list)

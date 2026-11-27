@@ -1,7 +1,8 @@
 """API pipeline học sinh tạo đề ôn (issue #4): phiên chat, gửi tin nhận SSE, bản xem trước, xác nhận, đề nháp.
 
-Chưa có xác thực: student_ref do client gửi khi tạo phiên. Khi có Auth (#8), lấy học sinh từ phiên đăng nhập và
-kiểm học sinh chỉ đọc được phiên của mình, kể cả với kết nối SSE.
+Quyền: mọi route nhận người gọi qua RequesterDep. Chưa có Auth (#8) thì người gọi là None, student_ref do client
+gửi khi tạo phiên. Khi Auth #8 merge, get_requester() trong deps.py trả học sinh đang đăng nhập; học sinh chỉ thấy
+phiên của mình, kể cả kết nối SSE, phiên của người khác trả 404 như không tồn tại.
 """
 import json
 import logging
@@ -10,7 +11,7 @@ from collections.abc import Iterator
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import ExamChatUseCaseDep, ReplyWriterDep
+from app.api.deps import ExamChatUseCaseDep, ReplyWriterDep, RequesterDep
 from app.schemas.exam_chat import (
     ConfirmIn,
     ConfirmOut,
@@ -23,8 +24,15 @@ from app.schemas.exam_chat import (
     SessionOut,
     SessionStateOut,
 )
-from app.usecase.exam_chat import InvalidState, PreviewNotFound, SessionNotFound, VersionConflict
+from app.usecase.exam_chat import (
+    InvalidState,
+    MissingStudent,
+    PreviewNotFound,
+    SessionNotFound,
+    VersionConflict,
+)
 from app.usecase.exam_preview_rules import PreviewRuleError
+from app.usecase.exam_template_plan import TemplateConflict
 
 router = APIRouter(prefix="/exam-chat", tags=["exam-chat"])
 log = logging.getLogger(__name__)
@@ -37,25 +45,35 @@ def _sse(event: str, data) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False, default=str)}\n\n"
 
 
+def _not_found(message: str = NO_SESSION) -> HTTPException:
+    return HTTPException(status.HTTP_404_NOT_FOUND, message)
+
+
 def _conflict(e: VersionConflict) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, {"message": str(e), "current_version": e.current})
 
 
 def _invalid(e: PreviewRuleError) -> HTTPException:
-    return HTTPException(422, {"message": "Cấu trúc không hợp lệ", "errors": e.errors})
+    if isinstance(e, TemplateConflict):
+        return HTTPException(422, {"message": "Chỉnh sửa xung đột với ràng buộc của mẫu kỳ thi",
+                                   "code": "TEMPLATE_CONFLICT", "errors": e.errors})
+    return HTTPException(422, {"message": "Cấu trúc không hợp lệ", "code": "INVALID_STRUCTURE", "errors": e.errors})
 
 
 @router.post("/sessions", response_model=SessionOut, status_code=status.HTTP_201_CREATED)
-async def create_session(body: SessionCreate, usecase: ExamChatUseCaseDep):
-    return await usecase.create_session(body.student_ref)
+async def create_session(body: SessionCreate, usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    try:
+        return await usecase.create_session(body.student_ref, requester)
+    except MissingStudent:
+        raise HTTPException(422, {"message": "Thiếu student_ref (chưa đăng nhập)"}) from None
 
 
 @router.get("/sessions/{session_id}", response_model=SessionStateOut)
-async def get_session(session_id: int, usecase: ExamChatUseCaseDep):
+async def get_session(session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     try:
-        session, messages, preview, draft = await usecase.get_state(session_id)
+        session, messages, preview, draft = await usecase.get_state(session_id, requester)
     except SessionNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_SESSION) from None
+        raise _not_found() from None
     return {
         "session": session,
         "messages": [MessageOut.model_validate(m) for m in messages],
@@ -65,12 +83,14 @@ async def get_session(session_id: int, usecase: ExamChatUseCaseDep):
 
 
 @router.post("/sessions/{session_id}/messages")
-async def send_message(session_id: int, body: MessageIn, usecase: ExamChatUseCaseDep, writer: ReplyWriterDep):
+async def send_message(
+    session_id: int, body: MessageIn, usecase: ExamChatUseCaseDep, writer: ReplyWriterDep, requester: RequesterDep
+):
     """Gửi một tin nhắn, nhận phản hồi qua SSE: message* → preview? → draft? → done (hoặc error)."""
     try:
-        turn = await usecase.respond(session_id, body.text)
-    except SessionNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_SESSION) from None
+        turn = await usecase.respond(session_id, body.text, requester)
+    except SessionNotFound:  # kiểm quyền trước khi mở luồng: phiên của người khác trả 404 thường
+        raise _not_found() from None
     except Exception:  # lỗi không lường trước: báo qua SSE thay vì cắt kết nối
         log.exception("exam-chat respond failed")
 
@@ -94,23 +114,23 @@ async def send_message(session_id: int, body: MessageIn, usecase: ExamChatUseCas
 
 
 @router.get("/sessions/{session_id}/preview", response_model=PreviewOut)
-async def get_preview(session_id: int, usecase: ExamChatUseCaseDep):
+async def get_preview(session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     try:
-        return await usecase.get_preview(session_id)
+        return await usecase.get_preview(session_id, requester)
     except SessionNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_SESSION) from None
+        raise _not_found() from None
     except PreviewNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_PREVIEW) from None
+        raise _not_found(NO_PREVIEW) from None
 
 
 @router.patch("/sessions/{session_id}/preview", response_model=PreviewOut)
-async def update_preview(session_id: int, body: PreviewUpdate, usecase: ExamChatUseCaseDep):
+async def update_preview(session_id: int, body: PreviewUpdate, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     try:
-        return await usecase.update_preview(session_id, body.edit, body.version)
+        return await usecase.update_preview(session_id, body.edit, body.version, requester)
     except SessionNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_SESSION) from None
+        raise _not_found() from None
     except PreviewNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_PREVIEW) from None
+        raise _not_found(NO_PREVIEW) from None
     except VersionConflict as e:
         raise _conflict(e) from e
     except PreviewRuleError as e:
@@ -118,14 +138,14 @@ async def update_preview(session_id: int, body: PreviewUpdate, usecase: ExamChat
 
 
 @router.post("/sessions/{session_id}/preview/confirm", response_model=ConfirmOut)
-async def confirm_preview(session_id: int, body: ConfirmIn, usecase: ExamChatUseCaseDep):
+async def confirm_preview(session_id: int, body: ConfirmIn, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     """Xác nhận bản xem trước rồi dựng đề nháp từ câu đã duyệt."""
     try:
-        preview, draft, message = await usecase.confirm(session_id, body.version)
+        preview, draft, message = await usecase.confirm(session_id, body.version, requester)
     except SessionNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_SESSION) from None
+        raise _not_found() from None
     except PreviewNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_PREVIEW) from None
+        raise _not_found(NO_PREVIEW) from None
     except VersionConflict as e:
         raise _conflict(e) from e
     except InvalidState as e:
@@ -136,11 +156,11 @@ async def confirm_preview(session_id: int, body: ConfirmIn, usecase: ExamChatUse
 
 
 @router.get("/sessions/{session_id}/draft", response_model=DraftOut)
-async def get_draft(session_id: int, usecase: ExamChatUseCaseDep):
+async def get_draft(session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     try:
-        draft = await usecase.latest_draft(session_id)
+        draft = await usecase.latest_draft(session_id, requester)
     except SessionNotFound:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_SESSION) from None
+        raise _not_found() from None
     if draft is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Phiên chưa có đề nháp")
+        raise _not_found("Phiên chưa có đề nháp")
     return draft

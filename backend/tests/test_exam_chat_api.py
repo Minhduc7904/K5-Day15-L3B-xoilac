@@ -1,21 +1,15 @@
-"""Test API issue #4 qua HTTP, với ngân hàng câu và lịch sử làm bài tự dựng (không phải dữ liệu thật)."""
-import json
+"""Test API issue #4 qua HTTP, với ngân hàng câu và lịch sử làm bài tự dựng (không phải dữ liệu thật).
+
+Bộ dữ liệu riêng của file này chỉ có câu trắc nghiệm một đáp án, để kết quả chọn câu theo chương dễ đoán.
+"""
 import re
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import insert
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
 
-from app.api.deps import get_student_history
-from app.core.database import get_session
-from app.main import app
-from app.models import Base
-from app.repositories.question_bank_repository import chapters, content_metadata, questions, questions_chapters, statements
+from app.repositories.question_bank_repository import chapters, questions, questions_chapters, statements
 from app.service.exam_chat_sources import ChapterResult, StaticHistory, StudentHistory
-
-BASE = "/api/v1/exam-chat"
+from tests.exam_chat_support import BASE, chat_client, new_session, no_answers, say
 
 HISTORY = StaticHistory({
     "HS01": StudentHistory([ChapterResult("12C1", 2, 10), ChapterResult("12C4", 6, 10), ChapterResult("11C6", 8, 10)]),
@@ -62,54 +56,8 @@ async def _seed(conn) -> None:
 
 @pytest.fixture
 async def chat():
-    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(content_metadata.create_all)
-        await _seed(conn)
-    maker = async_sessionmaker(engine, expire_on_commit=False)
-
-    async def _session():
-        async with maker() as s:
-            yield s
-
-    app.dependency_overrides[get_session] = _session
-    app.dependency_overrides[get_student_history] = lambda: HISTORY
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+    async with chat_client(history=HISTORY, seed_fn=_seed) as c:
         yield c
-    app.dependency_overrides.clear()
-    await engine.dispose()
-
-
-def parse_sse(body: str) -> list[tuple[str, dict]]:
-    events = []
-    for block in body.strip().split("\n\n"):
-        lines = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
-        events.append((lines["event"], json.loads(lines["data"])))
-    return events
-
-
-async def new_session(c, student="HS01") -> int:
-    r = await c.post(f"{BASE}/sessions", json={"student_ref": student})
-    assert r.status_code == 201
-    return r.json()["session_id"]
-
-
-async def say(c, sid: int, text: str):
-    r = await c.post(f"{BASE}/sessions/{sid}/messages", json={"text": text})
-    assert r.status_code == 200
-    assert r.headers["content-type"].startswith("text/event-stream")
-    events = parse_sse(r.text)
-    assert events[-1][0] == "done"
-    reply = "".join(d["delta"] for e, d in events if e == "message")
-    found = {e: d for e, d in events if e in ("preview", "draft")}
-    return reply, found.get("preview"), found.get("draft")
-
-
-def no_answers(draft: dict) -> None:
-    text = json.dumps(draft, ensure_ascii=False)
-    for key in ("is_correct", "correct_answer", "solution"):
-        assert key not in text
 
 
 async def test_weak_chapter_flow_with_chat_and_api_edits(chat):
@@ -139,7 +87,10 @@ async def test_weak_chapter_flow_with_chat_and_api_edits(chat):
     assert draft["title"].startswith("Đề ôn luyện ngày")
     assert [i["code"] for i in draft["items"]] == ["Q00020", "Q00021", "Q00022"]
     assert {i["chapter"] for i in draft["items"]} == {"12C4"}
-    assert draft["shortages"] == [{"chapter": "12C4", "difficulty": "TH", "requested": 4, "available": 3}]
+    [shortage] = draft["shortages"]
+    assert {k: shortage[k] for k in ("chapter", "difficulty", "requested", "available")} == \
+        {"chapter": "12C4", "difficulty": "TH", "requested": 4, "available": 3}
+    assert shortage["section_title"] is None                    # chỉ đề theo mẫu mới có phần
     assert "BẢN NHÁP" in reply and "không tự bịa" in reply
     no_answers(draft)
 

@@ -1,10 +1,19 @@
 """Luồng nghiệp vụ pipeline học sinh tạo đề ôn (issue #4).
 
-Một phiên có tin nhắn và đúng một bản xem trước hiện tại. Học sinh chỉnh bản xem trước bằng chat (respond) hoặc
-qua API (update_preview); cả hai cùng dùng luật ở exam_preview_rules và cùng kiểm version để không ghi đè nhau.
-Chỉ sau khi xác nhận mới chọn câu từ ngân hàng đã duyệt để dựng đề nháp; đề nháp không có đáp án hay lời giải.
+Một phiên có tin nhắn và đúng một bản xem trước hiện tại, ở một trong hai chế độ:
+- CHAPTER: ôn theo chương (chương yếu từ lịch sử làm bài, hoặc chương học sinh chọn); học sinh chỉnh tự do.
+- EXAM_TEMPLATE: ôn theo một mẫu kỳ thi đã duyệt (#5); mẫu cố định phần, loại câu, số câu, độ khó, học sinh chỉ
+  thu hẹp được chương. Chỉnh sửa vi phạm ràng buộc của mẫu bị từ chối kèm lý do.
+
+Học sinh chỉnh bằng chat (respond) hoặc qua API (update_preview); cả hai cùng dùng một bộ luật và cùng kiểm version
+để không ghi đè nhau. Chỉ sau khi xác nhận mới chọn câu từ ngân hàng đã duyệt để dựng đề nháp; đề nháp không có
+đáp án, cờ đúng/sai hay lời giải.
+
+Chủ sở hữu: khi có người gọi (Requester, lấy từ đăng nhập), học sinh chỉ thấy phiên của chính mình; phiên của người
+khác được coi như không tồn tại (SessionNotFound → 404), để không lộ phiên đó có thật.
 
 Hành vi bám codebase/agent.py (lát cắt đã đo): chặn trước, hỏi lại khi thiếu hoặc mâu thuẫn, không bịa câu.
+Test đối chiếu: tests/test_agent_parity.py.
 """
 import re
 from dataclasses import dataclass, field
@@ -29,11 +38,23 @@ from app.usecase.exam_preview_rules import (
     difficulty_plan,
     new_structure,
 )
+from app.usecase.exam_template_plan import (
+    EXAM_NAME,
+    TYPE_NAME,
+    TemplateConflict,
+    TemplatePreviewStructure,
+    apply_template_edit,
+    describe_template,
+    from_template,
+)
 
 MIN_ANSWERS = 5      # chương làm ít hơn số câu này không dùng để xếp hạng (như agent.py)
 CLOSE_GAP = 0.10     # hai chương yếu nhất cách nhau ≤ 10 điểm % → chia câu cho cả hai
 VN_TZ = timezone(timedelta(hours=7))
 CHAPTER_PHRASE = re.compile(r"chuong\s+([a-z0-9 ]+?)(?:\s+cho\b|\s+\d|[,.;:!?(]|$)")
+SWITCH_TO_CHAPTER = re.compile(r"(theo chuong|chuyen sang on chuong|bo mau|khong theo mau)")
+
+Structure = PreviewStructure | TemplatePreviewStructure
 
 
 class SessionNotFound(Exception):
@@ -54,6 +75,18 @@ class InvalidState(Exception):
     pass
 
 
+class MissingStudent(Exception):
+    """Tạo phiên mà không có người đăng nhập lẫn mã học sinh."""
+
+
+@dataclass(frozen=True)
+class Requester:
+    """Người gọi API, lấy từ phiên đăng nhập (Auth #8). student_ref là mã dùng để tra lịch sử làm bài."""
+
+    user_id: int
+    student_ref: str
+
+
 @dataclass
 class ChatTurn:
     """Kết quả một lượt chat để tầng API phát thành sự kiện SSE."""
@@ -70,6 +103,12 @@ def draft_title(now: datetime | None = None) -> str:
     return f"Đề ôn luyện ngày {day:%d/%m/%Y}"
 
 
+def load_structure(preview: ExamPreview) -> Structure:
+    if preview.mode == "EXAM_TEMPLATE":
+        return TemplatePreviewStructure.model_validate(preview.structure)
+    return PreviewStructure.model_validate(preview.structure)
+
+
 class ExamChatUseCase:
     def __init__(
         self,
@@ -83,49 +122,56 @@ class ExamChatUseCase:
         self._history = history
         self._templates = templates
 
-    # ---------- phiên ----------
+    # ---------- phiên và quyền sở hữu ----------
 
-    async def create_session(self, student_ref: str) -> ExamChatSession:
+    async def create_session(self, student_ref: str | None, requester: Requester | None = None) -> ExamChatSession:
+        if requester is not None:
+            return await self._repo.create_session(requester.student_ref, user_id=requester.user_id)
+        if not student_ref or not student_ref.strip():
+            raise MissingStudent()
         return await self._repo.create_session(student_ref.strip())
 
-    async def _session(self, session_id: int) -> ExamChatSession:
+    async def _session(self, session_id: int, requester: Requester | None) -> ExamChatSession:
         item = await self._repo.get_session(session_id)
-        if item is None:
+        if item is None or (requester is not None and item.user_id != requester.user_id):
             raise SessionNotFound()
         return item
 
-    async def get_state(self, session_id: int):
-        session = await self._session(session_id)
+    async def get_state(self, session_id: int, requester: Requester | None = None):
+        session = await self._session(session_id, requester)
         messages = await self._repo.list_messages(session_id)
         preview = await self._repo.get_preview(session_id)
         draft = await self._repo.latest_draft(session_id)
         return session, messages, preview, draft
 
-    async def get_preview(self, session_id: int) -> ExamPreview:
-        await self._session(session_id)
+    async def get_preview(self, session_id: int, requester: Requester | None = None) -> ExamPreview:
+        await self._session(session_id, requester)
         preview = await self._repo.get_preview(session_id)
         if preview is None:
             raise PreviewNotFound()
         return preview
 
-    async def latest_draft(self, session_id: int) -> ExamDraft | None:
-        await self._session(session_id)
+    async def latest_draft(self, session_id: int, requester: Requester | None = None) -> ExamDraft | None:
+        await self._session(session_id, requester)
         return await self._repo.latest_draft(session_id)
 
     # ---------- đường chỉnh qua API ----------
 
-    async def update_preview(self, session_id: int, edit: PreviewEdit, expected_version: int) -> ExamPreview:
-        preview = await self.get_preview(session_id)
+    async def update_preview(
+        self, session_id: int, edit: PreviewEdit, expected_version: int, requester: Requester | None = None
+    ) -> ExamPreview:
+        preview = await self.get_preview(session_id, requester)
         if preview.version != expected_version:
             raise VersionConflict(preview.version)
-        structure = apply_edit(PreviewStructure.model_validate(preview.structure), edit)
-        await self._validate(structure)
+        structure = await self._edited(load_structure(preview), edit)   # TemplateConflict / PreviewRuleError
         return await self._repo.save_preview(
             session_id, {"structure": structure.model_dump(mode="json"), "status": "EDITED"}
         )
 
-    async def confirm(self, session_id: int, expected_version: int) -> tuple[ExamPreview, ExamDraft | None, str]:
-        preview = await self.get_preview(session_id)
+    async def confirm(
+        self, session_id: int, expected_version: int, requester: Requester | None = None
+    ) -> tuple[ExamPreview, ExamDraft | None, str]:
+        preview = await self.get_preview(session_id, requester)
         if preview.version != expected_version:
             raise VersionConflict(preview.version)
         if not can_confirm(preview.status):
@@ -134,8 +180,8 @@ class ExamChatUseCase:
 
     # ---------- đường chỉnh qua chat ----------
 
-    async def respond(self, session_id: int, text: str) -> ChatTurn:
-        session = await self._session(session_id)
+    async def respond(self, session_id: int, text: str, requester: Requester | None = None) -> ChatTurn:
+        session = await self._session(session_id, requester)
         await self._repo.add_message(session_id, "student", text)
         turn = await self._decide(session, text)
         version = turn.preview.version if turn.preview is not None else None
@@ -146,18 +192,23 @@ class ExamChatUseCase:
         intent = chat_intent.read(text)
         sid = session.session_id
         current = await self._repo.get_preview(sid)
+        on_template = current is not None and current.mode == "EXAM_TEMPLATE" \
+            and not SWITCH_TO_CHAPTER.search(chat_intent.norm(text))
 
         if intent.kind == "refuse":
             return ChatTurn(intent.text, notes=["chặn trước AI"])
         if intent.kind == "exam":
-            return await self._exam_branch(intent.exam or {})
+            return await self._exam_branch(sid, intent.exam or {})
+        if on_template and intent.kind in ("confirm", "edit"):
+            return await self._template_turn(sid, current, intent)
         if intent.asked_total is not None and intent.asked_total > MAX_TOTAL and intent.kind != "confirm":
             return ChatTurn(f"Một đề ôn tối đa {MAX_TOTAL} câu. Em chọn số câu nhỏ hơn nhé.")
 
+        chapter_current = None if current is None or current.mode == "EXAM_TEMPLATE" else current
         if intent.kind == "confirm":
-            return await self._chat_confirm(sid, current, intent)
+            return await self._chat_confirm(sid, chapter_current, intent)
         if intent.kind == "edit":
-            return await self._chat_edit(sid, current, intent.edit)
+            return await self._chat_edit(sid, chapter_current, intent.edit)
 
         unknown = await self._unknown_chapter(text, intent)
         if unknown:
@@ -166,21 +217,62 @@ class ExamChatUseCase:
             return await self._weak_branch(session, intent.edit)
         return ChatTurn("Em muốn ôn chương nào, hay để mình chọn theo chương em hay sai? " + chat_intent.OFFER)
 
-    async def _exam_branch(self, exam: dict) -> ChatTurn:
+    # ---------- nhánh ôn theo mẫu kỳ thi ----------
+
+    async def _exam_branch(self, sid: int, exam: dict) -> ChatTurn:
         if not exam.get("exam_type"):
             return ChatTurn("Em muốn ôn theo kỳ thi nào: giữa kỳ hay cuối kỳ, học kỳ 1 hay 2, lớp mấy? "
-                            "Hoặc thi tốt nghiệp THPT, HSA, TSA?")
+                            "Hoặc thi tốt nghiệp THPT, HSA, TSA?", notes=["hỏi lại: thiếu loại kỳ thi"])
         found = await self._templates.find(exam["exam_type"], exam.get("grade"), exam.get("version_label"))
         if not found:
             return ChatTurn("Mình chưa có cấu trúc đã xác thực nguồn cho kỳ thi này nên không nêu số câu hay phân bố "
                             "chương, để khỏi nói sai. " + chat_intent.OFFER, notes=["thu hẹp: chưa có mẫu đã duyệt"])
         if len(found) > 1:
-            names = "; ".join(t.get("name", "") for t in found)
-            return ChatTurn(f"Có {len(found)} mẫu đã duyệt phù hợp: {names}. Em cho mình biết thêm khối, học kỳ "
-                            "hoặc năm để chọn đúng một mẫu nhé.")
-        # Dựng đề theo mẫu kỳ thi cần hợp đồng #5 (phần, loại câu, ràng buộc): làm sau khi #5 merge.
-        return ChatTurn(f"Mình tìm thấy mẫu đã duyệt \"{found[0].get('name', '')}\", nhưng chưa dựng đề theo mẫu kỳ thi "
-                        "được. " + chat_intent.OFFER, notes=["nhánh kỳ thi: chờ #5"])
+            options = "\n".join("- " + self._template_label(t) for t in found)
+            return ChatTurn(f"Có {len(found)} mẫu đã duyệt cho kỳ thi {EXAM_NAME.get(exam['exam_type'], '')}:\n{options}\n"
+                            "Em nhắn lại kèm khối hoặc năm (ví dụ \"lớp 11\", \"2025\") để mình chọn đúng một mẫu nhé.",
+                            notes=["hỏi lại: nhiều mẫu phù hợp"])
+        structure = from_template(found[0])
+        reason = f"Theo mẫu đã duyệt \"{structure.template_name}\"."
+        preview = await self._repo.save_preview(sid, {
+            "structure": structure.model_dump(mode="json"), "status": "PROPOSED", "mode": "EXAM_TEMPLATE",
+            "reason": reason,
+        })
+        names = await self._bank.chapter_names()
+        reply = ("Đề xuất đề ôn theo mẫu kỳ thi (chưa tạo đề):\n" + describe_template(structure, names) + "\n"
+                 "Mẫu cố định số câu và độ khó; em có thể thu hẹp chương trong phạm vi mẫu, rồi xác nhận để mình tạo đề.")
+        return ChatTurn(reply, preview=preview, preview_changed=True, notes=["preview theo mẫu kỳ thi"])
+
+    @staticmethod
+    def _template_label(t: dict) -> str:
+        parts = [t.get("name", "")]
+        if t.get("grade"):
+            parts.append(f"lớp {t['grade']}")
+        if t.get("version_label"):
+            parts.append(str(t["version_label"]))
+        parts.append(f"{t.get('total_questions', '?')} câu")
+        return " · ".join(parts)
+
+    async def _template_turn(self, sid: int, current: ExamPreview, intent) -> ChatTurn:
+        structure = load_structure(current)
+        try:
+            structure = apply_template_edit(structure, intent.edit)
+        except TemplateConflict as e:
+            return ChatTurn("Chỉnh này xung đột với mẫu kỳ thi: " + " ".join(e.errors) + " Nếu muốn tự chọn số câu "
+                            "và độ khó, em nhắn \"ôn theo chương ...\" để chuyển sang ôn theo chương.",
+                            notes=["từ chối: xung đột ràng buộc mẫu"])
+        changed = structure.model_dump() != load_structure(current).model_dump()
+        if changed or current.status not in ("PROPOSED", "EDITED"):
+            current = await self._repo.save_preview(sid, {"structure": structure.model_dump(mode="json"),
+                                                          "status": "EDITED"})
+        if intent.kind == "confirm":
+            preview, draft, reply = await self._confirm_and_build(sid, current)
+            return ChatTurn(reply, preview=preview, preview_changed=True, draft=draft)
+        names = await self._bank.chapter_names()
+        reply = "Đã cập nhật đề theo mẫu (chưa tạo đề):\n" + describe_template(structure, names) + "\n" + self._ask_confirm()
+        return ChatTurn(reply, preview=current, preview_changed=True)
+
+    # ---------- nhánh ôn theo chương ----------
 
     async def _chat_confirm(self, sid: int, current: ExamPreview | None, intent) -> ChatTurn:
         edit: PreviewEdit = intent.edit
@@ -199,7 +291,7 @@ class ExamChatUseCase:
         if errors:
             return ChatTurn("Cấu trúc chưa hợp lệ: " + " ".join(errors))
         preview = await self._repo.save_preview(
-            sid, {"structure": structure.model_dump(mode="json"), "status": "EDITED", "mode": "CHAPTER"}
+            sid, {"structure": structure.model_dump(mode="json"), "status": "EDITED", "mode": "CHAPTER", "reason": None}
         )
         preview, draft, reply = await self._confirm_and_build(sid, preview)
         if intent.asked_total is not None and intent.asked_total > MAX_TOTAL:
@@ -228,7 +320,8 @@ class ExamChatUseCase:
             return ChatTurn("Mình chưa đổi được cấu trúc: " + " ".join(errors))
         status = "EDITED" if current is not None else "PROPOSED"
         preview = await self._repo.save_preview(
-            sid, {"structure": structure.model_dump(mode="json"), "status": status, "mode": "CHAPTER"}
+            sid, {"structure": structure.model_dump(mode="json"), "status": status, "mode": "CHAPTER",
+                  **({} if current is not None else {"reason": None})}
         )
         names = await self._bank.chapter_names()
         reply = "Đề xuất cấu trúc đề ôn (chưa tạo đề):\n" + describe(structure, names) + "\n" + self._ask_confirm()
@@ -291,42 +384,48 @@ class ExamChatUseCase:
     def _ask_confirm() -> str:
         return "Em xác nhận hoặc chỉnh bằng lời (đổi chương, số câu, độ khó) nhé."
 
-    # ---------- dựng đề ----------
+    # ---------- kiểm tra ----------
 
     async def _errors(self, structure: PreviewStructure) -> list[str]:
         names = await self._bank.chapter_names()
         return check_structure(structure, set(names) if names else None)
 
-    async def _validate(self, structure: PreviewStructure) -> None:
-        errors = await self._errors(structure)
+    async def _edited(self, structure: Structure, edit: PreviewEdit) -> Structure:
+        """Một luật cho cả chat và API: mẫu kỳ thi thì kiểm ràng buộc của mẫu, còn lại kiểm luật cấu trúc chương."""
+        if isinstance(structure, TemplatePreviewStructure):
+            return apply_template_edit(structure, edit)
+        edited = apply_edit(structure, edit)
+        errors = await self._errors(edited)
         if errors:
             raise PreviewRuleError(errors)
+        return edited
+
+    # ---------- dựng đề ----------
 
     async def _confirm_and_build(self, sid: int, preview: ExamPreview) -> tuple[ExamPreview, ExamDraft | None, str]:
-        structure = PreviewStructure.model_validate(preview.structure)
-        await self._validate(structure)
+        structure = load_structure(preview)
+        if isinstance(structure, PreviewStructure):
+            errors = await self._errors(structure)
+            if errors:
+                raise PreviewRuleError(errors)
         confirmed = await self._repo.save_preview(sid, {"status": "CONFIRMED"})
-        chosen: list[int] = []
-        shortages: list[dict] = []
-        meta: dict[int, tuple[str, str]] = {}
-        for code, mix in difficulty_plan(structure).items():
-            for diff, k in mix.items():
-                res = await self._bank.pick(code, diff, k, exclude=chosen)
-                chosen += res.question_ids
-                meta.update({q: (code, diff) for q in res.question_ids})
-                if len(res.question_ids) < k:
-                    shortages.append({"chapter": code, "difficulty": diff, "requested": k,
-                                      "available": len(res.question_ids)})
+        if isinstance(structure, TemplatePreviewStructure):
+            chosen, meta, shortages = await self._pick_template(structure)
+        else:
+            chosen, meta, shortages = await self._pick_chapters(structure)
         loaded = await self._bank.load_items(chosen)
         items = []
         for qid in chosen:
             if qid not in loaded:          # chặn sau: chỉ câu còn đọc được trong ngân hàng đã duyệt
                 continue
-            q = loaded[qid]
-            items.append({"order": len(items) + 1, "chapter": meta[qid][0], **q})
+            q = dict(loaded[qid])
+            info = meta[qid]
+            q["chapter"] = info.get("chapter") or next(iter(q.get("chapter_codes") or []), None)
+            items.append({"order": len(items) + 1, **q, **{k: v for k, v in info.items() if k != "chapter"}})
         if not items:
             preview = await self._repo.save_preview(sid, {"status": "EDITED"})
-            return preview, None, "Ngân hàng chưa có câu nào phù hợp cấu trúc này. Em thử đổi chương hoặc độ khó nhé."
+            return preview, None, ("Ngân hàng chưa có câu nào phù hợp cấu trúc này, nên mình không tạo đề và không bịa "
+                                   "câu. Em thử đổi chương hoặc độ khó nhé.")
         draft = await self._repo.add_draft({
             "session_id": sid,
             "preview_version": confirmed.version,
@@ -338,17 +437,67 @@ class ExamChatUseCase:
         preview = await self._repo.save_preview(sid, {"status": "BUILT"})
         return preview, draft, self._draft_text(draft, structure)
 
+    async def _pick_chapters(self, structure: PreviewStructure):
+        chosen: list[int] = []
+        meta: dict[int, dict] = {}
+        shortages: list[dict] = []
+        for code, mix in difficulty_plan(structure).items():
+            for diff, k in mix.items():
+                res = await self._bank.pick(code, diff, k, exclude=chosen)
+                chosen += res.question_ids
+                meta.update({q: {"chapter": code} for q in res.question_ids})
+                if len(res.question_ids) < k:
+                    shortages.append({"chapter": code, "difficulty": diff, "requested": k,
+                                      "available": len(res.question_ids)})
+        return chosen, meta, shortages
+
+    async def _pick_template(self, structure: TemplatePreviewStructure):
+        chosen: list[int] = []
+        meta: dict[int, dict] = {}
+        shortages: list[dict] = []
+        for sec in structure.sections:
+            chapters = sec.effective_chapters()
+            for diff, k in sec.difficulty_plan().items():
+                res = await self._bank.pick_for_section(question_type=sec.question_type, n=k, chapter_codes=chapters,
+                                                        difficulty=diff, grade=structure.grade, exclude=chosen)
+                chosen += res.question_ids
+                meta.update({q: {"section_order": sec.order, "section_title": sec.title,
+                                 "points": sec.points_per_question} for q in res.question_ids})
+                if len(res.question_ids) < k:
+                    shortages.append({"section_order": sec.order, "section_title": sec.title,
+                                      "question_type": sec.question_type,
+                                      "chapter": ", ".join(chapters) if chapters else None,
+                                      "difficulty": diff, "requested": k, "available": len(res.question_ids)})
+        return chosen, meta, shortages
+
     @staticmethod
-    def _draft_text(draft: ExamDraft, structure: PreviewStructure) -> str:
-        lines = [f"{draft.title}: BẢN NHÁP đề ôn (chưa chính thức, chờ em duyệt). Chưa kèm đáp án.", ""]
+    def _draft_text(draft: ExamDraft, structure: Structure) -> str:
+        head = f"{draft.title}: BẢN NHÁP đề ôn (chưa chính thức, chờ em duyệt). Chưa kèm đáp án."
+        if isinstance(structure, TemplatePreviewStructure):
+            head += f" Theo mẫu \"{structure.template_name}\"."
+        lines = [head]
+        section = None
         for q in draft.items:
-            lines.append(f"Câu {q['order']} [{q['code']} · {q['chapter']} · {q['difficulty']}] {q['content'].strip()}")
+            if q.get("section_title") and q["section_title"] != section:
+                section = q["section_title"]
+                lines += ["", section]
+            elif q["order"] == 1:
+                lines.append("")
+            lines.append(f"Câu {q['order']} [{q['code']} · {q.get('chapter') or '?'} · {q.get('difficulty') or '?'}] "
+                         f"{q['content'].strip()}")
             for s in q["statements"]:
                 lines.append(f"   - {s['content']}")
         want = structure.total
         if len(draft.items) < want or draft.shortages:
-            detail = "; ".join(f"{s['chapter']} {DIFF_NAME[s['difficulty']]}: chỉ có {s['available']}/{s['requested']} câu"
-                               for s in draft.shortages)
             lines += ["", f"Lưu ý: ngân hàng không đủ câu như yêu cầu. Mình chỉ đưa {len(draft.items)}/{want} câu có thật, "
-                          f"thiếu {want - len(draft.items)} câu, không tự bịa thêm. {detail}"]
+                          f"thiếu {want - len(draft.items)} câu, không tự bịa thêm. "
+                          + "; ".join(ExamChatUseCase._shortage_text(s) for s in draft.shortages)]
         return "\n".join(lines)
+
+    @staticmethod
+    def _shortage_text(s: dict) -> str:
+        where = s.get("section_title") or s.get("chapter") or ""
+        if s.get("section_title") and s.get("question_type"):
+            where += f" ({TYPE_NAME[s['question_type']]})"
+        level = DIFF_NAME[s["difficulty"]] if s.get("difficulty") else "mọi mức"
+        return f"{where} {level}: chỉ có {s['available']}/{s['requested']} câu"

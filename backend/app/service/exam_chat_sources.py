@@ -5,12 +5,12 @@ Mỗi nguồn là một giao diện nhỏ, kèm cài đặt mặc định an to�
 - Lịch sử làm bài: chưa có bảng kết quả làm bài trong DB (dữ liệu nền không có học sinh). Mặc định NoHistory,
   agent sẽ nói chưa có lịch sử và hỏi chương, không đoán (giống ca B05). StaticHistory dùng cho test và demo.
 - Mẫu cấu trúc đề: thuộc issue #5. Mặc định NoTemplates, agent nói chưa có cấu trúc đã xác thực (giống ca B09).
-  Khi #5 merge, thay bằng cài đặt gọi ExamTemplateUseCase.lookup().
+  Khi #5 merge, dùng TemplateLookupSource(ExamTemplateUseCase.lookup), xem get_exam_template_source() trong deps.py.
 - Diễn đạt lại bằng model: chưa chốt nhà cung cấp và key. Mặc định PlainReplyWriter trả nguyên văn bản dựng bằng code.
 """
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 CONFLICT_RATIO = 0.25  # giống codebase/tools.py: ≥ 25% câu trái kết quả trong cùng lượt → mâu thuẫn
 
@@ -62,6 +62,31 @@ class ExamTemplateSource(Protocol):
 class NoTemplates:
     async def find(self, exam_type: str, grade: int | None, version_label: str | None) -> list[dict]:
         return []
+
+
+TEMPLATE_FIELDS = ("template_id", "name", "exam_type", "grade", "version_label", "duration_minutes", "source",
+                   "sections", "total_questions", "status")
+
+
+def template_to_dict(item: Any) -> dict:
+    """Đổi một mẫu (dict, hoặc model ORM ExamTemplate của #5) về dict theo hợp đồng ExamTemplateOut."""
+    if isinstance(item, dict):
+        return {k: item.get(k) for k in TEMPLATE_FIELDS}
+    return {k: getattr(item, k, None) for k in TEMPLATE_FIELDS}
+
+
+class TemplateLookupSource:
+    """Nối với tra cứu mẫu đã duyệt của #5. lookup là ExamTemplateUseCase.lookup (hoặc hàm cùng chữ ký):
+    async lookup(*, exam_type, grade, version_label) -> danh sách mẫu APPROVED.
+
+    Chỉ giữ mẫu có status APPROVED, phòng khi nguồn trả nhầm mẫu nháp."""
+
+    def __init__(self, lookup: Callable[..., Awaitable[Sequence[Any]]]) -> None:
+        self._lookup = lookup
+
+    async def find(self, exam_type: str, grade: int | None, version_label: str | None) -> list[dict]:
+        items = await self._lookup(exam_type=exam_type, grade=grade, version_label=version_label)
+        return [d for d in (template_to_dict(t) for t in items) if d.get("status") in (None, "APPROVED")]
 
 
 class ReplyWriter(Protocol):

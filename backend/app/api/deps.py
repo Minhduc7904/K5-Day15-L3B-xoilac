@@ -18,7 +18,7 @@ from app.service.exam_chat_sources import (
     StudentHistorySource,
 )
 from app.service.storage_service import StorageService
-from app.usecase.exam_chat import ExamChatUseCase
+from app.usecase.exam_chat import ExamChatUseCase, Requester
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 
@@ -46,7 +46,18 @@ SampleFileUseCaseDep = Annotated[SampleFileUseCase, Depends(get_sample_file_usec
 
 
 # ---------- issue #4: pipeline học sinh tạo đề ôn ----------
-# Ba nguồn dưới đây là chỗ cắm khi các phần phụ thuộc sẵn sàng (lịch sử làm bài, mẫu đề #5, model thật).
+# Các hàm dưới đây là chỗ cắm khi phần phụ thuộc sẵn sàng (đăng nhập, lịch sử làm bài, mẫu đề #5, model thật).
+
+
+def get_requester() -> Requester | None:
+    """Người gọi API. Chưa có Auth (#8) nên trả None: chưa kiểm chủ sở hữu, client gửi student_ref khi tạo phiên.
+
+    Khi Auth #8 merge, thay bằng:
+        def get_requester(current: StudentDep) -> Requester:
+            return Requester(user_id=current.user_id, student_ref=f"U{current.user_id}")
+    Khi đó mọi route /exam-chat cần đăng nhập vai trò học sinh và chỉ thấy phiên của chính mình (kể cả SSE).
+    """
+    return None
 
 
 def get_student_history() -> StudentHistorySource:
@@ -54,6 +65,12 @@ def get_student_history() -> StudentHistorySource:
 
 
 def get_exam_template_source() -> ExamTemplateSource:
+    """Khi #5 merge, thay bằng:
+        def get_exam_template_source(
+            templates: ExamTemplateUseCaseDep,
+        ) -> ExamTemplateSource:
+            return TemplateLookupSource(templates.lookup)
+    """
     return NoTemplates()
 
 
@@ -76,3 +93,4 @@ def get_exam_chat_usecase(
 
 ExamChatUseCaseDep = Annotated[ExamChatUseCase, Depends(get_exam_chat_usecase)]
 ReplyWriterDep = Annotated[ReplyWriter, Depends(get_reply_writer)]
+RequesterDep = Annotated[Requester | None, Depends(get_requester)]

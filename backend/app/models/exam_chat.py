@@ -12,11 +12,16 @@ JsonType = JSON().with_variant(JSONB(), "postgresql")
 
 
 class ExamChatSession(Base):
-    """Một phiên hội thoại tạo đề. student_ref tạm là mã học sinh do client gửi, sẽ thay bằng tài khoản khi có Auth #8."""
+    """Một phiên hội thoại tạo đề.
+
+    user_id: chủ phiên (tài khoản học sinh đăng nhập, Auth #8). Chưa có Auth thì NULL và student_ref do client gửi.
+    Không đặt khoá ngoại tới bảng users vì bảng đó thuộc migration của #8, chưa có trên main; thêm khi #8 merge.
+    """
 
     __tablename__ = "exam_chat_sessions"
 
     session_id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     student_ref: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
