@@ -3,7 +3,9 @@
 > Điền ở guide bước 1.2. Không khảo sát thì xoá thư mục này.
 > Ngưỡng: **≥20 người ngoài nhóm, đúng người dùng**, giữ log đủ câu hỏi và từng câu trả lời.
 
-## Mẫu form *(bản nháp, chưa phát)*
+> **Cập nhật 27/11/2026:** form đã phát với bộ câu hỏi khác bản nháp dưới đây. Bộ câu hỏi thực tế và cách đếm: [`questions.md`](questions.md). Kết quả ẩn danh: [`results.csv`](results.csv).
+
+## Mẫu form *(bản nháp ban đầu, đã thay bằng `questions.md`)*
 
 Kênh dự kiến: Google Form gửi tới học sinh lớp 10–12 tại trung tâm dạy thêm nơi Nguyễn Minh Đức đang làm quản lý. Nhóm đặt mục tiêu có ≥20 phản hồi hợp lệ từ học sinh ngoài nhóm đã từng tự ôn bằng đề Toán.
 

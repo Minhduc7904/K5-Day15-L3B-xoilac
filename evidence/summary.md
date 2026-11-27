@@ -9,13 +9,13 @@
 |---|---|---|
 | Đào data (x/N, %, cách đếm chạy lại được, ≥5 ví dụ) | ☐ | `evidence/data-mining.md` |
 | Phỏng vấn (≥3 người ngoài nhóm, đúng người dùng) | ☐ | `evidence/interviews/P1.md`… |
-| Khảo sát (≥20 người ngoài nhóm, đúng người dùng) | ☐ | `evidence/survey/` |
+| Khảo sát (≥20 người ngoài nhóm, đúng người dùng) | ☐ chưa đạt: form đã phát, mới có 1 phản hồi (cập nhật 27/11/2026) | `evidence/survey/questions.md` · `evidence/survey/results.csv` |
 
 ## 2. Số chính
 
 - Đào data: __/__ (__%) …
 - Phỏng vấn: __/3 người gặp *(n nhỏ không ghi %)* · số lần / tháng: P1 __, P2 __, P3 __ · mỗi lần mất __–__ phút
-- Khảo sát: n = __ · __/__ (__%) …
+- Khảo sát: **n = 1 phản hồi hợp lệ** (27/11/2026, học sinh lớp 10 ngoài nhóm, đội trưởng xác nhận) · câu kiểm giả thuyết (câu 8, "trong 30 ngày qua chữa đề xong mà chưa biết ôn phần nào tiếp"): phản hồi này chọn "1 lần" → 1/1 báo gặp. **Chưa kết luận được gì**: n quá nhỏ, ngưỡng cần ≥ 20, mốc giả thuyết là ≥ 2/3. Cách đếm: `evidence/survey/questions.md`.
 
 Phỏng vấn nhiều vai thì đếm theo từng vai, không cộng chung.
 
