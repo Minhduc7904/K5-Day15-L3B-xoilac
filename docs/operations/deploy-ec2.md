@@ -53,7 +53,7 @@ grep ^PRETTY_NAME= /etc/os-release
 
 Kết quả đã xác nhận là user `ubuntu`, hostname `ip-172-31-20-96` và instance ID `i-0931f2a3b4010b6b3`. Lần kiểm tra ngày 27/11/2026 chỉ thấy SSH lắng nghe trên giao diện công khai và chưa tìm thấy lệnh `docker` trong `PATH` của user `ubuntu`.
 
-Sau khi môi trường triển khai đã sẵn sàng, chạy `docker compose ps` từ thư mục có tệp Compose trên máy chủ và gọi `<baseURL>/api/v1/health` từ máy ngoài EC2 để xác nhận API phản hồi.
+Từ ngày 27/11/2026, VPS đã cài Docker và chạy backend qua nginx; quy trình tự động nằm ở [Deploy backend CI/CD](deploy-backend-ci-cd.md). Sau khi môi trường triển khai đã sẵn sàng, chạy `docker compose ps` từ thư mục có tệp Compose trên máy chủ và gọi `<baseURL>/api/v1/health` từ máy ngoài EC2 để xác nhận API phản hồi.
 
 ## Xử lý lỗi
 

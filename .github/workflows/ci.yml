@@ -1,0 +1,49 @@
+name: CI
+
+# Chạy trên mọi PR vào main và được deploy.yml gọi lại trước khi deploy.
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Cài thư viện
+        run: pip install -r backend/requirements-dev.txt
+      - name: Chạy test
+        working-directory: backend
+        run: pytest -q
+
+  docker-and-nginx:
+    name: Build image, kiểm Compose và nginx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kiểm cú pháp Compose (dev và prod)
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+      - name: Build image backend
+        run: docker build -t examind-backend:ci backend
+      - name: Kiểm cú pháp nginx
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            nginx:1.27-alpine nginx -t
+      - name: Kiểm script shell
+        run: |
+          for f in deploy/*.sh; do bash -n "$f"; done
+      - name: Dọn Docker trên runner
+        if: always()
+        run: docker system prune -af
