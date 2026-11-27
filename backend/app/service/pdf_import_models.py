@@ -9,6 +9,20 @@ from app.core.config import Settings
 from app.schemas.pdf_import import Extraction
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+OPTION_IMAGE = r"!\[[^\]\n]*\]\((?:media:\d+|media-missing:p\d+-\d+)\)"
+IMAGE_OPTIONS = re.compile(
+    r"(?m)^" + r"[ \t]*\n+[ \t]*".join(
+        rf"(?P<{label}>{OPTION_IMAGE})[ \t]*\n+[ \t]*{label}\.[ \t]*(?=\n|$)"
+        for label in "ABCD"
+    )
+)
+
+
+def order_image_options(markdown: str) -> str:
+    """Move trailing labels in a complete image-only A–D block before their figures."""
+    return IMAGE_OPTIONS.sub(
+        lambda block: "\n\n".join(f"{label}. {block[label]}" for label in "ABCD"), markdown
+    )
 
 
 @dataclass(frozen=True)
@@ -110,7 +124,9 @@ class PdfImportModels:
         key = self.settings.openai_api_key
         if not key:
             raise ValueError("Chưa cấu hình OpenAI.")
-        document = "\n\n".join(f"[[Trang {page['page']}]]\n{page['normalized']}" for page in pages)
+        document = "\n\n".join(
+            f"[[Trang {page['page']}]]\n{order_image_options(page['normalized'])}" for page in pages
+        )
         instructions = EXTRACTION_INSTRUCTIONS
         if owned:
             instructions += (
@@ -187,6 +203,14 @@ across question, key, and solution sections. Keep printed numbers and 1-based pa
 Keep LaTeX as printed and preserve each Markdown media or media-missing token at its original position in the
 stem, statement, or solution. Preserve each choice or true/false statement in source order.
 Keep option labels out of statements. Set image_dependent when a figure is needed for the question.
+The content field is the question stem only. Option text and option images belong exclusively
+in statements, even if a statement contains only one image. Never repeat an option in the stem.
+An option can consist entirely of an image. When a run alternates standalone figure tokens
+and standalone option labels in sequence (figure, A., figure, B., and so on), the label
+belongs to the preceding figure. Put each figure token in its own statement in label order.
+Apply the usual following-content rule when labels precede the option text or inline image.
+Keep a question with A–D options in the single-answer section as SINGLE_CHOICE unless the
+source explicitly permits multiple correct options.
 Answer tables and worked solutions are evidence, not additional questions. Return one record
 per explicit answer source with a short verbatim supporting excerpt and its page. Transcribe a
 printed worked solution only in a solution evidence record, preserving the original content.

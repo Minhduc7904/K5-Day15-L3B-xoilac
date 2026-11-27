@@ -1,7 +1,8 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import SecretStr
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,14 +14,9 @@ class Settings(BaseSettings):
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "examind"
-    # Rỗng: không bật CORS. Frontend gọi qua rewrites của Next.js nên cùng origin.
-    cors_origins: str = ""
+    cors_origins: str = "http://localhost:3000"
 
-    # Phiên đăng nhập (issue #8)
-    cookie_name: str = "examind_session"
-    cookie_secure: bool = False
-    session_ttl_hours: int = Field(default=168, ge=1)
-
+    pdf_import_admin_token: SecretStr | None = None
     mistral_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     ocr_provider: Literal["mistral"] = "mistral"

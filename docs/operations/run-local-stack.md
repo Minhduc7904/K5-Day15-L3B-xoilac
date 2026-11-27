@@ -20,8 +20,6 @@ Dành cho thành viên nhóm cần dựng PostgreSQL, MinIO và backend trên m�
 
 Đổi cổng hoặc mật khẩu bằng biến môi trường (xem đầu `docker-compose.yml`). Backend đọc `backend/.env`, mẫu ở `backend/.env.example`. Giá trị trong `.env` phải khớp compose.
 
-Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). `CORS_ORIGINS` mặc định rỗng; `.env.example` đặt `http://localhost:3000` cho trường hợp frontend dev gọi thẳng backend.
-
 ## Các bước thực hiện
 
 1. Dựng hạ tầng:
@@ -49,22 +47,6 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
    uvicorn app.main:app --reload --port 8000
    ```
 
-4. Tạo tài khoản admin (một lần, trong `backend/`). Đăng ký công khai chỉ tạo học sinh, nên đây là cách duy nhất để có admin:
-
-   ```bash
-   python -m app.cli.create_admin --email admin@example.com --name "Quản trị"
-   ```
-
-   Lệnh hỏi mật khẩu hai lần (6–128 ký tự) và không nhận mật khẩu qua tham số. Khi chạy không tương tác (script, `docker exec` không có `-t`), đặt biến `ADMIN_PASSWORD` cho riêng lệnh đó, vd `ADMIN_PASSWORD='...' python -m app.cli.create_admin --email ...` (PowerShell: `$env:ADMIN_PASSWORD='...'`, chạy xong thì `Remove-Item Env:ADMIN_PASSWORD`). Trên Windows, `getpass` đọc thẳng từ console, nên chuyển hướng stdin sẽ làm lệnh treo; trường hợp đó dùng `ADMIN_PASSWORD`.
-
-   | Mã thoát | Ý nghĩa |
-   | --- | --- |
-   | 0 | Đã tạo admin |
-   | 1 | Email đã có tài khoản; không tạo trùng, không đổi vai trò hay mật khẩu |
-   | 2 | Email sai định dạng (tên miền `.local`, `.test` cũng bị từ chối), mật khẩu sai độ dài hoặc không đọc được mật khẩu |
-
-   Trên VPS, chạy trong container backend: `docker compose ... exec -e ADMIN_PASSWORD backend python -m app.cli.create_admin --email <email>`, sau khi đã `export ADMIN_PASSWORD` trong phiên SSH.
-
 Nếu có gói dữ liệu nền ở `data/private/seed` (biến `SEED_DIR`), hai container init nạp thêm câu hỏi, đề và ảnh đúng một lần; không có thì chỉ tạo bảng. Cách dựng gói: [seed-base-data.md](seed-base-data.md). Cổng PostgreSQL và MinIO chỉ mở trên `127.0.0.1`.
 
 Quay lui: `docker compose down` giữ dữ liệu; `docker compose down -v` xoá cả dữ liệu PostgreSQL và MinIO.
@@ -82,7 +64,6 @@ curl http://localhost:8000/api/v1/sample-files/<key trả về ở lệnh trên>
 - `health` trả `{"status":"ok","database":true,"storage":true}`.
 - Bản ghi tạo ra đọc lại được qua `GET /sample-items` (ORM và PostgreSQL).
 - Tệp tải lên tải lại đúng nội dung (MinIO).
-- Đăng ký, đăng nhập và phân quyền: chạy luồng curl ở [auth-api.md](../api/auth-api.md#luồng-kiểm-thử).
 
 Test tự động không cần Docker (dùng SQLite và MinIO giả): `cd backend && pytest`.
 
