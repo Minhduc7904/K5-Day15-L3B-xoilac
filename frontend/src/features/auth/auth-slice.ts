@@ -23,6 +23,15 @@ export const authSlice = createSlice({
       state.status = 'authenticated';
       state.reason = null;
     },
+    /**
+     * Kết quả kiểm phiên lúc khởi động. Chỉ áp dụng khi chưa biết phiên: nếu trong lúc chờ `/auth/me`
+     * người dùng đã đăng nhập (vd trang /login/google đổi ticket xong) thì kết quả cũ bị bỏ qua.
+     */
+    sessionChecked(state, action: PayloadAction<User | null>) {
+      if (state.status !== 'unknown') return;
+      state.user = action.payload;
+      state.status = action.payload ? 'authenticated' : 'guest';
+    },
     signedOut(state, action: PayloadAction<SignOutReason | undefined>) {
       state.user = null;
       state.status = 'guest';
@@ -31,4 +40,4 @@ export const authSlice = createSlice({
   },
 });
 
-export const { signedIn, signedOut } = authSlice.actions;
+export const { sessionChecked, signedIn, signedOut } = authSlice.actions;
