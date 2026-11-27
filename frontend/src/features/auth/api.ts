@@ -1,6 +1,6 @@
 /**
  * Lớp gọi API của feature auth. Mọi trang auth chỉ gọi qua `authApi`.
- * Dùng mock khi bật NEXT_PUBLIC_MOCK_MODE. Quên mật khẩu chỉ có trong mock.
+ * Dùng mock khi bật NEXT_PUBLIC_MOCK_MODE.
  */
 import { isAxiosError } from 'axios';
 import { apiClient } from '@/lib/api-client';
@@ -54,7 +54,7 @@ const httpAuthApi = {
     call<User | PendingOtp>(() => apiClient.post('/auth/google/exchange', { ticket, verifier }, mailTimeout)),
   logout: () => call<void>(() => apiClient.post('/auth/logout', undefined, withCookie)),
   me: () => call<User>(() => apiClient.get('/auth/me', withCookie)),
-  forgotPassword: (email: string) => call<void>(() => apiClient.post('/auth/password/forgot', { email })),
+  forgotPassword: (email: string) => call<void>(() => apiClient.post('/auth/password/forgot', { email }, mailTimeout)),
   verifyOtp: (email: string, otp: string) =>
     call<{ reset_token: string }>(() => apiClient.post('/auth/password/verify-otp', { email, otp })),
   resetPassword: (resetToken: string, password: string) =>

@@ -219,6 +219,27 @@ class AuthUseCase:
         user.last_login_at = self._now()
         return user, await self._open_session(user, user_agent)
 
+    async def password_reset_candidate(self, email: str) -> User | None:
+        """Tài khoản được tự đặt lại mật khẩu qua email: học sinh đang hoạt động. Admin dùng CLI."""
+        user = await self._users.get_by_email(normalize_email(email))
+        if user is None or user.role != ROLE_STUDENT or user.status != STATUS_ACTIVE:
+            return None
+        return user
+
+    async def set_password(self, user_id: int, password: str) -> bool:
+        """Đặt mật khẩu mới, thu hồi mọi phiên cũ rồi commit. Trả False nếu tài khoản không còn hợp lệ."""
+        if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
+            raise InvalidInput(f"Mật khẩu phải dài {PASSWORD_MIN}–{PASSWORD_MAX} ký tự")
+        user = await self._users.get(user_id)
+        if user is None or user.role != ROLE_STUDENT or user.status != STATUS_ACTIVE:
+            return False
+        user.password_hash = await self._passwords.hash(password)
+        if user.email_verified_at is None:
+            user.email_verified_at = self._now()
+        await self._sessions.revoke_all_for_user(user.user_id, self._now())
+        await self._users.commit()
+        return True
+
     async def get_current_user(self, token: str | None) -> CurrentUser:
         """Kiểm phiên: tồn tại, chưa thu hồi, chưa hết hạn, user còn active. Cập nhật last_used_at."""
         row, user = await self._load_session(token)

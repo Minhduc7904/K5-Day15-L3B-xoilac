@@ -85,6 +85,18 @@ Công khai. Đăng nhập bằng mật khẩu mở phiên khi thông tin đúng.
 
 Cần phiên. Trả `UserOut` của người đang đăng nhập (200). Phản hồi có `Cache-Control: no-store`. Frontend gọi endpoint này khi tải trang để biết đã đăng nhập chưa và vai trò là gì.
 
+### Quên mật khẩu
+
+Công khai. Ba bước, chỉ áp dụng cho tài khoản học sinh đang hoạt động. Admin quên mật khẩu thì người vận hành dùng CLI.
+
+| Request | Body | Thành công | Lỗi |
+| --- | --- | --- | --- |
+| `POST /auth/password/forgot` | `{"email"}` | 204, kể cả khi email chưa có tài khoản | 422 email sai định dạng, 429 `OTP_RESEND_LIMIT` (chờ 60 giây giữa hai lượt, tối đa 5 lượt mỗi giờ), 503 `EMAIL_UNAVAILABLE` |
+| `POST /auth/password/verify-otp` | `{"email", "otp"}` | 200 `{"reset_token"}`, hạn 10 phút, dùng một lần | 400 `OTP_INVALID`, 400 `OTP_EXPIRED` (hết hạn, chưa yêu cầu mã hoặc mã đã dùng), 429 `TOO_MANY_ATTEMPTS` sau 5 lần sai |
+| `POST /auth/password/reset` | `{"reset_token", "password"}` | 204. Thu hồi mọi phiên của tài khoản, không đặt cookie | 400 `RESET_TOKEN_INVALID`, 422 mật khẩu ngoài 8–128 ký tự |
+
+Gọi lại `forgot` sau 60 giây sẽ gửi mã mới và mã cũ hết hiệu lực. Email chưa có tài khoản nhận cùng phản hồi như email có tài khoản để không lộ email nào đã đăng ký.
+
 ### GET /admin/ping
 
 Chỉ admin. Đây là endpoint mẫu chứng minh phân quyền.
@@ -110,7 +122,8 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
 | 401 | `SESSION_REVOKED` | Phiên đã đăng xuất | Chuyển tới trang đăng nhập |
 | 403 | `FORBIDDEN_ROLE` | Đăng nhập rồi nhưng sai vai trò (vd student gọi API admin) | Báo không có quyền, không chuyển tới trang đăng nhập |
 | 400 | `OTP_INVALID`, `OTP_EXPIRED`, `INVALID_CHALLENGE` | Sai mã, hết hạn hoặc yêu cầu đã kết thúc | Thử lại hoặc gửi mã mới theo thông báo |
-| 429 | `TOO_MANY_ATTEMPTS`, `OTP_RESEND_LIMIT` | Đã thử sai 5 lần hoặc vượt giới hạn gửi | Chờ và gửi mã mới |
+| 429 | `TOO_MANY_ATTEMPTS`, `OTP_RESEND_LIMIT` | Đã thử sai 5 lần hoặc vượt giới hạn gửi (đăng ký, Google, quên mật khẩu) | Chờ và gửi mã mới |
+| 400 | `RESET_TOKEN_INVALID` | `reset_token` sai, hết hạn hoặc đã dùng | Bắt đầu lại từ bước nhập email |
 | 400 | `GOOGLE_INVALID` | Ticket hết hạn, đã dùng hoặc verifier không khớp | Bắt đầu lại đăng nhập Google |
 | 409 | `GOOGLE_ACCOUNT_CONFLICT` | Email thuộc admin hoặc đã nối Google khác | Dùng phương thức đăng nhập của tài khoản hiện có |
 | 503 | `EMAIL_UNAVAILABLE`, `GOOGLE_UNAVAILABLE` | Cấu hình chưa sẵn sàng hoặc gửi thư thất bại | Thử lại sau |

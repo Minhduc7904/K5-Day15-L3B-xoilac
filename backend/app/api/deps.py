@@ -10,6 +10,7 @@ from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session, get_sessionmaker
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
+from app.repositories.exam_template_repository import ExamTemplateRepository
 from app.repositories.pdf_imports import PdfImportRepository
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
@@ -19,6 +20,7 @@ from app.service.google_identity import GoogleIdentityService
 from app.service.password_service import PasswordService
 from app.service.pdf_import_models import PdfImportModels
 from app.service.storage_service import StorageService
+from app.usecase.exam_templates import ExamTemplateUseCase
 from app.service.token_service import TokenService
 from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
@@ -57,8 +59,13 @@ def get_sample_file_usecase(storage: StorageDep) -> SampleFileUseCase:
     return SampleFileUseCase(storage)
 
 
+def get_exam_template_usecase(session: SessionDep) -> ExamTemplateUseCase:
+    return ExamTemplateUseCase(ExamTemplateRepository(session))
+
+
 SampleItemUseCaseDep = Annotated[SampleItemUseCase, Depends(get_sample_item_usecase)]
 SampleFileUseCaseDep = Annotated[SampleFileUseCase, Depends(get_sample_file_usecase)]
+ExamTemplateUseCaseDep = Annotated[ExamTemplateUseCase, Depends(get_exam_template_usecase)]
 
 
 # ---- Xác thực (issue #8) ----------------------------------------------------

@@ -25,9 +25,16 @@ def _logo() -> bytes:
     return (TEMPLATES / "examind-mark.png").read_bytes()
 
 
-def verification_email(code: str, minutes: int, *, google: bool) -> EmailContent:
-    subject = "Xác minh email đăng nhập Google" if google else "Xác minh email đăng ký"
-    action = "xác minh địa chỉ email của bạn" if google else "hoàn tất đăng ký tài khoản Examind"
+_PURPOSES = {
+    "registration": ("Xác minh email đăng ký", "hoàn tất đăng ký tài khoản Examind"),
+    "google_email": ("Xác minh email đăng nhập Google", "xác minh địa chỉ email của bạn"),
+    "password_reset": ("Đặt lại mật khẩu", "đặt lại mật khẩu tài khoản Examind"),
+}
+
+
+def verification_email(code: str, minutes: int, *, google: bool = False, purpose: str | None = None) -> EmailContent:
+    """`purpose` là registration, google_email hoặc password_reset. `google` giữ cho lời gọi cũ."""
+    subject, action = _PURPOSES[purpose or ("google_email" if google else "registration")]
     content = _template("otp.html").substitute(
         subject=escape(subject), action=escape(action), code=escape(code), minutes=minutes
     )

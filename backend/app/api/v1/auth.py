@@ -5,7 +5,19 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from app.api.cookies import clear_session_cookie, set_session_cookie
 from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep, StudentAuthDep, get_session_token
 from app.api.errors import to_api_error
-from app.schemas.auth import ErrorOut, LoginIn, OtpChallengeOut, OtpIn, OtpResendIn, RegisterIn, UserOut
+from app.schemas.auth import (
+    ErrorOut,
+    LoginIn,
+    OtpChallengeOut,
+    OtpIn,
+    OtpResendIn,
+    PasswordForgotIn,
+    PasswordResetIn,
+    PasswordVerifyIn,
+    RegisterIn,
+    ResetTokenOut,
+    UserOut,
+)
 from app.usecase.auth import AuthError
 from app.usecase.student_auth import REGISTRATION
 
@@ -98,3 +110,51 @@ async def logout(
 async def me(current: CurrentUserDep, response: Response):
     _no_store(response)
     return current.user
+
+
+@router.post(
+    "/password/forgot",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        429: {"model": ErrorOut, "description": "OTP_RESEND_LIMIT"},
+        503: {"model": ErrorOut, "description": "EMAIL_UNAVAILABLE"},
+    },
+)
+async def forgot_password(body: PasswordForgotIn, student: StudentAuthDep) -> Response:
+    """Gửi mã OTP đặt lại mật khẩu. Luôn 204 kể cả khi email chưa có tài khoản."""
+    try:
+        await student.start_password_reset(body.email)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})
+
+
+@router.post(
+    "/password/verify-otp",
+    response_model=ResetTokenOut,
+    responses={
+        400: {"model": ErrorOut, "description": "OTP_INVALID / OTP_EXPIRED"},
+        429: {"model": ErrorOut, "description": "TOO_MANY_ATTEMPTS"},
+    },
+)
+async def verify_password_otp(body: PasswordVerifyIn, student: StudentAuthDep, response: Response):
+    try:
+        token = await student.verify_password_reset(body.email, body.otp)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    _no_store(response)
+    return ResetTokenOut(reset_token=token)
+
+
+@router.post(
+    "/password/reset",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={400: {"model": ErrorOut, "description": "RESET_TOKEN_INVALID"}},
+)
+async def reset_password(body: PasswordResetIn, student: StudentAuthDep) -> Response:
+    """Đặt mật khẩu mới và thu hồi mọi phiên cũ. Không mở phiên mới: người dùng đăng nhập lại."""
+    try:
+        await student.reset_password(body.reset_token, body.password)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})

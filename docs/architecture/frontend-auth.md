@@ -1,6 +1,6 @@
 # Trang xác thực frontend
 
-Dành cho người phát triển frontend cần sửa hoặc nối API cho các trang đăng nhập, đăng ký, quên mật khẩu, nhập mã OTP và đặt mật khẩu mới. Đăng nhập và đăng ký dùng được API thật. Quên mật khẩu hiện dùng mock.
+Dành cho người phát triển frontend cần sửa hoặc nối API cho các trang đăng nhập, đăng ký, quên mật khẩu, nhập mã OTP và đặt mật khẩu mới, và cho lớp chặn route theo vai trò. Mọi luồng đều dùng được API thật. Mock chỉ bật khi đặt `NEXT_PUBLIC_MOCK_MODE=true` hoặc chạy dev mà không đặt biến này.
 
 ## Bối cảnh và ràng buộc
 
@@ -12,7 +12,7 @@ Backend auth có từ PR #26. Issue #25 bổ sung xác minh đăng ký và Googl
 
 | Vị trí trong `frontend/src/` | Trách nhiệm |
 | --- | --- |
-| `app/(auth)/layout.tsx` | Khung hai cột. Cột trái là `AuthAside` (linh vật và lời giới thiệu theo route, ẩn trên màn hình nhỏ), cột phải là logo, nút "Trang chủ" và form |
+| `app/(auth)/layout.tsx` | Khung hai cột. Cột trái là `AuthAside` (linh vật và lời giới thiệu theo route, ẩn trên màn hình nhỏ), cột phải là logo và form. Không có nút về trang chủ vì khách không có trang chủ |
 | `app/(auth)/template.tsx` | Hiệu ứng trượt vào mỗi khi đổi trang auth |
 | `app/(auth)/login/page.tsx` | `/login`. Đọc `?reason=session-expired \| password-reset \| logged-out`, giá trị khác bị bỏ qua |
 | `app/(auth)/register`, `forgot-password`, `verify-otp`, `reset-password` | Mỗi trang chỉ render form tương ứng |
@@ -21,14 +21,28 @@ Backend auth có từ PR #26. Issue #25 bổ sung xác minh đăng ký và Googl
 | `features/auth/types.ts` | `User`, `AuthErrorCode`, lớp `AuthError` và `toAuthError` |
 | `features/auth/validation.ts` | Kiểm tra email, mật khẩu mới (8–128 ký tự), xác nhận mật khẩu, tên hiển thị, độ mạnh mật khẩu, che email |
 | `features/auth/use-auth-form.ts` | Hook form: giá trị, lỗi, trạng thái gửi, gộp lỗi từ server, focus trường sai đầu tiên |
-| `features/auth/auth-slice.ts` | Reducer `auth`: `{ user, status: 'unknown' \| 'authenticated' \| 'guest' }`. Chỉ lưu `UserOut`, không lưu token |
+| `features/auth/route-guard.tsx` | `AuthGuard` bọc mọi trang trong `AppProvider`, chặn route theo phiên và vai trò (xem mục bên dưới) |
+| `lib/api-client.ts` | `onSessionLost`: API nào trả `SESSION_*` hoặc `ACCOUNT_DISABLED` (trừ `/auth/me`, `/auth/login`, `/auth/logout`) thì provider dispatch `signedOut('session-expired')` |
+| `features/auth/auth-slice.ts` | Reducer `auth`: `{ user, status: 'unknown' \| 'authenticated' \| 'guest' }`. `reason` (`session-expired` hoặc `logged-out`) cho trang đăng nhập hiện thông báo. Chỉ lưu `UserOut`, không lưu token |
 | `features/auth/reset-flow.ts` | Lưu email và `reset_token` của luồng quên mật khẩu trong `sessionStorage` key `examind:reset-flow`, để email không nằm trên URL |
 | `features/auth/forms/` | Năm form: đăng nhập, đăng ký, quên mật khẩu, nhập OTP, đặt mật khẩu mới |
-| `features/auth/components/` | `AuthAside`, `AuthHeader`, `PasswordStrength`, `SignedInNotice` (báo khi đã đăng nhập mà vẫn mở trang auth) |
+| `features/auth/components/` | `AuthAside`, `AuthHeader`, `PasswordStrength`, `UserMenu` (tên người dùng và nút đăng xuất, dùng ở navbar học sinh và header admin) |
 | `components/ui/otp-input.tsx` | Ô OTP 6 số: tự chuyển ô, dán cả mã, Backspace, phím mũi tên, `autocomplete="one-time-code"`, rung khi sai |
 | `lib/use-hydrated.ts` | Trả `false` khi hydrate, để UI phụ thuộc user trong store khớp HTML từ server |
 
-Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `signedOut`. Navbar landing (`features/landing/auth-actions.tsx`) hiện skeleton cho tới khi biết trạng thái.
+Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `signedOut`. Trong lúc chưa biết phiên, `AuthGuard` hiện spinner thay cho trang cần đăng nhập.
+
+### Chặn route theo vai trò
+
+Web chỉ có hai loại người dùng: học sinh và admin. Không có trang cho khách.
+
+| Người dùng | Được vào | Mở trang khác thì chuyển tới |
+| --- | --- | --- |
+| Chưa đăng nhập | `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`, `/login/google` | `/login` (kèm `?reason=` nếu vừa đăng xuất hoặc hết phiên) |
+| Học sinh | `/` và các trang ngoài `/admin`, cùng `/design-system` | `/` |
+| Admin | `/admin/*`, `/design-system` | `/admin` |
+
+Đã đăng nhập mà mở trang auth thì về trang chủ theo vai trò. Đăng xuất dispatch `signedOut('logged-out')`, guard đưa về `/login?reason=logged-out`. Guard chỉ là lớp giao diện, quyền thật do backend kiểm ở từng API. Trang `/` hiện vẫn là nội dung landing (đã bỏ các nút đăng ký) cho tới khi có khu học tập của #4.
 
 ## Luồng dữ liệu và tích hợp
 
@@ -40,7 +54,7 @@ Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `sig
 4. Sau khi có phiên, dispatch `signedIn`. Admin chuyển tới `/admin`, học sinh chuyển tới `/`.
 5. Lỗi được đổi thành `AuthError` và hiện bằng `Alert`: sai thông tin (`INVALID_CREDENTIALS`), tài khoản bị khoá (`ACCOUNT_DISABLED`), email đã dùng (`EMAIL_TAKEN`, kèm lỗi ở ô email), lỗi mạng (`NETWORK`, có nút "Thử lại").
 
-### Quên mật khẩu ở chế độ mock
+### Quên mật khẩu
 
 ```
 /forgot-password ──email──▶ /verify-otp ──mã 6 số──▶ /reset-password ──mật khẩu mới──▶ /login?reason=password-reset
@@ -50,15 +64,9 @@ Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `sig
 - Trang OTP hiện email đã che, cho gửi lại mã sau 60 giây, báo số lần thử còn lại, mã hết hạn và bị khoá do nhập sai nhiều lần.
 - Trang đặt mật khẩu mới cần `reset_token` trong `examind:reset-flow`. Không có thì báo phiên hết hiệu lực và cho bắt đầu lại.
 
-### Hợp đồng API đề xuất cho quên mật khẩu
+### Hợp đồng API quên mật khẩu
 
-**Chưa có ở backend.** Frontend gọi đúng các đường dẫn này ở `api.ts`. Backend có thể đổi, khi đó sửa `api.ts` và mục này cùng lúc.
-
-| Request | Body | Thành công | Lỗi |
-| --- | --- | --- | --- |
-| `POST /auth/password/forgot` | `{ "email" }` | 204, kể cả khi email không tồn tại | 422 email sai định dạng |
-| `POST /auth/password/verify-otp` | `{ "email", "otp" }` | 200 `{ "reset_token" }` | 400 `OTP_INVALID` kèm số lần còn lại, 400 `OTP_EXPIRED`, 429 `TOO_MANY_ATTEMPTS` |
-| `POST /auth/password/reset` | `{ "reset_token", "password" }` | 204 | 400 `RESET_TOKEN_INVALID`, 422 mật khẩu không hợp lệ |
+Backend đã có, xem [API xác thực](../api/auth-api.md#quên-mật-khẩu). Backend không trả số lần thử còn lại, nên ở API thật trang OTP chỉ báo "mã chưa đúng". Gửi lại quá sớm (429 `OTP_RESEND_LIMIT`) hoặc lỗi gửi thư (503) hiện thông báo từ máy chủ thay cho lỗi mạng.
 
 ### Mock
 
