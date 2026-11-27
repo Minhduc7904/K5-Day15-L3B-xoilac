@@ -38,4 +38,6 @@ export const typeLabels = {
   SINGLE_CHOICE: 'Trắc nghiệm',
   TRUE_FALSE: 'Đúng / Sai',
   SHORT_ANSWER: 'Trả lời ngắn',
+  MULTIPLE_CHOICE: 'Nhiều đáp án',
+  ESSAY: 'Tự luận',
 } as const;

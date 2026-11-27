@@ -56,6 +56,8 @@ Cấu hình local nằm trong [`backend/.env.example`](../../backend/.env.exampl
 
 Đăng ký đúng callback trong **Authorized redirect URIs**. Client đăng nhập dùng `openid email profile`. Client Gmail chỉ gửi thư. Để chạy trọn luồng Google local, cấu hình callback localhost và origin frontend local trong cả app lẫn Google Auth Platform.
 
+Để bật chat tạo đề trên môi trường thử, đặt `EXAM_CHAT_LIVE=true`, `OPENAI_API_KEY` và tùy chọn `EXAM_CHAT_MODEL` trong `prod.env`. Thêm `MISTRAL_API_KEY` khi sẵn sàng bật đọc ảnh và dùng `OCR_MODEL` nếu cần chỉ định model OCR. Chat vẫn lưu ảnh khi chưa có khóa OCR. Kiểm tra migration `0014_exam_chat_images`, MinIO, SSE, số dư và danh sách đề trước khi bật `NEXT_PUBLIC_EXAM_CHAT_LIVE=true` trên Vercel. Khi cần tạm dừng rollout, tắt cờ trên frontend trước và giữ migration để bảo toàn các khoản đã ghi.
+
 Sau khi cập nhật `prod.env`, chạy lệnh sau từ `/opt/examind/app` để kiểm cú pháp mà không in cấu hình. Lần deploy backend tiếp theo sẽ nạp biến vào container.
 
 ```bash

@@ -9,6 +9,10 @@ CREDIT_LIMIT = 500
 DAILY_CREDITS = 100
 
 
+class InsufficientCredits(Exception):
+    pass
+
+
 class CreditRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -22,6 +26,19 @@ class CreditRepository:
     def _record(self, account: CreditAccount, delta: int, reason: str, day: date) -> None:
         self._session.add(CreditLedger(
             user_id=account.user_id, delta=delta, balance_after=account.balance, reason=reason, effective_on=day
+        ))
+
+    async def charge_exam(self, user_id: int, session_id: int, day: date) -> None:
+        account = await self._session.scalar(
+            select(CreditAccount).where(CreditAccount.user_id == user_id)
+            .with_for_update().execution_options(populate_existing=True)
+        )
+        if account is None or account.balance < 100:
+            raise InsufficientCredits()
+        account.balance -= 100
+        self._session.add(CreditLedger(
+            user_id=user_id, exam_session_id=session_id, delta=-100,
+            balance_after=account.balance, reason="exam_creation", effective_on=day,
         ))
 
     async def balance(self, user_id: int) -> int:

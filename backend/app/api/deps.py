@@ -36,6 +36,9 @@ from app.service.token_service import TokenService
 from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.exam_chat import ExamChatUseCase, Requester
+from app.usecase.live_exam_chat import LiveExamChat
+from app.service.exam_chat_model import ExamChatModel
+from app.service.exam_chat_ocr import ExamChatOcr
 from app.usecase.exam_templates import ExamTemplateUseCase
 from app.usecase.pdf_imports import PdfImportUseCase
 from app.usecase.sample_files import SampleFileUseCase
@@ -265,8 +268,14 @@ def get_exam_chat_usecase(
     bank: Annotated[QuestionBankRepository, Depends(get_question_bank)],
     history: Annotated[StudentHistorySource, Depends(get_student_history)],
     templates: Annotated[ExamTemplateSource, Depends(get_exam_template_source)],
+    ocr_models: Annotated[PdfImportModels, Depends(get_pdf_import_models)],
+    storage: StorageDep,
 ) -> ExamChatUseCase:
-    return ExamChatUseCase(ExamChatRepository(session), bank, history, templates)
+    args = (ExamChatRepository(session), bank, history, templates)
+    settings = get_settings()
+    if settings.exam_chat_live:
+        return LiveExamChat(session, ExamChatModel(settings), ExamChatOcr(ocr_models), storage, *args)
+    return ExamChatUseCase(*args)
 
 
 ExamChatUseCaseDep = Annotated[ExamChatUseCase, Depends(get_exam_chat_usecase)]

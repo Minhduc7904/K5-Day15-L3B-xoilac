@@ -206,8 +206,8 @@ function ExamCard({ exam, onStructure }: { exam: ExamSummary; onStructure: () =>
           >
             <ListTree className="size-4" aria-hidden="true" /> Cấu trúc
           </button>
-          <Button size="sm" variant={isNew ? 'primary' : 'secondary'} href={`/exams/${exam.id}/take`} leftIcon={<Play aria-hidden="true" />}>
-            {isNew ? 'Làm bài' : 'Làm lại'}
+          <Button size="sm" variant={isNew ? 'primary' : 'secondary'} href={exam.remote ? `/exams/${exam.id}` : `/exams/${exam.id}/take`} leftIcon={<Play aria-hidden="true" />}>
+            {exam.remote ? 'Xem đề' : isNew ? 'Làm bài' : 'Làm lại'}
           </Button>
         </div>
       </div>

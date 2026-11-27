@@ -14,6 +14,11 @@ services:
     image: examind-backend:latest
     restart: unless-stopped
     environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      OCR_MODEL: ${OCR_MODEL:-mistral-ocr-4-1}
+      EXAM_CHAT_LIVE: ${EXAM_CHAT_LIVE:-false}
+      EXAM_CHAT_MODEL: ${EXAM_CHAT_MODEL:-gpt-5.4-mini}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-examind}:${POSTGRES_PASSWORD:?thiếu POSTGRES_PASSWORD trong prod.env}@postgres:5432/${POSTGRES_DB:-examind}
       S3_ENDPOINT_URL: http://minio:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?thiếu S3_ACCESS_KEY trong prod.env}

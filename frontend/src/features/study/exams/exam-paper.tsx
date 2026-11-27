@@ -31,6 +31,8 @@ const PART_TITLE: Record<QuestionType, string> = {
   SINGLE_CHOICE: 'Câu trắc nghiệm nhiều phương án lựa chọn.',
   TRUE_FALSE: 'Câu trắc nghiệm đúng sai.',
   SHORT_ANSWER: 'Câu trắc nghiệm trả lời ngắn.',
+  MULTIPLE_CHOICE: 'Câu trắc nghiệm có thể có nhiều đáp án.',
+  ESSAY: 'Câu tự luận.'
 };
 const partHint = (type: QuestionType, n: number) =>
   type === 'SINGLE_CHOICE'
@@ -278,7 +280,7 @@ function BlockView({ block, exam, total, pageCount }: { block: Block; exam: Exam
       </div>
     );
   }
-  return <PaperQuestion n={block.n} q={block.q} />;
+  return <PaperQuestion n={block.q.order ?? block.n} q={block.q} />;
 }
 
 function PaperHead({ exam, total, pageCount }: { exam: Exam; total: number; pageCount?: number }) {
@@ -327,14 +329,14 @@ function PaperQuestion({ n, q }: { n: number; q: PublicQuestion }) {
     <div className="grid gap-1.5 text-[15px] leading-normal">
       <div className="paper-q flex gap-1.5">
         <b className="shrink-0">Câu {n}.</b>
-        <QuestionContent source={q.content} printable className="min-w-0 flex-1" />
+        <QuestionContent draftId={q.remoteDraftId} source={q.content} printable className="min-w-0 flex-1" />
       </div>
       {q.statements.length > 0 && (
         <div className="grid gap-x-4 gap-y-1 pl-[3.25rem]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {q.statements.map((s) => (
             <p key={s.label} className="flex gap-1.5">
-              <b className="shrink-0">{q.type === 'SINGLE_CHOICE' ? `${s.label}.` : `${s.label})`}</b>
-              <QuestionContent source={s.content} inline printable />
+              <b className="shrink-0">{q.type !== 'TRUE_FALSE' ? `${s.label}.` : `${s.label})`}</b>
+              <QuestionContent draftId={q.remoteDraftId} source={s.content} inline printable />
             </p>
           ))}
         </div>

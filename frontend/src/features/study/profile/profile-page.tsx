@@ -397,6 +397,7 @@ const creditDate = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZ
 const creditReason: Record<string, string> = {
   initial_grant: 'Credit khởi tạo',
   daily_grant: 'Credit hằng ngày',
+  exam_creation: 'Tạo đề ôn',
 };
 
 function CreditPanel() {

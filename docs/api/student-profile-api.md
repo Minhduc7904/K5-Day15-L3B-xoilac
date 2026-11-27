@@ -30,7 +30,7 @@ Các endpoint dưới `/api/v1/student/me` dùng phiên đăng nhập hiện t�
 
 `GET /api/v1/student/me/credits?limit=20` trả `balance`, `limit` (trần số dư 500), `daily_grant` (mức cộng tối đa 100), `history` và `next_before_id`. Mỗi giao dịch có `id`, `delta`, `balance_after`, `reason`, `effective_on` (ngày Việt Nam) và `created_at` (thời điểm ghi).
 
-Lịch sử mặc định 20 giao dịch mỗi trang, tối đa 50. Nếu `next_before_id` khác `null`, truyền giá trị này ở tham số `before_id` cho trang kế tiếp. Học sinh mới nhận giao dịch `initial_grant` bằng 500 credit. Job hằng ngày ghi `daily_grant` bằng số credit thực cộng.
+Lịch sử mặc định 20 giao dịch mỗi trang, tối đa 50. Nếu `next_before_id` khác `null`, truyền giá trị này ở tham số `before_id` cho trang kế tiếp. Học sinh mới nhận giao dịch `initial_grant` bằng 500 credit. Job hằng ngày ghi `daily_grant` bằng số credit thực cộng. Khi bật chat tạo đề thật, `exam_creation` ghi khoản trừ 100 credit cho lần lưu đề đầu tiên của một phiên. Các lần chỉnh trong cùng phiên không tạo giao dịch mới.
 
 ## Lỗi và luồng kiểm thử
 
