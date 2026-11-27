@@ -43,6 +43,8 @@ Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa
 
 ## Luồng kiểm thử
 
+Chạy PostgreSQL và MinIO local theo runbook. Cấu hình `MISTRAL_API_KEY` và `OPENAI_API_KEY` trong `backend/.env`. Giữ `OCR_PROVIDER=mistral` và chọn `OCR_MODEL` nếu cần thử model khác. Dùng admin local, đăng nhập qua `POST /auth/login` và giữ cookie phiên khi gọi các endpoint bên dưới. Có thể dùng trang Swagger `/docs` trên cùng origin. Chỉ tải PDF và dữ liệu tham chiếu được phép gửi cho nhà cung cấp.
+
 1. Tải PDF, dùng mã phiên để theo dõi đến `ready_for_review`.
 2. Mở bản nháp Phần I câu 6 của mẫu, kiểm thứ tự A–D và dùng URL xem từng hình. Đối chiếu đáp án D với trang 7.
 3. Chốt chương và độ khó, duyệt câu, rồi dùng mã câu trả về để kiểm bản đọc chung chỉ chứa nội dung, lựa chọn có thứ tự và tham chiếu ảnh.
@@ -59,5 +61,7 @@ Issue #4 có thể dùng `PdfImportRepository.read_published_question(question_i
 ## Tài liệu liên quan
 
 - [Pipeline nhập đề PDF](pipeline.md)
+- [Chạy bộ khung local và tạo admin](../../operations/run-local-stack.md)
+- [API Auth](../../api/auth-api.md)
 - [API mẫu](../../api/sample-api.md)
 - [Issue #4](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/4)

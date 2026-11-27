@@ -39,9 +39,10 @@ MVP dùng FastAPI BackgroundTasks. Nếu tiến trình dừng trong lúc xử l�
 - [x] Mốc 2. Đã kiểm từ tải lên đến câu xuất bản và URL ảnh qua API. Test dùng phản hồi nhà cung cấp giả lập và kho tệp trong bộ nhớ.
 - [x] Mốc 3. Đã kiểm năm loại câu, số câu lặp, đáp án xung đột, mệnh đề chưa rõ, hình thiếu và câu bị từ chối. Bộ test backend có 49 ca đạt tại mốc này.
 - [x] Mốc 4. Đã kiểm gợi ý nhãn, bỏ trống khi điểm thấp, dùng lại embedding đã lưu và bỏ câu bị ngừng xuất bản. Test dùng vector giả lập.
-- [ ] Mốc 5. Nghiệm thu với nhà cung cấp và hạ tầng thật.
+- [x] Mốc 5. Đã chạy PostgreSQL và MinIO thật trong Compose local. Hai tệp fixture có chữ và chỉ có ảnh đi qua upload, xem hình, duyệt và đọc kho dùng chung. Cũng đã kiểm tra lưu embedding và truy vấn tham chiếu trên PostgreSQL. Mistral và OpenAI dùng phản hồi fixture trong các lượt này.
+- [ ] Mốc 5. Chờ khóa để chạy hai tệp đại diện qua API Mistral và OpenAI thật, đối chiếu thứ tự hình và đáp án rồi kiểm ngưỡng phân loại trên mẫu đã cho phép.
 
-Mẫu tại máy nhóm `data/example_exam.pdf` có 15 trang. Phần I câu 6 có bốn đồ thị trên trang 2 và đáp án D trên trang 7. Phần I câu 5 qua ranh giới trang 1–2. PDF có lớp văn bản. Ca scan cần thêm bản ảnh hoặc fixture ảnh tương đương.
+Mẫu tại máy nhóm `data/example_exam.pdf` có 15 trang. Phần I câu 6 có bốn đồ thị trên trang 2 và đáp án D trên trang 7. Phần I câu 5 qua ranh giới trang 1–2. Bản raster hóa local `data/private/pdf-import-example-scanned.pdf` có cùng 15 trang và hoàn toàn gồm ảnh. Cả hai là tệp local.
 
 Chạy từ thư mục gốc trên Windows bằng `.\.venv\Scripts\python.exe -m pytest -q backend`. Test sinh PDF có lớp chữ và PDF chỉ có ảnh. Các test tách câu dùng phản hồi OCR và OpenAI cố định để tái hiện các trường hợp biên. Để nghiệm thu thật, cấu hình `MISTRAL_API_KEY` và `OPENAI_API_KEY` trong `backend/.env`, chạy backend cùng PostgreSQL và MinIO local, rồi thực hiện luồng trong tài liệu API.
 

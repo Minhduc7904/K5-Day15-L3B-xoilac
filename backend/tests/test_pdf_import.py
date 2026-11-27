@@ -263,3 +263,46 @@ async def test_ocr_adapter_output_contract(monkeypatch):
         OcrPage(0, "Trang 1", [OcrImage("figure.png", base64.b64decode(FIGURE))]),
         OcrPage(1, "Trang 2", [OcrImage("bad.png", None)]),
     ]
+
+
+async def test_extraction_retries_truncated_output_with_page_ownership(monkeypatch):
+    from app.core.config import Settings
+
+    pages = [{"page": page, "normalized": f"Phần I\nTrang {page}"} for page in range(1, 7)]
+    requests = []
+
+    async def post(url, key, body, timeout):
+        instructions = body["messages"][0]["content"]
+        requests.append(instructions)
+        if len(requests) == 1:
+            return {"choices": [{"finish_reason": "length", "message": {"content": ""}}]}
+        questions = [{
+            "section": "I", "number": str(page), "pages": [page], "type": "SHORT_ANSWER",
+            "content": f"Câu {page}", "statements": [], "image_dependent": False,
+        } for page in ([1, 4, 5] if len(requests) == 2 else [4, 5, 6])]
+        return {"choices": [{
+            "finish_reason": "stop",
+            "message": {"content": json.dumps({"questions": questions, "answers": []})},
+        }]}
+
+    models = PdfImportModels(Settings(openai_api_key="fixture"))
+    monkeypatch.setattr(models, "_post", post)
+    _, result = await models.extract(pages)
+    assert [question.number for question in result.questions] == ["1", "4", "5", "6"]
+    assert "pages [1, 2, 3, 4]" in requests[1]
+    assert "pages [5, 6]" in requests[2]
+
+
+async def test_ocr_failure_leaves_a_failed_session_without_drafts(pdf_api, monkeypatch):
+    client, _, _ = pdf_api
+
+    async def fail_recognition(self, pdf):
+        raise ValueError("fixture internal provider payload")
+
+    monkeypatch.setattr(FixtureModels, "recognize", fail_recognition)
+    assert (await login(client, email="admin@example.com")).status_code == 200
+    response = await client.post(ROOT, files={"file": ("scan.pdf", fixture_pdf(scanned=True))})
+    assert response.status_code == 202
+    status = (await client.get(response.json()["statusUrl"])).json()
+    assert status["status"] == "failed" and status["stage"] == "ocr"
+    assert status["draftCount"] == 0 and "fixture internal" not in status["error"]
