@@ -9,10 +9,20 @@ from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
+from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.exam_template_repository import ExamTemplateRepository
+from app.repositories.question_bank_repository import QuestionBankRepository
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
+from app.service.exam_chat_sources import (
+    ExamTemplateSource,
+    NoHistory,
+    PlainReplyWriter,
+    ReplyWriter,
+    StudentHistorySource,
+    TemplateLookupSource,
+)
 from app.service.email_service import GmailEmailService
 from app.service.google_identity import GoogleIdentityService
 from app.service.password_service import PasswordService
@@ -21,6 +31,7 @@ from app.usecase.exam_templates import ExamTemplateUseCase
 from app.service.token_service import TokenService
 from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
+from app.usecase.exam_chat import ExamChatUseCase, Requester
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 from app.usecase.student_auth import StudentAuthUseCase
@@ -167,3 +178,47 @@ def require_role(*roles: str):
 
 AdminDep = Annotated[CurrentUser, Depends(require_role("admin"))]
 StudentDep = Annotated[CurrentUser, Depends(require_role("student"))]
+
+
+# ---------- issue #4: pipeline học sinh tạo đề ôn ----------
+
+
+def get_requester(current: StudentDep) -> Requester:
+    """Học sinh đang đăng nhập. Mọi route /exam-chat cần vai trò học sinh và chỉ thấy phiên của chính mình (kể cả SSE).
+
+    student_ref là mã dùng tra lịch sử làm bài; khi có bảng kết quả làm bài thật, đổi cho khớp khoá của bảng đó.
+    """
+    return Requester(user_id=current.user_id, student_ref=f"U{current.user_id}")
+
+
+def get_student_history() -> StudentHistorySource:
+    """Chưa có bảng kết quả làm bài: agent nói chưa có lịch sử và hỏi chương, không đoán."""
+    return NoHistory()
+
+
+def get_exam_template_source(templates: ExamTemplateUseCaseDep) -> ExamTemplateSource:
+    """Nhánh ôn theo mẫu kỳ thi đọc mẫu ĐÃ DUYỆT qua hợp đồng tra cứu của #5."""
+    return TemplateLookupSource(templates.lookup)
+
+
+def get_reply_writer() -> ReplyWriter:
+    """Chưa chốt model và key: trả văn bản dựng bằng code, chia theo dòng để phát qua SSE."""
+    return PlainReplyWriter()
+
+
+def get_question_bank(session: SessionDep) -> QuestionBankRepository:
+    return QuestionBankRepository(session)
+
+
+def get_exam_chat_usecase(
+    session: SessionDep,
+    bank: Annotated[QuestionBankRepository, Depends(get_question_bank)],
+    history: Annotated[StudentHistorySource, Depends(get_student_history)],
+    templates: Annotated[ExamTemplateSource, Depends(get_exam_template_source)],
+) -> ExamChatUseCase:
+    return ExamChatUseCase(ExamChatRepository(session), bank, history, templates)
+
+
+ExamChatUseCaseDep = Annotated[ExamChatUseCase, Depends(get_exam_chat_usecase)]
+ReplyWriterDep = Annotated[ReplyWriter, Depends(get_reply_writer)]
+RequesterDep = Annotated[Requester | None, Depends(get_requester)]
