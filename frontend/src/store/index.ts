@@ -1,15 +1,17 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
-
-const initialState = {};
+import { authSlice } from '@/features/auth/auth-slice';
 
 export function makeStore() {
   return configureStore({
-    reducer: (state = initialState) => state,
+    reducer: {
+      auth: authSlice.reducer,
+    },
   });
 }
 
 export type AppStore = ReturnType<typeof makeStore>;
 export type RootState = ReturnType<AppStore['getState']>;
-export const useAppDispatch = useDispatch.withTypes<AppStore['dispatch']>();
+export type AppDispatch = AppStore['dispatch'];
+export const useAppDispatch = useDispatch.withTypes<AppDispatch>();
 export const useAppSelector = useSelector.withTypes<RootState>();

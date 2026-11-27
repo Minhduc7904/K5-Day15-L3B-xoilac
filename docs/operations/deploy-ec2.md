@@ -33,13 +33,14 @@ Ngày 27/11/2026 instance được gắn **Elastic IP** `54.79.136.46` (thay cho
 
    Trên macOS hoặc Linux, dùng đường dẫn `./backend-key.pem`.
 
-2. **Tra địa chỉ API cho frontend.** Backend được phục vụ qua nginx ở cổng 80 (cổng 8000 chỉ nghe nội bộ trên VPS, không mở ra ngoài). Dùng tên miền làm host của `baseURL`.
+2. **Tra địa chỉ API cho frontend.** Backend được phục vụ qua nginx ở cổng 80 và **443** (cổng 8000 chỉ nghe nội bộ trên VPS, không mở ra ngoài). Frontend trên Vercel (HTTPS) phải dùng địa chỉ HTTPS, nếu không trình duyệt chặn vì mixed content.
 
    ```text
-   http://examind.duckdns.org/api/v1
+   API:    https://examind.duckdns.org/api/v1
+   Socket: wss://examind.duckdns.org   (đường dẫn /api/socket.io, issue #20)
    ```
 
-   Hiện chỉ có HTTP, chưa có HTTPS. Frontend chạy trên trang HTTPS sẽ bị trình duyệt chặn gọi HTTP (mixed content), cần thêm HTTPS (mở cổng 443 và cấp chứng chỉ trong nginx) trước. Nếu frontend gọi từ origin khác, cho phép origin đó trong `CORS_ORIGINS` của FastAPI.
+   Chứng chỉ Let's Encrypt do `deploy/remote-deploy.sh` xin ở lần deploy đầu và container `certbot` tự gia hạn. Cần cả cổng **80** (xác minh tên miền) và **443** mở trong Security Group. Cổng 80 vẫn phục vụ API qua HTTP để kiểm sức khoẻ. Frontend gọi từ origin khác thì cho phép origin đó trong `CORS_ORIGINS` của `/opt/examind/prod.env` trên VPS (nhiều origin phân tách bằng dấu phẩy).
 
 ## Kiểm tra kết quả
 

@@ -1,6 +1,6 @@
 # Lớp phủ cho VPS: chạy cùng docker-compose.yml.
 #   docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-# Chỉ nginx mở cổng ra ngoài (80). Postgres, MinIO và backend chỉ nghe trên 127.0.0.1 hoặc mạng nội bộ compose.
+# Chỉ nginx mở cổng ra ngoài (80 và 443). Postgres, MinIO và backend chỉ nghe trên 127.0.0.1 hoặc mạng nội bộ compose.
 
 x-logging: &logging
   driver: json-file
@@ -20,6 +20,10 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:?thiếu S3_SECRET_KEY trong prod.env}
       S3_BUCKET: ${S3_BUCKET:-examind}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      # Phiên đăng nhập (#8). nginx có TLS (cổng 443) nên cookie đặt Secure mặc định.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_NAME: ${COOKIE_NAME:-examind_session}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -44,8 +48,13 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ${LETSENCRYPT_DIR:-/opt/examind/letsencrypt}:/etc/letsencrypt:ro
+      - ${CERTBOT_WEBROOT:-/opt/examind/certbot-www}:/var/www/certbot:ro
+    # Nạp lại cấu hình mỗi 6 giờ để nginx dùng chứng chỉ vừa được certbot gia hạn.
+    command: ["/bin/sh", "-c", "while :; do sleep 6h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'"]
     depends_on:
       backend:
         condition: service_healthy
@@ -55,6 +64,26 @@ services:
       timeout: 3s
       retries: 5
     logging: *logging
+
+  # Gia hạn chứng chỉ Let's Encrypt tự động (kiểm tra mỗi 12 giờ, chỉ gia hạn khi còn dưới 30 ngày).
+  # Xin chứng chỉ lần đầu do deploy/remote-deploy.sh làm, dùng chung hai thư mục với nginx.
+  certbot:
+    image: certbot/certbot:v3.0.1
+    restart: unless-stopped
+    volumes:
+      - ${LETSENCRYPT_DIR:-/opt/examind/letsencrypt}:/etc/letsencrypt
+      - ${CERTBOT_WEBROOT:-/opt/examind/certbot-www}:/var/www/certbot
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+    logging: *logging
+
+  db-init:
+    environment:
+      # Admin mặc định (ensure_admin) lấy từ prod.env. Thiếu ADMIN_EMAIL hoặc ADMIN_PASSWORD thì bỏ qua.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-}
+      # Prod có HTTPS: ensure_admin đòi ADMIN_PASSWORD ≥ 12 ký tự.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
 
   postgres:
     restart: unless-stopped

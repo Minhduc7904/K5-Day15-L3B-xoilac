@@ -1,10 +1,42 @@
-"""Test issue #5: mẫu cấu trúc đề. Dữ liệu dưới đây là mẫu tự dựng để thử luật, không phải cấu trúc đề chính thức."""
+"""Test issue #5: mẫu cấu trúc đề. Dữ liệu dưới đây là mẫu tự dựng để thử luật, không phải cấu trúc đề chính thức.
+
+Mặc định mỗi test đăng nhập bằng một admin (fixture as_admin). Test phân quyền tự đăng xuất hoặc đổi tài khoản.
+Mật khẩu sinh lúc chạy (tests/conftest.py), không viết cứng.
+"""
 import copy
 
+import pytest
+
+from app.api.deps import get_password_service
+from app.repositories.session_repository import SessionRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.exam_template import ExamTemplateIn
+from app.service.token_service import TokenService
+from app.usecase.auth import AuthUseCase
 from app.usecase.exam_template_rules import check_template
+from tests.conftest import new_password
 
 BASE = "/api/v1/exam-templates"
+AUTH = "/api/v1/auth"
+
+
+async def _create_user(db, email: str, password: str, role: str) -> None:
+    async with db() as s:
+        uc = AuthUseCase(UserRepository(s), SessionRepository(s), get_password_service(), TokenService(), 168)
+        await uc.create_user(email, password, role)
+
+
+async def _login_as(client, db, email: str, role: str) -> None:
+    password = new_password()
+    await _create_user(db, email, password, role)
+    client.cookies.clear()
+    r = await client.post(f"{AUTH}/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+
+
+@pytest.fixture(autouse=True)
+async def as_admin(client, db):
+    await _login_as(client, db, "admin-templates@example.com", "admin")
 
 GK1_11 = {
     "name": "Giữa kỳ 1 lớp 11 (mẫu thử)",
@@ -176,3 +208,37 @@ def test_rules_are_usable_without_http():
     assert len(check_template(data, for_approval=True)) == 1
     bad = ExamTemplateIn.model_validate(_with(GK1_11, grade=None))
     assert any("khối" in e for e in check_template(bad, for_approval=False))
+
+
+# ---------- phân quyền (Auth #8) ----------
+
+async def test_admin_routes_require_login_and_admin_role(client, db):
+    tid = (await _create(client, _with(GK1_11, source="nguồn thử")))["template_id"]
+    await _approve(client, tid)
+    admin_calls = [
+        ("post", BASE, GK1_11),
+        ("get", BASE, None),
+        ("get", f"{BASE}/{tid}", None),
+        ("put", f"{BASE}/{tid}", GK1_11),
+        ("post", f"{BASE}/{tid}/approve", None),
+    ]
+
+    client.cookies.clear()                                            # chưa đăng nhập: 401 ở mọi route
+    for method, url, body in admin_calls:
+        r = await client.request(method, url, json=body)
+        assert r.status_code == 401, (method, url, r.text)
+    assert (await client.get(f"{BASE}/lookup", params={"exam_type": "GK1"})).status_code == 401
+
+    await _login_as(client, db, "hs-templates@example.com", "student")  # học sinh: 403 ở route quản trị
+    for method, url, body in admin_calls:
+        r = await client.request(method, url, json=body)
+        assert r.status_code == 403, (method, url, r.text)
+        assert r.json()["code"] == "FORBIDDEN_ROLE"                  # định dạng lỗi chung của auth (#8)
+    found = await client.get(f"{BASE}/lookup", params={"exam_type": "GK1", "grade": 11})
+    assert found.status_code == 200 and [t["template_id"] for t in found.json()] == [tid]
+
+
+async def test_student_lookup_never_sees_drafts(client, db):
+    await _create(client, GK1_11)                                     # admin tạo mẫu nháp
+    await _login_as(client, db, "hs-drafts@example.com", "student")
+    assert (await client.get(f"{BASE}/lookup", params={"exam_type": "GK1"})).json() == []

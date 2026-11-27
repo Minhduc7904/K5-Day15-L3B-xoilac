@@ -1,15 +1,25 @@
 """API mẫu cấu trúc đề (issue #5).
 
-Chưa có xác thực: các route quản trị (tạo, sửa, duyệt, xem mọi trạng thái) sẽ được khoá cho vai trò admin khi
-thiết kế Auth #8 được chốt. /lookup là hợp đồng đọc cho pipeline học sinh (#4), chỉ trả mẫu đã duyệt.
+Quyền (Auth #8):
+- Tạo, sửa, duyệt, xem danh sách và chi tiết mọi trạng thái: chỉ admin (AdminDep).
+- /lookup: mọi tài khoản đã đăng nhập (CurrentUserDep). Đây là hợp đồng đọc cho pipeline học sinh (#4), chỉ trả mẫu
+  đã duyệt nên không lộ mẫu nháp cho học sinh.
 """
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.api.deps import ExamTemplateUseCaseDep
+from app.api.deps import AdminDep, CurrentUserDep, ExamTemplateUseCaseDep
+from app.schemas.auth import ErrorOut
 from app.schemas.exam_template import ExamTemplateIn, ExamTemplateOut, ExamType, TemplateStatus
 from app.usecase.exam_template_rules import TemplateValidationError
 
-router = APIRouter(prefix="/exam-templates", tags=["exam-templates"])
+router = APIRouter(
+    prefix="/exam-templates",
+    tags=["exam-templates"],
+    responses={
+        401: {"model": ErrorOut, "description": "Chưa đăng nhập hoặc phiên không còn hiệu lực"},
+        403: {"model": ErrorOut, "description": "FORBIDDEN_ROLE (route quản trị) / ACCOUNT_DISABLED"},
+    },
+)
 
 NOT_FOUND = "Không có mẫu cấu trúc đề này"
 
@@ -22,6 +32,7 @@ def _invalid(e: TemplateValidationError) -> HTTPException:
 # /lookup phải khai báo trước /{template_id} để không bị bắt nhầm thành id.
 @router.get("/lookup", response_model=list[ExamTemplateOut])
 async def lookup_templates(
+    _: CurrentUserDep,
     usecase: ExamTemplateUseCaseDep,
     exam_type: ExamType,
     grade: int | None = Query(default=None, ge=10, le=12),
@@ -31,7 +42,7 @@ async def lookup_templates(
 
 
 @router.post("", response_model=ExamTemplateOut, status_code=status.HTTP_201_CREATED)
-async def create_template(body: ExamTemplateIn, usecase: ExamTemplateUseCaseDep):
+async def create_template(_: AdminDep, body: ExamTemplateIn, usecase: ExamTemplateUseCaseDep):
     try:
         return await usecase.create(body)
     except TemplateValidationError as e:
@@ -40,6 +51,7 @@ async def create_template(body: ExamTemplateIn, usecase: ExamTemplateUseCaseDep)
 
 @router.get("", response_model=list[ExamTemplateOut])
 async def list_templates(
+    _: AdminDep,
     usecase: ExamTemplateUseCaseDep,
     status_filter: TemplateStatus | None = Query(default=None, alias="status"),
     exam_type: ExamType | None = None,
@@ -49,7 +61,7 @@ async def list_templates(
 
 
 @router.get("/{template_id}", response_model=ExamTemplateOut)
-async def get_template(template_id: int, usecase: ExamTemplateUseCaseDep):
+async def get_template(_: AdminDep, template_id: int, usecase: ExamTemplateUseCaseDep):
     item = await usecase.get(template_id)
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
@@ -57,7 +69,7 @@ async def get_template(template_id: int, usecase: ExamTemplateUseCaseDep):
 
 
 @router.put("/{template_id}", response_model=ExamTemplateOut)
-async def update_template(template_id: int, body: ExamTemplateIn, usecase: ExamTemplateUseCaseDep):
+async def update_template(_: AdminDep, template_id: int, body: ExamTemplateIn, usecase: ExamTemplateUseCaseDep):
     try:
         item = await usecase.update(template_id, body)
     except TemplateValidationError as e:
@@ -68,7 +80,7 @@ async def update_template(template_id: int, body: ExamTemplateIn, usecase: ExamT
 
 
 @router.post("/{template_id}/approve", response_model=ExamTemplateOut)
-async def approve_template(template_id: int, usecase: ExamTemplateUseCaseDep):
+async def approve_template(_: AdminDep, template_id: int, usecase: ExamTemplateUseCaseDep):
     try:
         item = await usecase.approve(template_id)
     except TemplateValidationError as e:

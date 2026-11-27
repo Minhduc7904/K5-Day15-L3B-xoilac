@@ -4,7 +4,7 @@ Admin tạo, sửa, duyệt mẫu. Agent pipeline học sinh (#4) chỉ tra mẫ
 exam_type dùng lại mã của exams.type_of_exam (migration 0002) để hai bảng nói cùng một ngôn ngữ.
 
 Revision ID: 0005_exam_templates
-Revises: 0002
+Revises: 0004
 Create Date: 2026-11-28
 """
 import sqlalchemy as sa
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0005_exam_templates"
-down_revision = "0002"
+down_revision = "0004"  # 0004_users_created_by (auth, #8)
 branch_labels = None
 depends_on = None
 

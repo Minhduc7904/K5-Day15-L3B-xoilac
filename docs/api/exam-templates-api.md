@@ -6,8 +6,15 @@ Admin tạo, sửa và duyệt mẫu cấu trúc đề (giữa kỳ, cuối kỳ
 
 - Base URL local: `http://localhost:8000/api/v1`. Tài liệu tự sinh: `http://localhost:8000/docs`.
 - Dữ liệu gửi và nhận dạng JSON.
-- **Chưa có xác thực.** Khi thiết kế Auth #8 được chốt, các route tạo, sửa, duyệt và xem danh sách sẽ chỉ dành cho admin. `GET /exam-templates/lookup` dành cho backend pipeline học sinh.
-- Cần migration `0005_exam_templates` (`alembic upgrade head`).
+- **Quyền** (Auth #8, cookie phiên hoặc `Authorization: Bearer`):
+
+  | Route | Ai gọi được |
+  | --- | --- |
+  | `POST /exam-templates`, `GET /exam-templates`, `GET /exam-templates/{id}`, `PUT /exam-templates/{id}`, `POST /exam-templates/{id}/approve` | Chỉ admin |
+  | `GET /exam-templates/lookup` | Mọi tài khoản đã đăng nhập. Chỉ trả mẫu đã duyệt nên không lộ mẫu nháp |
+
+  Chưa đăng nhập trả `401`; học sinh gọi route quản trị trả `403` với `code = "FORBIDDEN_ROLE"` (định dạng lỗi chung của auth: `{"detail": "...", "code": "..."}`).
+- Cần migration `0005_exam_templates`, nối sau `0004_users_created_by` của auth (`alembic upgrade head`).
 
 ## Mô hình dữ liệu
 
@@ -119,8 +126,9 @@ Test tự động: `cd backend && pytest tests/test_exam_templates.py` (chạy b
 4. Sửa mẫu đã duyệt làm mất `source` → `422`, mẫu không đổi.
 5. `lookup` lọc theo loại kỳ thi và khối; mẫu `THPT` không ghi khối khớp khi hỏi khối 12.
 6. Các ca `422` nghiệp vụ, `422` hình dạng và `404`.
+7. Phân quyền: chưa đăng nhập nhận `401` ở mọi route; học sinh nhận `403 FORBIDDEN_ROLE` ở route quản trị nhưng tra cứu được mẫu đã duyệt; học sinh không bao giờ thấy mẫu nháp qua `lookup`.
 
-Chưa kiểm với PostgreSQL thật. Đã kiểm SQL của migration bằng `alembic upgrade 0002:0005_exam_templates --sql`.
+Chưa kiểm với PostgreSQL thật. Đã kiểm SQL của migration bằng `alembic upgrade 0004:0005_exam_templates --sql`.
 
 ## Tài liệu liên quan
 
