@@ -11,7 +11,7 @@ from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
 from app.service.token_service import TokenService
 from app.usecase.auth import AuthUseCase
-from tests.conftest import new_password
+from tests.conftest import TEST_OTP, new_password
 
 API = "/api/v1"
 COOKIE = "examind_session"
@@ -20,7 +20,13 @@ PW = new_password()
 
 
 async def register(client, email="hs01@example.com", password=PW, **extra):
-    return await client.post(f"{API}/auth/register", json={"email": email, "password": password, **extra})
+    started = await client.post(f"{API}/auth/register", json={"email": email, "password": password, **extra})
+    if started.status_code != 202:
+        return started
+    return await client.post(
+        f"{API}/auth/otp/verify",
+        json={"purpose": "registration", "challenge": started.json()["challenge"], "otp": TEST_OTP},
+    )
 
 
 async def login(client, email="hs01@example.com", password=PW):

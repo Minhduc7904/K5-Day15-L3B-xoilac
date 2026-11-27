@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -19,11 +19,14 @@ class User(Base):
         CheckConstraint("role IN ('student','admin')", name="ck_users_role"),
         CheckConstraint("status IN ('active','disabled')", name="ck_users_status"),
         Index("uq_users_email_lower", func.lower(text("email")), unique=True),
+        UniqueConstraint("google_subject", name="uq_users_google_subject"),
     )
 
     user_id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255))
-    password_hash: Mapped[str] = mapped_column(Text)
+    password_hash: Mapped[str | None] = mapped_column(Text)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    google_subject: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(10), default=ROLE_STUDENT, server_default=ROLE_STUDENT)
     status: Mapped[str] = mapped_column(String(10), default=STATUS_ACTIVE, server_default=STATUS_ACTIVE)
     display_name: Mapped[str | None] = mapped_column(String(100))

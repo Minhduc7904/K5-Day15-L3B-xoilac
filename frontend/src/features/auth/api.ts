@@ -1,19 +1,16 @@
 /**
  * Lớp gọi API của feature auth. Mọi trang auth chỉ gọi qua `authApi`.
- * Mặc định dùng mock (`NEXT_PUBLIC_MOCK_MODE` khác `false`). Đổi sang backend thật chỉ cần tắt cờ mock.
- *
- * login, register, logout, me: theo hợp đồng của #8 ở PR #17 (đã revert ở #18, xem docs/architecture/frontend-auth.md).
- * forgotPassword, verifyOtp, resetPassword: hợp đồng ĐỀ XUẤT, backend chưa có endpoint.
+ * Dùng mock khi bật NEXT_PUBLIC_MOCK_MODE. Quên mật khẩu chỉ có trong mock.
  */
 import { isAxiosError } from 'axios';
 import { apiClient } from '@/lib/api-client';
 import { mockMode } from '@/lib/config';
 import { mockAuthApi } from './mock';
-import { AuthError, type AuthErrorCode, type LoginInput, type RegisterInput, type User } from './types';
+import { AuthError, type AuthErrorCode, type LoginInput, type OtpPurpose, type PendingOtp, type RegisterInput, type User } from './types';
 
 const FIELD_MESSAGES: Record<string, string> = {
   email: 'Email chưa đúng định dạng.',
-  password: 'Mật khẩu cần từ 6 đến 128 ký tự.',
+  password: 'Mật khẩu cần từ 8 đến 128 ký tự.',
   display_name: 'Tên hiển thị dài tối đa 100 ký tự.',
 };
 
@@ -43,10 +40,18 @@ async function call<T>(request: () => Promise<{ data: T }>): Promise<T> {
 }
 
 const withCookie = { withCredentials: true };
+const mailTimeout = { ...withCookie, timeout: 25_000 };
 
 const httpAuthApi = {
   login: (input: LoginInput) => call<User>(() => apiClient.post('/auth/login', input, withCookie)),
-  register: (input: RegisterInput) => call<User>(() => apiClient.post('/auth/register', input, withCookie)),
+  register: (input: RegisterInput) => call<PendingOtp>(() => apiClient.post('/auth/register', input, mailTimeout)),
+  resendOtp: (purpose: OtpPurpose, challenge: string) =>
+    call<PendingOtp>(() => apiClient.post('/auth/otp/resend', { purpose, challenge }, mailTimeout)),
+  completeOtp: (purpose: OtpPurpose, challenge: string, otp: string) =>
+    call<User>(() => apiClient.post('/auth/otp/verify', { purpose, challenge, otp }, withCookie)),
+  googleStart: (challenge: string) => call<{ url: string }>(() => apiClient.post('/auth/google/start', { challenge })),
+  googleExchange: (ticket: string, verifier: string) =>
+    call<User | PendingOtp>(() => apiClient.post('/auth/google/exchange', { ticket, verifier }, mailTimeout)),
   logout: () => call<void>(() => apiClient.post('/auth/logout', undefined, withCookie)),
   me: () => call<User>(() => apiClient.get('/auth/me', withCookie)),
   forgotPassword: (email: string) => call<void>(() => apiClient.post('/auth/password/forgot', { email })),
@@ -56,4 +61,4 @@ const httpAuthApi = {
     call<void>(() => apiClient.post('/auth/password/reset', { reset_token: resetToken, password })),
 };
 
-export const authApi: typeof httpAuthApi = mockMode ? mockAuthApi : httpAuthApi;
+export const authApi: typeof httpAuthApi = mockMode ? { ...httpAuthApi, ...mockAuthApi } : httpAuthApi;

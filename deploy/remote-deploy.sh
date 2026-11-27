@@ -22,7 +22,15 @@ compose() {
 ensure_placeholder_cert() {
   local live="$LETSENCRYPT_DIR/live/$DOMAIN"
   sudo install -d -m 755 "$CERTBOT_WEBROOT"
-  [ -s "$live/fullchain.pem" ] && return 0
+  # The deploy user may be unable to traverse Certbot's root-owned archive directory.
+  if sudo test -s "$live/fullchain.pem" && sudo test -s "$live/privkey.pem"; then
+    return 0
+  fi
+  if sudo test -f "$LETSENCRYPT_DIR/renewal/$DOMAIN.conf" \
+    || sudo test -L "$live/fullchain.pem" || sudo test -L "$live/privkey.pem"; then
+    echo "== Bộ chứng chỉ Certbot chưa đủ tệp cho $DOMAIN. Kiểm tra live/archive." >&2
+    return 1
+  fi
   sudo install -d -m 755 "$live"
   sudo openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=$DOMAIN" \
     -keyout "$live/privkey.pem" -out "$live/fullchain.pem" 2>/dev/null
@@ -31,7 +39,7 @@ ensure_placeholder_cert() {
 # Xin chứng chỉ Let's Encrypt lần đầu (HTTP-01 qua cổng 80). Đã có thì bỏ qua: container certbot tự gia hạn.
 # Lỗi ở đây không làm hỏng deploy: API vẫn chạy qua HTTP, lần deploy sau sẽ thử lại.
 obtain_certificate() {
-  [ -f "$LETSENCRYPT_DIR/renewal/$DOMAIN.conf" ] && return 0
+  sudo test -f "$LETSENCRYPT_DIR/renewal/$DOMAIN.conf" && return 0
   echo "== Xin chứng chỉ Let's Encrypt cho $DOMAIN"
   sudo rm -rf "$LETSENCRYPT_DIR/live/$DOMAIN" "$LETSENCRYPT_DIR/archive/$DOMAIN"
   if compose run --rm --no-deps --entrypoint certbot certbot certonly \
@@ -63,7 +71,7 @@ cleanup() {
 trap cleanup EXIT
 
 apply() {
-  ensure_placeholder_cert
+  ensure_placeholder_cert || return 1
   compose up -d --build --remove-orphans
   # Cấu hình nginx được mount vào container nên container không tự đổi khi file đổi: luôn kiểm và reload.
   compose exec -T nginx nginx -t

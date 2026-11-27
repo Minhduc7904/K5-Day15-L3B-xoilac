@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     pdf_import_extraction_model: str = "gpt-5.4-mini"
     pdf_import_embedding_model: str = "text-embedding-3-small"
 
+    email_provider: str = ""
+    email_from: str = ""
+    email_from_name: str = "Examind"
+    gmail_client_id: SecretStr = SecretStr("")
+    gmail_client_secret: SecretStr = SecretStr("")
+    gmail_refresh_token: SecretStr = SecretStr("")
+
+    auth_otp_secret: SecretStr = SecretStr("")
+    google_client_id: str = ""
+    google_client_secret: SecretStr = SecretStr("")
+    google_callback_url: str = ""
+    frontend_url: str = "http://localhost:3000"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

@@ -167,5 +167,6 @@ class AdminAccountsUseCase:
         return target
 
     async def _reauth(self, actor: CurrentUser, current_password: str) -> None:
-        if not current_password or not await self._passwords.verify(actor.user.password_hash, current_password):
+        password_hash = actor.user.password_hash
+        if not current_password or not password_hash or not await self._passwords.verify(password_hash, current_password):
             raise ReauthFailed()

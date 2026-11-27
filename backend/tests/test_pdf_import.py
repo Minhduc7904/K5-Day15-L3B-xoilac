@@ -12,7 +12,7 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject, Num
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.api.deps import get_pdf_import_models, get_storage
+from app.api.deps import get_email_service, get_pdf_import_models, get_storage
 from app.core.config import get_settings
 from app.core.database import get_session, get_sessionmaker
 from app.main import app
@@ -20,7 +20,7 @@ from app.models import Base, PdfReferenceVector
 from app.repositories.pdf_imports import PdfImportRepository, question_chapters, questions
 from app.service.pdf_import_models import PdfImportModels, order_image_options
 from app.usecase.pdf_import_classification import classify_drafts
-from tests.conftest import FakeStorage
+from tests.conftest import TEST_OTP, TEST_SETTINGS, FakeEmail, FakeStorage
 from tests.test_auth import login, make_admin, register
 
 ROOT = "/api/v1/admin/pdf-imports"
@@ -117,6 +117,8 @@ class FixtureModels(PdfImportModels):
 async def pdf_api(tmp_path, monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral")
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
+    monkeypatch.setenv("AUTH_OTP_SECRET", TEST_SETTINGS.auth_otp_secret.get_secret_value())
+    monkeypatch.setattr("app.usecase.student_auth.secrets.randbelow", lambda _: int(TEST_OTP))
     get_settings.cache_clear()
     storage = FakeStorage()
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'imports.db'}")
@@ -141,6 +143,7 @@ async def pdf_api(tmp_path, monkeypatch):
 
     app.dependency_overrides[get_session] = session_override
     app.dependency_overrides[get_sessionmaker] = lambda: maker
+    app.dependency_overrides[get_email_service] = FakeEmail
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_pdf_import_models] = lambda: FixtureModels(get_settings())
     try:
