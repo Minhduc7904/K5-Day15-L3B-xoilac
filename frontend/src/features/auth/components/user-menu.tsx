@@ -9,14 +9,27 @@ import { useAppDispatch, useAppSelector } from '@/store';
 import { authApi } from '../api';
 import { signedOut } from '../auth-slice';
 
-/** Tên người dùng và nút đăng xuất trên thanh điều hướng. Đăng xuất xong `AuthGuard` đưa về /login. */
+/** Tên người dùng và nút đăng xuất trên thanh điều hướng. Khách thấy nút Đăng nhập / Đăng ký. */
 export function UserMenu() {
   const user = useAppSelector((s) => s.auth.user);
+  const status = useAppSelector((s) => s.auth.status);
   const dispatch = useAppDispatch();
   const [leaving, setLeaving] = useState(false);
   const hydrated = useHydrated();
 
-  if (!hydrated || !user) return <Skeleton className="h-9 w-48 rounded-xl" />;
+  if (!hydrated || status === 'unknown') return <Skeleton className="h-9 w-48 rounded-xl" />;
+  if (!user) {
+    return (
+      <>
+        <Button variant="ghost" size="sm" href="/login">
+          Đăng nhập
+        </Button>
+        <Button size="sm" href="/register">
+          Đăng ký
+        </Button>
+      </>
+    );
+  }
 
   const name = user.display_name ?? user.email;
   const logout = async () => {

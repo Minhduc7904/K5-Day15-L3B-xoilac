@@ -2,7 +2,7 @@
 
 /**
  * Chặn route theo phiên và vai trò. Web chỉ có hai loại người dùng: học sinh và admin.
- * - Chưa đăng nhập: chỉ vào được các trang auth, mọi trang khác chuyển tới /login.
+ * - Chưa đăng nhập: vào được trang chủ `/` (landing) và các trang auth, mọi trang khác chuyển tới /login.
  * - Học sinh: không vào /admin. Admin: chỉ ở /admin.
  * - Đã đăng nhập mà mở trang auth: chuyển về trang chủ theo vai trò.
  * Đây chỉ là lớp UX. Quyền thật do backend kiểm ở từng API.
@@ -23,13 +23,15 @@ const under = (path: string, base: string) => path === base || path.startsWith(`
 export const homeFor = (user: Pick<User, 'role'>) => (user.role === 'admin' ? '/admin' : '/');
 
 const isAuthPage = (path: string) => AUTH_PATHS.some((base) => under(path, base));
+/** Khách xem được trang chủ để biết Examind là gì trước khi đăng nhập. */
+const isPublicPage = (path: string) => isAuthPage(path) || path === '/';
 
 /** Trả đường dẫn cần chuyển tới, hoặc `null` nếu được ở lại. `undefined` khi chưa biết phiên. */
 export function guardRedirect(path: string, auth: AuthState): string | null | undefined {
   const authPage = isAuthPage(path);
-  if (auth.status === 'unknown') return authPage ? null : undefined;
+  if (auth.status === 'unknown') return isPublicPage(path) ? null : undefined;
   const { user } = auth;
-  if (!user) return authPage ? null : auth.reason ? `/login?reason=${auth.reason}` : '/login';
+  if (!user) return isPublicPage(path) ? null : auth.reason ? `/login?reason=${auth.reason}` : '/login';
   if (authPage) return homeFor(user);
   if (SHARED_PATHS.some((base) => under(path, base))) return null;
   const inAdmin = under(path, '/admin');
