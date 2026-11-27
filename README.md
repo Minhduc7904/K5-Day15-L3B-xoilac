@@ -12,6 +12,10 @@
 
 ---
 
+## Tài liệu dự án
+
+Xem [mục lục, quy chuẩn và template](docs/README.md). Trước khi làm việc, agent đọc [danh sách tài liệu bắt buộc](AGENTS.md#đọc-trước-khi-làm). Hướng dẫn truy cập môi trường demo nằm trong [runbook EC2](docs/operations/deploy-ec2.md).
+
 ## Nhóm làm gì, khung làm gì
 
 | Nhóm quyết định và viết | Khung làm sẵn (không cần sửa) |

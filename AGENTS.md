@@ -6,6 +6,29 @@
 
 Repo nộp bài hackathon AI20K của nhóm: một bản chạy thử AI cho **một lát cắt** (xem `spec.md` §4), kèm bằng chứng, bộ câu thử và mô phỏng chi phí. Mọi câu trả lời phải chạy được bằng các lệnh dưới đây.
 
+## Đọc trước khi làm
+
+1. Đọc [AGENTS.md](AGENTS.md), [README.md](README.md), [mục lục và quy chuẩn tài liệu](docs/README.md) và phần liên quan trong [spec.md](spec.md). Riêng việc đụng tới luồng sản phẩm hoặc kiểm thử phải đọc §4 và §7.
+2. Đối chiếu yêu cầu hiện tại với issue liên quan nếu có. Tìm `AGENTS.md` gần file sẽ sửa và đọc các quy ước áp dụng trong thư mục đó.
+3. Đọc các nguồn theo phạm vi trước khi thiết kế hay chỉnh sửa.
+
+| Phạm vi | Nguồn cần đọc thêm |
+| --- | --- |
+| Backend, frontend, API, database hoặc MinIO | Đặc tả §4, tài liệu kiến trúc/API liên quan trong [mục lục](docs/README.md) và entry point, schema hoặc module hiện có. |
+| Agent, prompt, model hoặc tool | Đặc tả §4, [cách nối model](docs/connect-model.md), và các file liên quan trong `codebase/`. |
+| Dữ liệu, benchmark và đánh giá | [Data card](data/DATA_CARD.md), [hướng dẫn eval](eval/README.md), [metric spec](eval/metric_spec.yaml) và đặc tả §7. |
+| Deploy, Docker, CI/CD hoặc EC2 | [Runbook EC2](docs/operations/deploy-ec2.md), cấu hình mẫu, Compose và workflow liên quan nếu đã có trong nhánh. |
+| Viết hoặc sửa tài liệu | [Quy chuẩn tài liệu](docs/README.md) và template tương ứng trước khi sửa. |
+
+Nếu tài liệu và code mô tả khác nhau, xác minh hành vi tại entry point hoặc cấu hình rồi ghi rõ phần khác biệt khi bàn giao.
+
+## Quy tắc thay đổi chung
+
+- Giữ entry point, hợp đồng API và format đầu ra đã công bố, trừ khi yêu cầu thay đổi chúng. Cập nhật ví dụ và tài liệu tương ứng trong cùng thay đổi.
+- Trong backend, giữ trách nhiệm riêng cho API, use case, service và repository. Trong frontend, giữ tổ chức theo feature và dùng lớp gọi API chung của feature. Đọc module hiện có trước khi thêm cấu trúc mới.
+- Ghi lệnh hoặc kịch bản đã dùng để kiểm chứng. Với thay đổi chỉ về tài liệu, kiểm liên kết và đối chiếu lệnh mẫu với các entry point thực tế.
+- Dùng template đã chọn, tên file chữ thường có dấu gạch ngang và cập nhật mục lục `docs/README.md` khi thêm tài liệu chính. Xem [quy chuẩn đầy đủ](docs/README.md).
+
 ## Lệnh
 
 ```
