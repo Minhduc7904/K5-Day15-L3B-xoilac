@@ -1,6 +1,6 @@
 # Tổng quan hệ thống
 
-Dành cho thành viên mới cần biết các thành phần của bộ khung và cách chúng nối với nhau. Phạm vi là bộ khung của issue #1: kết nối mẫu giữa backend, PostgreSQL và MinIO. Frontend được thêm ở phần sau của issue này.
+Dành cho thành viên mới cần biết các thành phần của bộ khung và cách chúng nối với nhau. Phạm vi gồm bộ khung backend của #1 và frontend base của #9.
 
 ## Bối cảnh và ràng buộc
 
@@ -12,7 +12,7 @@ Dành cho thành viên mới cần biết các thành phần của bộ khung v�
 
 ```mermaid
 flowchart LR
-  FE["Frontend<br/>Next.js + Redux + Axios<br/>(chưa có)"] -- "HTTP /api/v1" --> BE["Backend<br/>FastAPI"]
+  FE["Frontend<br/>Next.js + Redux + Axios"] -- "HTTP /api/v1" --> BE["Backend<br/>FastAPI"]
   BE -- "SQLAlchemy async" --> PG[("PostgreSQL 16")]
   BE -- "API tương thích S3" --> MN[("MinIO")]
 ```
@@ -20,7 +20,7 @@ flowchart LR
 | Thành phần | Công nghệ | Vai trò |
 | --- | --- | --- |
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 async, Alembic | API, luồng nghiệp vụ, truy cập dữ liệu. Chi tiết: [backend-layers.md](backend-layers.md) |
-| Frontend | Next.js, TypeScript, Tailwind, Redux Toolkit, Axios | Giao diện *(chưa có)* |
+| Frontend | Next.js, TypeScript, Tailwind, Redux Toolkit, Axios | Bộ khung cho route học sinh và quản trị. Xem [kiến trúc frontend](frontend-base.md). |
 | PostgreSQL | 16 | Dữ liệu có cấu trúc |
 | MinIO | `bitnamilegacy/minio` 2025.5.24 | PDF gốc, ảnh câu hỏi |
 
@@ -31,7 +31,7 @@ flowchart LR
 - `db-init`: dùng image backend, chạy `alembic upgrade head`.
 - `minio-init`: tạo bucket nếu chưa có (`mc mb --ignore-existing`).
 
-Backend và frontend chạy trực tiếp trên máy ở giai đoạn này. Backend đọc cấu hình từ `backend/.env`.
+Backend đọc cấu hình local từ `backend/.env`. Frontend có cấu hình cho Axios và hai entry point riêng.
 
 ### Trên VPS
 

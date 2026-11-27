@@ -6,6 +6,8 @@
 | Nắm phạm vi, luồng AI và tiêu chí nghiệm thu | [Đặc tả dự án](../spec.md) |
 | Hiểu các thành phần và luồng dữ liệu của hệ thống | [Tổng quan hệ thống](architecture/system-overview.md) |
 | Viết tính năng mới trong backend | [Các lớp backend](architecture/backend-layers.md) |
+| Viết tính năng mới trong frontend | [Kiến trúc frontend](architecture/frontend-base.md) |
+| Chạy frontend và deploy Vercel | [Runbook frontend](operations/deploy-frontend-vercel.md) |
 | Chạy PostgreSQL, MinIO và backend trên máy | [Chạy bộ khung local](operations/run-local-stack.md) |
 | Xem định dạng API và gọi thử endpoint mẫu | [API mẫu](api/sample-api.md) |
 | Kết nối EC2 và kiểm tra khả năng truy cập API | [Runbook EC2](operations/deploy-ec2.md) |
