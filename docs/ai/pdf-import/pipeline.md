@@ -69,7 +69,9 @@ Gợi ý nhãn đôi khi sai chương dù có điểm tương đồng cao, nên 
 
 API nhập đề dùng chung kiểm tra vai trò admin của Auth. URL đọc hình và PDF vẫn hết hạn sau 5 phút. Issue #4 đọc câu đã xuất bản qua kho câu hỏi dùng chung.
 
-Revision Alembic `0007_pdf_import_auth` nối hai nhánh `0004` (Auth) và `0004_pdf_import_vectors` (nhập đề). Lượt kiểm PostgreSQL ban đầu nâng DB trắng, DB đã chạy Auth và DB đã chạy nhập đề về revision này. Sau khi `main` thêm `0005_student_auth`, revision `0008_pdf_import_student_auth` nối hai head và giữ nguyên lịch sử migration. Khi tích hợp #5 và #4, nối revision mới với head trên `main` tại thời điểm merge. Tại lần đối chiếu này, `0005_exam_templates` và `0006_exam_chat` đều còn trỏ về `0002`.
+Revision Alembic `0007_pdf_import_auth` nối hai nhánh `0004` (Auth) và `0004_pdf_import_vectors` (nhập đề). Lượt kiểm PostgreSQL ban đầu nâng DB trắng, DB đã chạy Auth và DB đã chạy nhập đề về revision này. Sau khi `main` thêm `0005_student_auth`, revision `0008_pdf_import_student_auth` nối hai head và giữ nguyên lịch sử migration. Đã nâng cấp PostgreSQL local từ DB trắng và DB ở `0005_student_auth` lên cùng một head mới.
+
+Trên các nhánh tính năng, `0005_exam_templates` hiện trỏ về `0004`, còn `0006_exam_chat` trỏ về `0005_exam_templates`. Nếu #3 vào `main` trước, #5 cập nhật `down_revision` sang `0008_pdf_import_student_auth` khi tích hợp tiếp. #4 giữ phụ thuộc vào #5 và tích hợp sau khi #5 vào `main`. Kiểm tra lại head thực tế theo thứ tự merge, chạy `alembic heads` và `alembic upgrade head` trước khi triển khai.
 
 Đã nạp và đọc lại đủ 103 mã chương từ `data/chapters.csv` trên PostgreSQL local. Cả 1.279 câu mẫu trong `data/question_bank.csv` dùng mã hợp lệ và quan hệ chương–chương con khớp danh mục. Danh mục trên VPS chưa được đối chiếu vì máy này chưa có host key SSH đã xác minh.
 
