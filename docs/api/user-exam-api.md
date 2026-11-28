@@ -13,6 +13,15 @@ Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`.
 - `GET /exam-chat/sessions` liệt kê phiên của tài khoản. `GET /exam-chat/sessions/{id}/transcript` nhận
   `before` là mã tin nhắn và `limit` là số tin để tải lịch sử cũ hơn. `GET /exam-chat/chapters` trả danh mục
   theo mã với tên và `parent_code`.
+- `PATCH /exam-chat/sessions/{id}` đổi tên đoạn chat (`{"title": "..."}`, 1–80 ký tự, không để trống), trả phần tử như
+  `GET /exam-chat/sessions`. `DELETE /exam-chat/sessions/{id}` trả `204` và ẩn phiên khỏi danh sách; dữ liệu và
+  đề nháp đã dựng vẫn còn nên "Đề của tôi" và lượt làm bài không đổi. Người khác nhận `404`, như phiên không tồn tại.
+  Tên do học sinh đặt ưu tiên hơn tên lấy từ tin nhắn đầu.
+- `edit.title` (tối đa 120 ký tự) đặt tên đề cho bản xem trước theo chương hoặc theo mẫu. Khi dựng, tên này thành
+  tên đề nháp; không đặt thì server tự đặt "Đề ôn luyện ngày …". Đổi tên không làm đổi cấu trúc nên không đặt lại ma trận.
+- `plan` trong body tin nhắn (tuỳ chọn) là tổng quan học sinh vừa chỉnh: `chapter_counts`, `type_counts` (mỗi số 1–50) và
+  `difficulty_counts` (0–50). Server đưa nó vào ngữ cảnh của agent để phân bổ lại thành ma trận chi tiết theo chương con;
+  kết quả vẫn qua cùng bước kiểm tra như mọi chỉnh sửa khác.
 - `PATCH /exam-chat/sessions/{id}/preview` chấp nhận `edit.rows` gồm `chapter`, `difficulty`, `type`, `count`
   cho đề tự chọn. Bản xem trước có thể kèm `operation` đổi câu hoặc dựng lại bộ câu. Sự kiện SSE
   `preview` mang `null` khi học sinh bỏ bản xem trước chưa dựng.
@@ -132,6 +141,8 @@ Số câu mỗi mức của từng chương được chia từ `count` theo `dif
 | Method | Path | Việc |
 | --- | --- | --- |
 | POST | `/exam-chat/sessions` | Tạo phiên |
+| PATCH | `/exam-chat/sessions/{id}` | Đổi tên phiên |
+| DELETE | `/exam-chat/sessions/{id}` | Ẩn phiên khỏi danh sách |
 | GET | `/exam-chat/sessions/{id}` | Đọc phiên: tin nhắn, bản xem trước, đề nháp mới nhất |
 | POST | `/exam-chat/sessions/{id}/messages` | Gửi tin nhắn, nhận SSE |
 | GET | `/exam-chat/sessions/{id}/preview` | Đọc bản xem trước |
@@ -151,7 +162,7 @@ Số câu mỗi mức của từng chương được chia từ `count` theo `dif
 
 ### POST /exam-chat/sessions/{id}/messages (SSE)
 
-Body `{"text": "..."}` (1–2000 ký tự). Phản hồi `200`, `Content-Type: text/event-stream`. Mỗi sự kiện có dạng:
+Body `{"text": "...", "version": 2, "plan": {...}}` (`text` 1–2000 ký tự; `version` và `plan` tuỳ chọn). Phản hồi `200`, `Content-Type: text/event-stream`. Mỗi sự kiện có dạng:
 
 ```
 event: <tên>

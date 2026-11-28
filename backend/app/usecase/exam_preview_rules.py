@@ -43,6 +43,7 @@ class PreviewStructure(BaseModel):
     """Cấu trúc đề học sinh đang xem: chương và số câu mỗi chương, cách trộn độ khó."""
 
     kind: Literal["CHAPTER"] = "CHAPTER"
+    title: str | None = Field(None, max_length=120)
     chapters: list[ChapterCount] = Field(min_length=1, max_length=MAX_CHAPTERS)
     difficulty_weights: dict[Difficulty, float] = Field(default_factory=lambda: dict(DEFAULT_WEIGHTS))
     excluded_difficulties: list[Difficulty] = Field(default_factory=list)
@@ -72,6 +73,7 @@ class PreviewEdit(BaseModel):
     type_counts: dict[str, int] | None = None
     type_point_weights: PointWeights | None = None
     rows: list[MatrixCell] | None = Field(None, min_length=1, max_length=50)
+    title: str | None = Field(None, max_length=120)
 
     def is_empty(self) -> bool:
         return all(v is None for v in self.model_dump().values())
@@ -179,6 +181,8 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
         s.duration_minutes = edit.duration_minutes
     if edit.type_point_weights is not None:
         s.type_point_weights = edit.type_point_weights
+    if edit.title is not None:
+        s.title = edit.title.strip() or None
     if edit.rows is not None:
         cells = [(row.chapter, row.difficulty, row.type) for row in edit.rows]
         if len(set(cells)) != len(cells):
@@ -200,7 +204,7 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
         s.difficulty_weights = diffs
         s.excluded_difficulties = []
         s.rows = edit.rows
-    elif any(v is not None for k, v in edit.model_dump().items() if k not in {"duration_minutes", "type_point_weights"}):
+    elif any(v is not None for k, v in edit.model_dump().items() if k not in {"duration_minutes", "type_point_weights", "title"}):
         s.rows = None
         if edit.type_counts is not None:
             s.type_counts = edit.type_counts

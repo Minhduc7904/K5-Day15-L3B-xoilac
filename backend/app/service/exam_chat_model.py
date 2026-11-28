@@ -141,7 +141,9 @@ class ExamChatModel:
             "Thông hiểu là mức TH trong difficulty_counts. Bỏ type_counts và chapter_counts khi học sinh "
             "chưa chỉ định dạng câu hoặc số câu riêng theo chương. "
             "Không đoán chương yếu, không tự đặt mẫu. Số câu tối đa 50; yêu cầu vượt 50 dùng clarify. "
-            "Khi chỉnh số câu, trả số đích; nếu thiếu căn cứ, hỏi lại. Khi phân bổ lại, giữ ràng buộc đã chốt.",
+            "Khi chỉnh số câu, trả số đích; nếu thiếu căn cứ, hỏi lại. Khi phân bổ lại, giữ ràng buộc đã chốt. "
+            "Nếu có student_plan (tổng quan học sinh vừa chỉnh), gọi rebalance và dùng đúng các số chương, dạng câu, "
+            "độ khó trong đó làm số đích.",
             context, tools=tools, tool_choice="required", parallel_tool_calls=False,
         )
         try:

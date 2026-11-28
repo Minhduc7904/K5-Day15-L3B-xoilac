@@ -50,7 +50,7 @@ class LiveExamChat(ExamChatUseCase):
 
     async def _lock(self, sid: int, requester: Requester | None):
         session = await self._repo.lock_session(sid)
-        if requester is None or session is None or session.user_id != requester.user_id:
+        if requester is None or session is None or session.deleted_at is not None or session.user_id != requester.user_id:
             raise SessionNotFound()
         return session
 
@@ -186,7 +186,7 @@ class LiveExamChat(ExamChatUseCase):
         notice = f"Mình chỉ dùng ảnh đọc được và phù hợp với Toán THPT. Đã bỏ qua {ignored} ảnh." if ignored else ""
         return action, notice
 
-    async def respond(self, session_id: int, text: str, requester=None, *, version=None, images=None) -> ChatTurn:
+    async def respond(self, session_id: int, text: str, requester=None, *, version=None, images=None, plan=None) -> ChatTurn:
         if requester is None:
             raise SessionNotFound()
         prepared = self.ocr.prepare(images) if images else []
@@ -194,6 +194,8 @@ class LiveExamChat(ExamChatUseCase):
         context, latest, previous_version, summary, cutoff = await self._context(
             session_id, requester, text, version, image_turn=bool(prepared),
         )
+        if plan is not None:
+            context["student_plan"] = plan.model_dump(mode="json", exclude_defaults=True)
         normalized = norm(text)
         blocked = refusal(normalized)
         next_exam = next_practice(normalized) if not prepared else None
@@ -475,7 +477,7 @@ class LiveExamChat(ExamChatUseCase):
             await CreditRepository(self.db).charge_exam(requester.user_id, sid, study_date(datetime.now(timezone.utc)))
         draft = previous or ExamDraft(session_id=sid)
         draft.preview_version = preview.version
-        draft.title = previous.title if previous else draft_title()
+        draft.title = getattr(structure, "title", None) or (previous.title if previous else draft_title())
         draft.structure = structure.model_dump(mode="json")
         draft.items = items
         draft.shortages = shortages if not operation else previous.shortages

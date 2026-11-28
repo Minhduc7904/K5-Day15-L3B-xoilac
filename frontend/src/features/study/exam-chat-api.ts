@@ -41,6 +41,7 @@ type Structure = {
   duration_minutes: number | null;
 } & ({
   kind: 'CHAPTER';
+  title?: string | null;
   chapters: Array<{ code: string; count: number }>;
   rows: StructureRow[] | null;
   difficulty_weights: Partial<Record<Difficulty, number>>;
@@ -51,9 +52,16 @@ type Structure = {
   sections: TemplateSection[];
   source: string | null;
 });
+/** Tổng quan học sinh vừa chỉnh, nhờ agent phân bổ lại thành ma trận chi tiết. */
+export interface StudentPlan {
+  chapter_counts: Record<string, number>;
+  type_counts: Record<string, number>;
+  difficulty_counts: Record<string, number>;
+}
 export interface ServerPreview {
   version: number;
-  status: 'PROPOSED' | 'EDITED' | 'CONFIRMED' | 'BUILT';
+  status: 'PROPOSED' | 'EDITED' | 'CONFIRMED' | 'BUILT' | 'CANCELLED';
+  reason?: string | null;
   structure: Structure;
   offer: { requested: number; count: number; shortages: Shortage[] } | null;
   operation: { kind: string; positions: number[] } | null;
@@ -130,7 +138,13 @@ export const examChatApi = {
   async chapters(signal?: AbortSignal) {
     return (await apiClient.get<Record<string, { name: string; parent_code: string | null; grade?: number | null }>>(root + '/chapters', { signal })).data;
   },
-  async edit(id: number, version: number, edit: { rows?: StructureRow[]; chapter_codes?: string[]; duration_minutes?: number; type_point_weights?: PointWeights }) {
+  async renameSession(id: number, title: string) {
+    return (await apiClient.patch<ServerSession>(sessionPath(id), { title })).data;
+  },
+  async deleteSession(id: number) {
+    await apiClient.delete(sessionPath(id));
+  },
+  async edit(id: number, version: number, edit: { rows?: StructureRow[]; chapter_codes?: string[]; duration_minutes?: number; type_point_weights?: PointWeights; title?: string }) {
     return (await apiClient.patch<ServerPreview>(sessionPath(id) + '/preview', { version, edit })).data;
   },
   async confirm(id: number, version: number, acceptedCount?: number) {
@@ -138,7 +152,7 @@ export const examChatApi = {
       sessionPath(id) + '/preview/confirm', { version, accepted_count: acceptedCount }, { timeout: 30000 },
     )).data;
   },
-  async *send(id: number, text: string, version: number, images: File[] = []): AsyncGenerator<ExamChatEvent> {
+  async *send(id: number, text: string, version: number, images: File[] = [], plan?: StudentPlan): AsyncGenerator<ExamChatEvent> {
     const path = apiBaseUrl + sessionPath(id) + '/messages';
     const headers = new Headers({ Accept: 'text/event-stream' });
     let body: FormData | string;
@@ -149,7 +163,7 @@ export const examChatApi = {
       for (const image of images) body.append('images', image);
     } else {
       headers.set('Content-Type', 'application/json');
-      body = JSON.stringify({ text, version });
+      body = JSON.stringify({ text, version, plan });
     }
     const response = await fetch(path + (images.length ? '/with-images' : ''), {
       method: 'POST', credentials: 'same-origin', headers, body, signal: AbortSignal.timeout(110000),
