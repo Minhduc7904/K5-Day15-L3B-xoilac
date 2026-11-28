@@ -12,6 +12,21 @@
 
 ---
 
+## Demo online
+
+| Gì | Địa chỉ |
+|---|---|
+| Ứng dụng web (học sinh) | https://examind-frontend.vercel.app/ |
+| Trang quản trị | https://examind-frontend.vercel.app/admin |
+| API (kiểm sống) | https://examind.duckdns.org/api/v1/health/live |
+| Slide | [demo-slides.pdf](demo-slides.pdf) |
+| Video demo dự phòng (30 giây, gọi AI thật) | [Google Drive](https://drive.google.com/drive/folders/1F7REkMX2KSdoWrGfLZYcdNP5P0CPiDj9?usp=sharing) |
+
+- Backend chạy trên EC2, frontend trên Vercel; cách dựng và vận hành ở [runbook EC2](docs/operations/deploy-ec2.md), [CI/CD backend](docs/operations/deploy-backend-ci-cd.md) và [Vercel](docs/operations/deploy-frontend-vercel.md).
+- Nếu ứng dụng không mở hoặc API trả lỗi 502, xem video dự phòng ở trên.
+- Bản chạy thử theo đề (CLI, không cần mạng nội bộ của nhóm): làm theo mục "Chạy trong 3 phút" bên dưới; các số trong `eval/` và `cost/` đo trên bản CLI này, chưa đo trên luồng web.
+- Tài khoản dùng thử: *(chưa điền, nhóm bổ sung nếu giám khảo cần đăng nhập)*.
+
 ## Tài liệu dự án
 
 Xem [mục lục, quy chuẩn và template](docs/README.md). Trước khi làm việc, agent đọc [danh sách tài liệu bắt buộc](AGENTS.md#đọc-trước-khi-làm). Hướng dẫn truy cập môi trường demo nằm trong [runbook EC2](docs/operations/deploy-ec2.md).
