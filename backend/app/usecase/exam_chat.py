@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from app.models.exam_chat import ExamChatSession, ExamDraft, ExamPreview
 from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
-from app.service.exam_chat_sources import ExamTemplateSource, StudentHistorySource
+from app.service.exam_chat_sources import MIN_ANSWERED, ExamTemplateSource, StudentHistorySource
 from app.usecase import exam_chat_intent as chat_intent
 from app.usecase.exam_preview_rules import (
     DEFAULT_TOTAL,
@@ -50,7 +50,6 @@ from app.usecase.exam_template_plan import (
     from_template,
 )
 
-MIN_ANSWERS = 5      # chương làm ít hơn số câu này không dùng để xếp hạng (như agent.py)
 CLOSE_GAP = 0.10     # hai chương yếu nhất cách nhau ≤ 10 điểm % → chia câu cho cả hai
 VN_TZ = timezone(timedelta(hours=7))
 CHAPTER_PHRASE = re.compile(r"chuong\s+([a-z0-9 ]+?)(?:\s+cho\b|\s+\d|[,.;:!?(]|$)")
@@ -387,7 +386,10 @@ class ExamChatUseCase:
         if history is None or not history.chapters:
             return ChatTurn(f"Mình chưa có lịch sử làm bài của {session.student_ref} nên chưa biết chương em hay sai, "
                             "và mình không đoán. Em muốn ôn chương nào?", notes=["dừng: chưa có lịch sử"])
-        ranked = sorted((c for c in history.chapters if c.total >= MIN_ANSWERS), key=lambda c: (c.rate, c.code))
+        ranked = sorted((c for c in history.chapters if c.total >= MIN_ANSWERED
+                         and (history.latest_at is None or c.classification == "weak")), key=lambda c: (c.rate, c.code))
+        if history.latest_at and not history.attempt_count:
+            return ChatTurn("Em chưa có lượt đã chấm trong khoảng thời gian gần đây. Em muốn chọn chương nào để ôn?")
         if history.conflicting:
             lines = "\n".join(f"- {c.code}: đúng {c.correct}/{c.total} ({round(100 * c.rate)}%)" for c in ranked[:3])
             return ChatTurn(f"Kết quả làm bài của {session.student_ref} có chỗ mâu thuẫn (khoảng "
@@ -395,7 +397,7 @@ class ExamChatUseCase:
                             f"mình chưa xác định chắc chương yếu. Các chương đang thấp nhất:\n{lines}\n"
                             "Em muốn ôn chương nào trong số này, hay chương khác?", notes=["dừng: dữ liệu mâu thuẫn"])
         if not ranked:
-            return ChatTurn("Em làm chưa đủ nhiều câu ở mỗi chương để mình xác định chương yếu. Em muốn ôn chương nào?")
+            return ChatTurn("Chưa xác định được chương yếu từ số câu đã làm. Em muốn chọn chương nào để ôn?")
         # + 1e-9: để khoảng cách đúng 10 điểm % (vd 40% − 30%) không bị sai số dấu phẩy động loại ra.
         top = ranked[:2] if len(ranked) >= 2 and ranked[1].rate - ranked[0].rate <= CLOSE_GAP + 1e-9 else ranked[:1]
         n = edit.total or DEFAULT_TOTAL
@@ -410,6 +412,8 @@ class ExamChatUseCase:
             f"{c.code} đúng {c.correct}/{c.total} ({round(100 * c.rate)}%), sai {c.total - c.correct}/{c.total} câu"
             for c in top
         ) + (", hai chương yếu gần nhau nên chia câu cho cả hai." if len(top) == 2 else ".")
+        if history.latest_at:
+            reason = "Gợi ý theo quy tắc. " + reason
         preview = await self._repo.save_preview(
             session.session_id,
             {"structure": structure.model_dump(mode="json"), "status": "PROPOSED", "mode": "CHAPTER", "reason": reason},

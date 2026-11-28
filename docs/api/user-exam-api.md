@@ -31,7 +31,42 @@ Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`.
   Hết credit trả `402 INSUFFICIENT_CREDITS` và giữ preview.
 - `GET /exam-chat/drafts` liệt kê đề hiện hành của tài khoản. `GET /exam-chat/drafts/{id}` đọc nội dung đề và
   `GET /exam-chat/drafts/{id}/media/{media_id}` đọc ảnh trong đề. Chủ đề và kết quả làm bài cũ không được
-  suy ra từ dữ liệu thử. Đợt này hỗ trợ xem và in đề. Chưa triển khai làm bài trực tuyến.
+  suy ra từ dữ liệu thử. Đề hỗ trợ xem, in và làm trực tuyến qua [API lượt làm bài](online-exam-attempts-api.md).
+
+### Ôn theo lịch sử đã chấm
+
+Gửi “Tạo đề ôn tiếp” qua endpoint tin nhắn đang dùng. Agent lấy khối trong hồ sơ hoặc phạm vi học sinh chọn và chỉ đọc lượt của tài khoản đăng nhập. Mỗi lần yêu cầu mới đọc lại tối đa năm lượt đã chấm trong 30 ngày, xếp theo thời điểm chấm rồi mã lượt. Phản hồi tóm tắt bài vừa làm và các lượt trước trong khoảng này.
+
+| Số câu đã làm theo chương cha | Cách diễn giải |
+| --- | --- |
+| 0 | Chưa luyện trong khoảng đang xét |
+| 1–4 | Ít dữ liệu, kể cả sai 1/1 |
+| Ít nhất 5 và sai từ 50% | Chương yếu cần củng cố |
+| Ít nhất 5 và sai dưới 50% | Có đủ dữ liệu để ôn cân bằng |
+
+Chỉ trạng thái `correct` tính đúng. `wrong` và `partial` tính sai. Câu bỏ qua được đếm riêng và không tính vào mẫu số. Server gộp theo chương cha và loại mục thiếu kết quả hoặc nhãn chương rõ ràng. Lượt thiếu căn cứ hoặc có kết quả trái nhau trong cùng lượt dẫn tới câu hỏi chọn chương hoặc gợi ý làm bài ngắn. Các ngưỡng nằm trong `backend/app/service/exam_chat_sources.py`.
+
+Model nhận thống kê tổng hợp, phạm vi, ràng buộc và số câu đã duyệt theo ô. Kết quả là các nhóm chương, độ khó, dạng câu, số lượng, mã căn cứ và mục đích luyện. Server kiểm số liệu và ghép thử câu phân biệt trước khi gửi `preview`. Kho thiếu thì tin nhắn nêu phần thiếu để học sinh sửa. Nếu kho thay đổi sau khi xem trước, dùng cơ chế `offer` và xác nhận số câu rút gọn đang có. Bước dựng và định dạng sự kiện SSE dùng hợp đồng hiện có.
+
+#### Kiểm chứng CP3 #41
+
+Ca live ngày 28/11/2026 dùng hai tài khoản lớp 12 tự tạo và nộp bài qua API thật trong cơ sở dữ liệu kiểm thử.
+
+| Ca | Kết quả |
+| --- | --- |
+| Cùng yêu cầu “Tạo đề ôn tiếp 1 câu thông hiểu” | Tài khoản A nhận `12C11` vì sai 6/6 câu ở chương cha `12C1`. Tài khoản B nhận `12C4` vì sai 6/6 câu ở chương đó. |
+| Có lượt chấm mới trong phiên chat của A | Sau khi A làm đúng một lượt ở `12C1` và nộp hai lượt ở `12C4`, đề xuất chuyển sang `12C4`. |
+| Xem trước, chỉnh và xác nhận | A chỉnh từ một thành hai câu rồi xác nhận. Đề nháp chứa hai câu đã duyệt và ẩn dữ liệu đáp án. |
+
+Ba lời gọi đề xuất dùng `gpt-5.4-mini-2026-03-17`. API ghi lần lượt 830, 830 và 843 token vào, cùng 52 token ra mỗi lần. Các ca lịch sử rỗng, 1/1, chưa luyện, mâu thuẫn, kho thiếu, đổi phiên bản, chặn truy cập chéo và chỉnh qua chat chạy trong bộ test thường.
+
+Chạy lại ca live từ thư mục `backend/` bằng PowerShell với khóa model đã cấu hình.
+
+```powershell
+$env:EXAMIND_CP3_LIVE = '1'
+..\.venv\Scripts\python.exe -m pytest -q tests/test_personalization_chat.py -k configured_provider --log-cli-level=INFO
+$env:EXAMIND_CP3_LIVE = $null
+```
 
 ### Ảnh trong chat
 

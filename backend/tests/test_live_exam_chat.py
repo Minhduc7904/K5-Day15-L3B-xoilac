@@ -37,6 +37,9 @@ async def test_tool_dispatch_uses_function_schema(monkeypatch):
     options = call.call_args.kwargs
     assert options["tool_choice"] == "required"
     assert {tool["function"]["name"] for tool in options["tools"]} >= {"chapter", "template", "confirm", "replace"}
+    history = next(tool["function"] for tool in options["tools"] if tool["function"]["name"] == "history")
+    types = history["parameters"]["properties"]["type_counts"]["properties"]
+    assert set(types) == {"SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"}
 
 
 async def test_context_scope_shortage_and_free_replacement(live):

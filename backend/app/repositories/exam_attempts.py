@@ -50,11 +50,15 @@ class ExamAttemptRepository:
             .order_by(ExamAttempt.attempt_id.desc())
         )).all()
 
-    async def graded(self, user_id: int, limit: int) -> list[ExamAttempt]:
+    async def graded(self, user_id: int, limit: int, *, by_grading_time: bool = False) -> list[ExamAttempt]:
         """Các lượt đã chấm gần nhất của học sinh, dùng cho dashboard và lịch sử của agent."""
+        order = [ExamAttempt.attempt_id.desc()]
+        if by_grading_time:
+            graded_at = func.coalesce(ExamAttempt.graded_at, ExamAttempt.finished_at, ExamAttempt.started_at)
+            order.insert(0, graded_at.desc())
         return list(await self.session.scalars(
             select(ExamAttempt).where(ExamAttempt.user_id == user_id, ExamAttempt.status == "graded")
-            .order_by(ExamAttempt.attempt_id.desc()).limit(limit)
+            .order_by(*order).limit(limit)
         ))
 
     async def due_ids(self, now: datetime) -> list[int]:

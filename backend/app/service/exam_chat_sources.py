@@ -11,9 +11,14 @@ Mỗi nguồn là một giao diện nhỏ, kèm cài đặt mặc định an to�
 """
 from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Protocol
 
 CONFLICT_RATIO = 0.25  # giống codebase/tools.py: ≥ 25% câu trái kết quả trong cùng lượt → mâu thuẫn
+HISTORY_DAYS = 30
+HISTORY_ATTEMPTS = 5
+MIN_ANSWERED = 5
+WEAK_ERROR_RATE = 0.50
 
 
 @dataclass
@@ -21,28 +26,53 @@ class ChapterResult:
     code: str
     correct: int
     total: int
+    skipped: int = 0
 
     @property
     def rate(self) -> float:
         return self.correct / self.total if self.total else 0.0
+
+    @property
+    def incorrect(self) -> int:
+        return self.total - self.correct
+
+    @property
+    def error_rate(self) -> float | None:
+        return self.incorrect / self.total if self.total else None
+
+    @property
+    def classification(self) -> str:
+        if not self.total:
+            return "unpracticed"
+        if self.total < MIN_ANSWERED:
+            return "under_practiced"
+        return "weak" if self.incorrect >= WEAK_ERROR_RATE * self.total else "adequate"
 
 
 @dataclass
 class StudentHistory:
     chapters: list[ChapterResult] = field(default_factory=list)
     conflict_ratio: float = 0.0
+    latest: list[ChapterResult] = field(default_factory=list)
+    earlier: list[ChapterResult] = field(default_factory=list)
+    latest_at: datetime | None = None
+    attempt_count: int = 0
+    incomplete: int = 0
+    conflicting_items: int = 0
 
     @property
     def conflicting(self) -> bool:
-        return self.conflict_ratio >= CONFLICT_RATIO
+        return self.conflicting_items > 0 or self.conflict_ratio >= CONFLICT_RATIO
 
 
 class StudentHistorySource(Protocol):
-    async def get(self, student_ref: str) -> StudentHistory | None: ...
+    async def get(
+        self, student_ref: str, *, grade: int | None = None, chapter_codes: Sequence[str] = (),
+    ) -> StudentHistory | None: ...
 
 
 class NoHistory:
-    async def get(self, student_ref: str) -> StudentHistory | None:
+    async def get(self, student_ref: str, *, grade: int | None = None, chapter_codes: Sequence[str] = ()) -> StudentHistory | None:
         return None
 
 
@@ -52,7 +82,7 @@ class StaticHistory:
     def __init__(self, data: dict[str, StudentHistory]) -> None:
         self._data = data
 
-    async def get(self, student_ref: str) -> StudentHistory | None:
+    async def get(self, student_ref: str, *, grade: int | None = None, chapter_codes: Sequence[str] = ()) -> StudentHistory | None:
         return self._data.get(student_ref)
 
 

@@ -24,7 +24,7 @@ import { builtCard, shortageText, toProposal, uid, useChatSessions, type ChatMes
 import { StructurePreview } from './structure-preview';
 
 const STARTERS = [
-  { icon: Target, title: 'Ôn chương mình hay sai', text: 'Ôn chương mình hay sai, đề 30 phút', hint: 'Agent xem lịch sử làm bài để chọn chương' },
+  { icon: Target, title: 'Ôn chương mình hay sai', text: 'Tạo đề ôn tiếp', hint: 'Agent xem lịch sử làm bài để chọn chương' },
   { icon: BookMarked, title: 'Theo một chương cụ thể', text: 'Ra đề 20 phút về nguyên hàm và tích phân', hint: 'Vd: tích phân, mũ – lôgarit, Oxyz…' },
   { icon: ClipboardList, title: 'Luyện thoải mái, không tính giờ', text: 'Cho mình đề không giới hạn thời gian về hàm số mũ và lôgarit', hint: 'Làm chậm, hiểu kỹ từng câu' },
   { icon: ImageUp, title: 'Gửi ảnh bài hay sai', text: '', hint: 'Đính kèm ảnh, agent gợi ý chương cần ôn', attach: true },

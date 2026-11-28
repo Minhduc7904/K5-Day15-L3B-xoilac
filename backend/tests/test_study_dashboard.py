@@ -7,7 +7,7 @@ from app.service.exam_chat_sources import StudentHistory
 from app.usecase import study_stats
 from app.usecase.study_dashboard import AttemptHistory, StudyDashboard
 from app.usecase.study_stats import GradedAttempt
-from tests.exam_chat_support import chat_client, login_as
+from tests.exam_chat_support import chat_client, login_as, seed
 from tests.test_exam_attempts import ROOT, add_draft, seed_attempt_bank
 
 CATALOG = {
@@ -16,6 +16,11 @@ CATALOG = {
     "11C6": {"name": "Mũ và lôgarit", "parent_code": None, "grade": 11},
 }
 TODAY = date(2026, 11, 28)
+
+
+async def seed_dashboard_bank(conn):
+    await seed(conn)
+    await seed_attempt_bank(conn)
 
 
 def graded(attempt_id, finished, *, draft_id=1, score=5.0, statuses=None, items=None, time_ms=None, minutes=0):
@@ -110,7 +115,7 @@ async def test_dashboard_endpoint_reflects_graded_attempts_and_isolates_users():
 
 @pytest.mark.asyncio
 async def test_attempt_history_feeds_the_agent_from_graded_attempts():
-    async with chat_client(real_auth=True, seed_fn=seed_attempt_bank) as client:
+    async with chat_client(real_auth=True, seed_fn=seed_dashboard_bank) as client:
         owner = await login_as(client, "history-owner@example.com")
         draft_id = await add_draft(client, owner)
         attempt = (await client.post(f"{ROOT}/exams/{draft_id}/attempts", json={})).json()
@@ -122,6 +127,8 @@ async def test_attempt_history_feeds_the_agent_from_graded_attempts():
             history = AttemptHistory(StudyDashboard(ExamAttemptRepository(session), QuestionBankRepository(session)))
             found = await history.get(f"U{owner}")
             assert isinstance(found, StudentHistory)
-            assert [(c.code, c.correct, c.total) for c in found.chapters] == [("12C1", 0, 3)]
+            chapter = next(c for c in found.chapters if c.code == "12C1")
+            assert (chapter.correct, chapter.total, chapter.skipped, chapter.error_rate) == (0, 0, 3, None)
+            assert found.attempt_count == 1
             assert await history.get("U999999") is None
             assert await history.get("not-a-ref") is None
