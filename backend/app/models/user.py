@@ -20,7 +20,7 @@ class User(Base):
         CheckConstraint("status IN ('active','disabled')", name="ck_users_status"),
         Index("uq_users_email_lower", func.lower(text("email")), unique=True),
         UniqueConstraint("google_subject", name="uq_users_google_subject"),
-        # Admin gốc (migration 0018, #20): tối đa một tài khoản, và phải là admin.
+        # Admin gốc (migration 0020, #20): tối đa một tài khoản, và phải là admin.
         CheckConstraint("NOT is_root OR role = 'admin'", name="ck_users_root_is_admin"),
         Index(
             "uq_users_single_root",

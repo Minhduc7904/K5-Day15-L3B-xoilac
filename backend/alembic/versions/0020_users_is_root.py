@@ -5,14 +5,14 @@ Admin gốc là tài khoản tạo từ ADMIN_EMAIL/ADMIN_PASSWORD (ensure_admin
 - CHECK (NOT is_root OR role = 'admin'): admin gốc không thể bị hạ vai trò, kể cả bằng SQL lỡ tay.
 Không có API nào đặt is_root; chỉ ensure_admin đặt.
 
-Revision ID: 0018_users_is_root
-Revises: 0017_preview_cancelled
+Revision ID: 0020_users_is_root
+Revises: 0019_seed_exam_template_matrix
 Create Date: 2026-11-28
 """
 from alembic import op
 
-revision = "0018_users_is_root"
-down_revision = "0017_preview_cancelled"
+revision = "0020_users_is_root"
+down_revision = "0019_seed_exam_template_matrix"
 branch_labels = None
 depends_on = None
 

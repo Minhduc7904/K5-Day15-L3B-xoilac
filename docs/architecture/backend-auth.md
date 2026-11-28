@@ -28,7 +28,7 @@ Tài liệu này dành cho người viết backend của các issue #3, #4, #5, 
 | Service | `app/service/password_service.py` | Băm và kiểm mật khẩu bằng argon2id (chạy trong threadpool), kèm hash giả để chống dò email qua thời gian phản hồi |
 | Service | `app/service/token_service.py` | Sinh token bằng `secrets.token_urlsafe(32)` và băm SHA-256 |
 | Repository | `app/repositories/user_repository.py`, `session_repository.py` | Đọc ghi `users`, `sessions` |
-| Model | `app/models/user.py`, `app/models/session.py` | ORM. Migration `0003_auth.py` (bảng), `0004_users_created_by.py`, `0018_users_is_root.py` (admin gốc) |
+| Model | `app/models/user.py`, `app/models/session.py` | ORM. Migration `0003_auth.py` (bảng), `0004_users_created_by.py`, `0020_users_is_root.py` (admin gốc) |
 | CLI | `app/cli/ensure_admin.py` | Tạo admin gốc từ `ADMIN_*` nếu chưa có. Chạy trong `db-init` |
 | CLI | `app/cli/create_admin.py` | Cứu hộ: tạo admin bằng tay. Mật khẩu lấy từ `ADMIN_PASSWORD` hoặc getpass |
 
@@ -238,7 +238,7 @@ Các dòng #3, #4, #5, #11 là đề xuất. Người làm issue đó chốt l�
 
 ### Cấp tài khoản admin
 
-Không có đường HTTP công khai nào tạo được admin. **Admin gốc** (`users.is_root`, migration `0018`, tối đa một tài khoản) là tài khoản tạo từ `ADMIN_EMAIL`; chỉ admin gốc tạo, sửa, khoá admin khác và đổi vai trò (#20). Có đúng ba cách có admin:
+Không có đường HTTP công khai nào tạo được admin. **Admin gốc** (`users.is_root`, migration `0020`, tối đa một tài khoản) là tài khoản tạo từ `ADMIN_EMAIL`; chỉ admin gốc tạo, sửa, khoá admin khác và đổi vai trò (#20). Có đúng ba cách có admin:
 
 | Cách | Ai làm | Khi nào dùng | `created_by` | Admin gốc? |
 | --- | --- | --- | --- | --- |
