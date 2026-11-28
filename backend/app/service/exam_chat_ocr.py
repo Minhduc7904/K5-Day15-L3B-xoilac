@@ -11,6 +11,25 @@ MAX_CHAT_IMAGES = 4
 MAX_CHAT_IMAGE_BYTES = 4 * 1024 * 1024
 MAX_OCR_TEXT_PER_IMAGE = 3500
 OCR_IMAGE_PLACEHOLDER = re.compile(r"!\[[^\]\n]*\]\([^\)\n]*\)")
+_ARROW = re.compile(r"\\(?:overrightarrow|vec)\s*\{([^{}]*)\}")
+_FRAC = re.compile(r"\\d?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}")
+_SQRT = re.compile(r"\\sqrt\s*\{([^{}]*)\}")
+_WRAP = re.compile(r"\\(?:text|mathrm|mathbf|mathit|operatorname|overline|widehat|hat)\s*\{([^{}]*)\}")
+_COMMAND = re.compile(r"\\[A-Za-z]+")
+_SYMBOLS = (("\\left", ""), ("\\right", ""), ("\\cdot", "·"), ("\\geq", "≥"), ("\\leq", "≤"), ("\\ge", "≥"),
+            ("\\le", "≤"), ("\\;", " "), ("\\,", " "), ("\\!", ""), ("\\{", "{"), ("\\}", "}"))
+
+
+def plain_math(text: str) -> str:
+    """Flatten OCR LaTeX into plain words so vetting and chapter matching never depend on backslashes."""
+    text = _ARROW.sub(lambda m: f"vectơ {m.group(1)}", text)
+    text = _FRAC.sub(lambda m: f"({m.group(1)})/({m.group(2)})", text)
+    text = _SQRT.sub(lambda m: f"căn({m.group(1)})", text)
+    text = _WRAP.sub(lambda m: m.group(1), text)
+    for source, target in _SYMBOLS:
+        text = text.replace(source, target)
+    text = _COMMAND.sub(" ", text).replace("$", " ").replace("{", "").replace("}", "")
+    return re.sub(r"[ \t]+", " ", text).strip()
 
 
 class ExamChatImageError(Exception):
@@ -58,4 +77,4 @@ class ExamChatOcr:
             text = await self.models.recognize_image(data, mime)
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError("OCR provider unavailable") from exc
-        return OCR_IMAGE_PLACEHOLDER.sub("", text).strip()[:MAX_OCR_TEXT_PER_IMAGE]
+        return plain_math(OCR_IMAGE_PLACEHOLDER.sub("", text))[:MAX_OCR_TEXT_PER_IMAGE]

@@ -15,6 +15,7 @@ from app.repositories.notifications import NotificationRepository
 from app.repositories.student_profiles import StudentProfileRepository
 from app.service.exam_chat_model import ChatAction, ExamChatModel, ExamChatModelError
 from app.service.exam_chat_ocr import ExamChatImageError, ExamChatOcr, PreparedImage
+from app.service.exam_chat_topics import chapter_hints, clear_winner
 from app.service.storage_service import StorageService
 from app.usecase.exam_chapter_scope import expand_chapters, leaf_codes
 from app.usecase.exam_chat import (
@@ -175,7 +176,21 @@ class LiveExamChat(ExamChatUseCase):
                         else "Em gửi ảnh rõ hơn hoặc nhập chủ đề muốn ôn nhé.")
                 return None, reason + " " + hint
             context["ocr_evidence"] = evidence
-            action = await self.model.interpret(context)
+            topics = [item for item in evidence if item.get("kind") == "topic"]
+            hints = chapter_hints(" ".join(texts[item["image"] - 1] for item in topics), context["catalog"])
+            if hints:
+                context["chapter_hints"] = [{key: hint[key] for key in ("code", "name", "leaves")} for hint in hints]
+            # Exercise images name their chapter by content, so the server's own reading backs up the model.
+            fallback = (ChatAction(action="chapter", chapters=[winner["code"]])
+                        if len(topics) == len(evidence) and (winner := clear_winner(hints)) else None)
+            try:
+                action = await self.model.interpret(context)
+            except ExamChatModelError:
+                if fallback is None:
+                    raise
+                action = fallback
+            if fallback and action.action in {"clarify", "unsupported"}:
+                action = fallback
         except ExamChatImageError as exc:
             return None, str(exc)
         except ExamChatModelError:
