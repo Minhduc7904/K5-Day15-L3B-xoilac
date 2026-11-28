@@ -185,7 +185,15 @@ flowchart LR
 - Ai có thể bị hại nếu AI sai, và nhóm chặn thế nào: học sinh ôn lệch chương hoặc ôn sai cấu trúc kỳ thi (hại vừa, sửa được). Chặn bằng số liệu làm căn cứ, bước preview, kiểm mã câu bằng code và thu hẹp phạm vi khi thiếu căn cứ. Admin có thể gán sai độ khó cho câu mới nếu tin gợi ý của embedding; chặn bằng việc admin duyệt từng câu trước khi vào ngân hàng.
 
 ## §10. Phân công & changelog
-- Phân công có tên (theo chặng, chia cặp — guide "Cách chia việc"): Nguyễn Minh Đức — PO, Tech Lead, DevOps, chốt chuẩn "đạt" và duyệt tài liệu · Đỗ Thị Thu Hằng — backend và frontend · Phùng Văn Thanh Cao và Vũ Quang Huy — AI Agent (công cụ, luồng agent, luồng admin nhập PDF). Phân công theo từng chặng sẽ ghi thêm ở CP3.
+- Phân công có tên (theo chặng, chia cặp — guide "Cách chia việc"): Nguyễn Minh Đức — PO, Tech Lead, DevOps, chốt chuẩn "đạt" và duyệt tài liệu · Đỗ Thị Thu Hằng — backend và frontend · Phùng Văn Thanh Cao và Vũ Quang Huy — AI Agent (công cụ, luồng agent, luồng admin nhập PDF).
+
+  Phân công theo từng chặng (căn cứ lịch sử commit và `docs/ai-usage.md`; dòng CP4 của Hằng, Cao, Huy là **đề xuất của đội trưởng, chờ từng người xác nhận**):
+
+  | Chặng | Nguyễn Minh Đức | Đỗ Thị Thu Hằng | Phùng Văn Thanh Cao | Vũ Quang Huy |
+  |---|---|---|---|---|
+  | CP1–CP2 | Canvas, giả thuyết khảo sát, `spec.md` §4–§7, bộ câu thử B01–B13, metric, data card, công cụ và luồng agent mẫu | Nền backend và frontend | API mẫu cấu trúc đề thi (#5), chat tạo đề ôn qua SSE (#4) | Nhập đề từ PDF (#3), cấu hình production (#13) |
+  | CP3 | Khảo sát 23 phiếu và `evidence/`, nối model thật, bộ câu thử B14–B27, lượt 1, bảng impact, §0, §3 | Admin ngân hàng câu hỏi và danh mục chương (#11), users realtime (#20) | Gộp mẫu đề với phân quyền học sinh, test đối chiếu với `codebase/agent.py` (#4) | Cá nhân hóa đề ôn từ lượt đã chấm (#41) |
+  | CP4 | Lượt 2, mô phỏng chi phí, `eval/report.md`, slide, tài liệu spec | *(đề xuất)* chạy demo web, kiểm hiển thị ảnh và bảng câu hỏi, reflection | *(đề xuất)* kiểm luồng chat tạo đề và mẫu đề trên môi trường demo, người chấm thứ hai nếu được nhóm chọn, reflection | *(đề xuất)* xác minh môi trường EC2 cho demo, cá nhân hóa, reflection |
 - Dùng AI vào việc gì (2–3 dòng; chi tiết `docs/ai-usage.md`): Claude Code hỗ trợ soạn bản đầu `spec.md` §4–§7, `eval/benchmark.csv`, `eval/metric_spec.yaml` và `data/DATA_CARD.md` cho CP2; nhóm đọc và duyệt trước khi commit. Câu thử do AI soạn ghi nguồn `tu_viet`, không phải lời người dùng thật.
 - Nhật ký thay đổi — **mọi thay đổi sau CP2 19:30 Thứ Sáu 27/11 phải có dòng ở đây**:
 
@@ -198,6 +206,7 @@ flowchart LR
 | 28/11/2026 | Ghi cách quy đổi ngưỡng "đạt" sang 27 câu: ≥ 22/27 · tu_choi 7/7 · thuong ≥ 6/8 · kho ≥ 10/12 | Chuẩn §7 và `metric_spec.yaml` giữ nguyên chữ, chỉ giữ tỷ lệ % đã chốt ở CP2 (80%, 100%, 75%, 80%) và làm tròn lên cho bộ câu lớn hơn; chi tiết `eval/README.md` mục 3. |
 | 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
 | 28/11/2026 | Lượt 2: thêm ba mẫu chặn trước AI (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input` của `codebase/agent.py` | Lượt 1 trượt B25–B27 (`tu_choi` 4/7). Lượt 2 trên cùng bộ 27 câu: 25/27, `tu_choi` 7/7; chi tiết `eval/report.md` mục 3. |
+| 28/11/2026 | Điền phân công theo từng chặng ở §10 | Bổ sung mục còn trống theo yêu cầu CP3–CP4; dòng CP4 của ba thành viên là đề xuất, chờ xác nhận. |
 | 28/11/2026 | Điền §8 chi phí từ `simulate-1` (50 phiên, 3 mức model, tỉ lệ đạt 25/27 của lượt 2) và `cost/personas.yaml` | Nhóm chưa có số học sinh thật nên 3 mốc người dùng ghi *(tự ước tính)*; số phiên / tháng lấy từ khảo sát câu 8; chi phí chỉ đo bản CLI, chưa đo luồng web. |
 | 28/11/2026 | Điền §0 (luồng hiện tại từ khảo sát) và §3 (Azota, Khan Academy) | Cần §0–§7 đủ nội dung cho CP3; §3 lấy từ tài liệu chính thức của hai sản phẩm, phần không kiểm được ghi "chưa kiểm". |
 

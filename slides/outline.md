@@ -18,6 +18,15 @@
 
 Ai nói trang nào (mỗi người ≥1 phần):
 
+*(Đề xuất của đội trưởng, nhóm chốt lại. Mỗi người phải giải thích được trang mình nói; Đức nói các trang đánh giá, chi phí vì đã chạy và chấm các lượt đó.)*
+
 | Trang | Người nói |
 |---|---|
-| | |
+| 1. Người dùng & pain | Đỗ Thị Thu Hằng |
+| 2. Vì sao chọn bài này | Đỗ Thị Thu Hằng |
+| 3. Giải pháp | Phùng Văn Thanh Cao |
+| 4. Demo live | Vũ Quang Huy |
+| 5. Đánh giá thế nào | Nguyễn Minh Đức |
+| 6. Chi phí khi dùng thật | Nguyễn Minh Đức |
+| 7. Kết luận | Nguyễn Minh Đức |
+| 8. Nếu có thêm 1 tuần | Vũ Quang Huy |
