@@ -70,6 +70,11 @@ function save(state: MockState) {
 
 const delay = (ms = 750) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+/** Email của tài khoản mock đang đăng nhập; mock của feature khác (vd quản lý người dùng #20) dùng để biết "ai đang gọi". */
+export function getMockCurrentEmail(): string | null {
+  return load().currentEmail;
+}
+
 function failIfNetwork(email: string) {
   if (normalizeEmail(email) === 'loimang@example.com') {
     throw new AuthError('NETWORK', 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại nhé.');
