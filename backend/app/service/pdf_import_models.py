@@ -1,13 +1,19 @@
 import base64
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from io import BytesIO
 
 import httpx
+from pypdf import PdfReader, PdfWriter
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings
 from app.schemas.pdf_import import Extraction
 
+OCR_BATCH_PAGES = 30
+EXTRACTION_FULL_DOCUMENT_PAGES = 30
+EXTRACTION_BATCH_PAGES = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 OPTION_IMAGE = r"!\[[^\]\n]*\]\((?:media:\d+|media-missing:p\d+-\d+)\)"
 IMAGE_OPTIONS = re.compile(
@@ -40,6 +46,19 @@ class OcrPage:
 
 class ExtractionTooLong(ValueError):
     pass
+
+
+def split_ocr_pdf(pdf: bytes, page_count: int) -> list[bytes]:
+    reader = PdfReader(BytesIO(pdf))
+    parts = []
+    for start in range(0, page_count, OCR_BATCH_PAGES):
+        writer = PdfWriter()
+        for page in reader.pages[start:start + OCR_BATCH_PAGES]:
+            writer.add_page(page)
+        output = BytesIO()
+        writer.write(output)
+        parts.append(output.getvalue())
+    return parts
 
 
 def image_mime(data: bytes | None) -> str:
@@ -78,11 +97,22 @@ class PdfImportModels:
         key = self.settings.openai_api_key
         return bool(self.ocr_key and key and key.get_secret_value())
 
-    async def recognize(self, pdf: bytes) -> tuple[str, list[OcrPage]]:
+    async def recognize(self, pdf: bytes, *, page_count: int) -> tuple[str, list[OcrPage]]:
         key = self.ocr_key
         if not key:
             raise ValueError("Chưa cấu hình OCR.")
-        return await self._recognize_mistral(pdf, key)
+        if page_count <= OCR_BATCH_PAGES:
+            return await self._recognize_mistral(pdf, key)
+
+        parts = await run_in_threadpool(split_ocr_pdf, pdf, page_count)
+        pages = []
+        for offset, part in zip(range(0, page_count, OCR_BATCH_PAGES), parts, strict=True):
+            model, batch = await self._recognize_mistral(part, key)
+            expected = min(OCR_BATCH_PAGES, page_count - offset)
+            if [page.index for page in batch] != list(range(expected)):
+                raise ValueError("OCR không trả đủ số trang trong lô.")
+            pages.extend(replace(page, index=offset + page.index) for page in batch)
+        return model, pages
 
     async def recognize_image(self, image: bytes, mime: str) -> str:
         """Read image text via the same Mistral OCR endpoint and configuration as PDF import."""
@@ -128,13 +158,14 @@ class PdfImportModels:
     async def extract(
         self, pages: list[dict], *, source_solution_keys: list[tuple[str, str]] | None = None,
     ) -> tuple[str, Extraction]:
-        try:
-            return await self._extract_pages(pages, source_solution_keys=source_solution_keys)
-        except ExtractionTooLong:
-            if len(pages) == 1:
-                raise
+        if len(pages) <= EXTRACTION_FULL_DOCUMENT_PAGES:
+            try:
+                return await self._extract_pages(pages, source_solution_keys=source_solution_keys)
+            except ExtractionTooLong:
+                if len(pages) <= 1:
+                    raise
 
-        # Retry a truncated document in small page groups. Neighboring pages supply
+        # Extract long documents in small page groups. Neighboring pages supply
         # context for questions and solutions that continue over a page break.
         questions, answers = [], []
         headings = "\n".join(
@@ -142,8 +173,8 @@ class PdfImportModels:
             for page in pages
             for match in re.finditer(r"(?im)^#{0,6}\s*(?:phần\s+[ivx]+|đáp án|lời giải)[^\n]*", page["normalized"])
         )
-        for start in range(0, len(pages), 4):
-            end = min(start + 4, len(pages))
+        for start in range(0, len(pages), EXTRACTION_BATCH_PAGES):
+            end = min(start + EXTRACTION_BATCH_PAGES, len(pages))
             owned = {page["page"] for page in pages[start:end]}
             model, batch = await self._extract_pages(
                 pages[max(start - 1, 0):end + 1], owned, headings, source_solution_keys=source_solution_keys,

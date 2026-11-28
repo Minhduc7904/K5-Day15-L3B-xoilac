@@ -253,7 +253,7 @@ function DraftEditor({ importId, draft, onChanged }: { importId: number; draft: 
             <FormField label="Lời giải">
               {(f) => <Textarea {...f} rows={4} value={form.solution} onChange={(e) => set({ solution: e.target.value })} />}
             </FormField>
-            <Checkbox label="Đã kiểm tra hình" description="Bắt buộc với câu phụ thuộc hình hoặc có cờ về hình."
+            <Checkbox label="Đã kiểm tra hình" description="Bắt buộc với câu có hình, phụ thuộc hình hoặc có cờ về hình."
               checked={form.imageReviewed} onChange={(e) => set({ imageReviewed: e.target.checked })} />
           </fieldset>
           {!locked && (

@@ -6,6 +6,8 @@ Hợp đồng cho backend, frontend admin và kiểm thử Issue #3.
 
 Base URL local là `http://localhost:8000/api/v1`. Các thao tác nhập, duyệt và cấp URL xem tệp dùng phiên có vai trò admin theo Auth chung. URL xem đối tượng đã ký hết hạn sau 5 phút hoặc khi backend khởi động lại.
 
+Mỗi tệp PDF cần có từ 1 đến 60 trang và tối đa 20 MiB.
+
 ## Endpoint và hợp đồng
 
 | Method và path tương đối | Kết quả |
@@ -34,9 +36,9 @@ Ví dụ phản hồi tải lên
 | 403 | Tài khoản thiếu quyền admin hoặc chữ ký URL xem tệp sai hoặc hết hạn. |
 | 404 | Phiên, câu hoặc hình không tồn tại trong phạm vi yêu cầu. |
 | 409 | Bản nháp đã có quyết định hoặc phiên chưa sẵn sàng. |
-| 413 | PDF vượt giới hạn. |
+| 413 | PDF lớn hơn 20 MiB. |
 | 415 | Đầu vào không phải PDF. |
-| 422 | PDF không đọc được hoặc câu chưa đạt điều kiện duyệt. |
+| 422 | PDF không đọc được, nằm ngoài giới hạn 1–60 trang hoặc câu chưa đạt điều kiện duyệt. |
 | 503 | Backend chưa cấu hình nhà cung cấp OCR hoặc model tách đề. |
 
 Lỗi xử lý sau `202` nằm trong chi tiết phiên. Câu có đáp án chưa xác định hoặc hình bắt buộc bị thiếu cần được sửa trước khi duyệt. `suggestions` chứa nhãn đề xuất và danh sách `neighbors` gồm `questionId`, mã chương, độ khó và điểm cosine. Frontend gửi chương và độ khó đã xác nhận qua PATCH.

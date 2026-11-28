@@ -17,7 +17,7 @@ from app.usecase.pdf_import_classification import classify_drafts
 from app.usecase.pdf_import_solutions import worked_solutions
 
 MAX_PDF_BYTES = 20 * 1024 * 1024
-MAX_PAGES = 30
+MAX_PAGES = 60
 IMAGE_LINK = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 CHAPTER_CODE = re.compile(r"(10|11|12)C\d+")
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class PdfImportUseCase:
             original = await self.storage.get(source["object_key"]) if source else None
             if not original:
                 raise ValueError("PDF gốc không tồn tại.")
-            row.ocr_model, pages = await self.models.recognize(original[0])
+            row.ocr_model, pages = await self.models.recognize(original[0], page_count=row.page_count)
             if [p.index for p in pages] != list(range(row.page_count)):
                 raise ValueError("OCR không trả đủ số trang theo thứ tự.")
             stage = row.stage = "media"
@@ -236,7 +236,7 @@ class PdfImportUseCase:
         refs = media_ids(*contents)
         if data["imageDependent"] and not refs:
             raise ImportErrorDetail(422, "Cần có hình cho câu phụ thuộc hình.")
-        needs_image_review = data["imageDependent"] or any(
+        needs_image_review = refs or data["imageDependent"] or any(
             flag in data["flags"] for flag in ("image_source_mismatch", "image_unplaced")
         )
         if needs_image_review and not data["imageReviewed"]:

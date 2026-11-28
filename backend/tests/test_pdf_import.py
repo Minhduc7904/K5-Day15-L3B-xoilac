@@ -42,7 +42,7 @@ def test_image_only_options_use_their_trailing_labels():
     assert order_image_options(partial) == partial
 
 
-def fixture_pdf(*, scanned: bool) -> bytes:
+def fixture_pdf(*, scanned: bool, page_count: int = 1) -> bytes:
     writer = PdfWriter()
     page = writer.add_blank_page(width=200, height=200)
     stream = DecodedStreamObject()
@@ -70,6 +70,8 @@ def fixture_pdf(*, scanned: bool) -> bytes:
         })
         stream.set_data(b"BT /F1 12 Tf 25 170 Td (Cau 1. Chon do thi. Dap an D.) Tj ET")
     page[NameObject("/Contents")] = writer._add_object(stream)
+    for _ in range(page_count - 1):
+        writer.add_page(page)
     buffer = BytesIO()
     writer.write(buffer)
     return buffer.getvalue()
@@ -233,6 +235,85 @@ async def test_invalid_pdf_and_rejected_draft_do_not_publish(pdf_api):
         assert (await db.execute(select(questions))).all() == []
 
 
+async def test_import_60_scanned_pages_preserves_images_across_ocr_batches(pdf_api, monkeypatch):
+    client, _, _ = pdf_api
+    ocr_sizes = []
+    extraction_owners = []
+    figure = {"id": "figure.png", "image_base64": FIGURE}
+    key_excerpt = "I. 42 D"
+
+    async def post(self, url, key, body, timeout):
+        if url.endswith("/ocr"):
+            encoded = body["document"]["document_url"].split(",", 1)[1]
+            pages = PdfReader(BytesIO(base64.b64decode(encoded))).pages
+            assert all(not page.extract_text() and "/Figure" in page["/Resources"]["/XObject"] for page in pages)
+            start = sum(ocr_sizes)
+            ocr_sizes.append(len(pages))
+            markdown = {
+                29: "Phần I\nCâu 42. Chọn hình. ![x](figure.png)",
+                30: "D. ![y](figure.png)",
+                59: key_excerpt,
+            }
+            return {"pages": [
+                {"index": index, "markdown": markdown.get(start + index, " "),
+                 "images": [figure] if start + index in {29, 30} else []}
+                for index in range(len(pages))
+            ]}
+
+        assert url.endswith("/chat/completions")
+        instructions, document = (message["content"] for message in body["messages"])
+        owners = json.loads(re.search(r"begin on pages (\[[\d, ]+\])", instructions)[1])
+        extraction_owners.extend(owners)
+        questions, answers = [], []
+        if 30 in owners:
+            media = re.findall(r"!\[media:\d+\]\(media:\d+\)", document)
+            assert len(media) == 2 and media[0] != media[1]
+            questions.append({
+                "section": "I", "number": "42", "pages": [30, 31], "type": "SINGLE_CHOICE",
+                "content": f"Chọn hình. {media[0]}", "statements": ["A", "B", "C", media[1]],
+                "image_dependent": False,
+            })
+        if 60 in owners:
+            assert f"[[Trang 60]]\n{key_excerpt}" in document
+            answers.append({
+                "section": "I", "number": "42", "page": 60, "source": "key", "excerpt": key_excerpt,
+                "choices": [4], "truth_values": None, "answer": None, "solution": None,
+            })
+        return {"choices": [{
+            "finish_reason": "stop",
+            "message": {"content": json.dumps({"questions": questions, "answers": answers})},
+        }]}
+
+    monkeypatch.setattr(FixtureModels, "_post", post)
+    assert (await login(client, email="admin@example.com")).status_code == 200
+    rejected = await client.post(ROOT, files={"file": ("long.pdf", fixture_pdf(scanned=True, page_count=61))})
+    assert rejected.status_code == 422 and "60" in rejected.json()["detail"]
+    upload = await client.post(ROOT, files={"file": ("scan.pdf", fixture_pdf(scanned=True, page_count=60))})
+    assert upload.status_code == 202, upload.text
+    path = upload.json()["statusUrl"]
+    status = (await client.get(path)).json()
+    assert status["status"] == "ready_for_review" and status["pageCount"] == 60, status
+    assert ocr_sizes == [30, 30]
+    assert extraction_owners == list(range(1, 61))
+
+    draft, = (await client.get(f"{path}/drafts")).json()
+    assert draft["sourcePages"] == [30, 31]
+    assert draft["evidence"][0]["page"] == 60 and draft["statements"][3]["isCorrect"] is True
+    assert draft["imageDependent"] is True
+    assert {"image_review", "label_review"} <= set(draft["flags"])
+    assert draft["suggestions"]["neighbors"] == []
+    for markdown in [draft["content"], draft["statements"][3]["content"]]:
+        media_id = re.search(r"media:(\d+)", markdown)[1]
+        signed = (await client.get(f"{path}/media/{media_id}/url")).json()["url"]
+        assert (await client.get(signed)).content == base64.b64decode(FIGURE)
+
+    review = f"{path}/drafts/{draft['id']}"
+    assert (await client.patch(review, json={"chapterCodes": ["12C1"], "difficulty": "TH"})).status_code == 200
+    assert (await client.post(f"{review}/approve")).status_code == 422
+    assert (await client.patch(review, json={"imageReviewed": True})).status_code == 200
+    assert (await client.post(f"{review}/approve")).status_code == 200
+
+
 async def test_reference_cache_uses_published_questions_and_abstains(pdf_api):
     _, sessions, _ = pdf_api
     models = FixtureModels(get_settings())
@@ -284,7 +365,7 @@ async def test_ocr_adapter_output_contract(monkeypatch):
     settings = Settings(ocr_provider="mistral", ocr_model="selected-mistral", mistral_api_key="fixture")
     models = PdfImportModels(settings)
     monkeypatch.setattr(models, "_post", post)
-    model, pages = await models.recognize(b"test")
+    model, pages = await models.recognize(b"test", page_count=2)
     assert model == "selected-mistral"
     assert pages == [
         OcrPage(0, "Trang 1", [OcrImage("figure.png", base64.b64decode(FIGURE))]),
@@ -324,7 +405,7 @@ async def test_extraction_retries_truncated_output_with_page_ownership(monkeypat
 async def test_ocr_failure_leaves_a_failed_session_without_drafts(pdf_api, monkeypatch):
     client, _, _ = pdf_api
 
-    async def fail_recognition(self, pdf):
+    async def fail_recognition(self, pdf, *, page_count):
         raise ValueError("fixture internal provider payload")
 
     monkeypatch.setattr(FixtureModels, "recognize", fail_recognition)
