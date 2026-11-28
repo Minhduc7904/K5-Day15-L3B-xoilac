@@ -313,7 +313,7 @@ tr.pick td{ background:var(--primary-subtle); font-weight:600 }
         <p class="lab"><b>Cải tiến duy nhất:</b> thêm 3 mẫu chặn trước AI cho yêu cầu ngoài phạm vi (so sánh học sinh, tự soạn câu hỏi, giải bài). Nhóm lỗi đó 0/3 → 3/3; không câu nào tệ đi.</p>
       </div>
       <div class="card" style="background:var(--warning-subtle); border-color:#f1d9a8">
-        <p class="lab"><b>Lỗi còn lại:</b> B15 (bỏ qua chủ đề “hình không gian” học sinh nêu), B17 (không nói chưa có cấu trúc đề của trường). <b>Hạn chế:</b> một người chấm, mẫu từ chối viết sau khi thấy câu trượt nên cần bộ câu giữ riêng.</p>
+        <p class="lab"><b>Lỗi còn lại:</b> B15 (bỏ qua chủ đề “hình không gian” học sinh nêu), B17 (không nói chưa có cấu trúc đề của trường). <b>Hạn chế:</b> người thứ hai chấm thử 5 câu chỉ khớp 3/5 (lệch B15, B26; nếu B26 = 0 thì từ chối 6/7), mẫu từ chối viết sau khi thấy câu trượt.</p>
       </div>
     </div>
   </div>
@@ -354,14 +354,14 @@ tr.pick td{ background:var(--primary-subtle); font-weight:600 }
   <div class="body" style="flex-direction:column; gap:0">
     <div class="verdict">
       <div class="v">Iterate</div>
-      <div class="t"><b>Chưa “go” hoàn toàn</b> vì bộ câu thử còn nhỏ và do nhóm viết, một người chấm, và luồng web chưa đo. <b>Không “stop”</b> vì pain có số, chi phí rất thấp, lỗi còn lại sửa được.</div>
+      <div class="t"><b>Chưa “go” hoàn toàn</b> vì bộ câu thử còn nhỏ và do nhóm viết, người chấm thứ hai khớp 3/5 (B26 còn tranh cãi), và luồng web chưa đo. <b>Không “stop”</b> vì pain có số, chi phí rất thấp, lỗi còn lại sửa được.</div>
     </div>
     <div class="thirds">
       <div class="card white"><div class="big">19<small>/23</small></div><div class="lab">học sinh chưa biết ôn gì tiếp sau khi chữa đề (trang 1)</div></div>
       <div class="card white"><div class="big">25<small>/27</small></div><div class="lab">câu thử qua ở lượt 2, từ chối 7/7, đạt chuẩn của nhóm (trang 5)</div></div>
       <div class="card white"><div class="big" style="font-size:50px; line-height:1.15">$0,0026</div><div class="lab">chi phí model / học sinh / tháng với gpt-5.4-mini; cận dưới (trang 6)</div></div>
     </div>
-    <p class="note" style="margin-top:24px; font-size:17px">Điều kiện để chuyển sang “go”: bộ câu giữ riêng đạt chuẩn, người thứ hai chấm khớp ≥ 4/5, đo chi phí luồng web, và 2–3 học sinh ngoài nhóm dùng thử.</p>
+    <p class="note" style="margin-top:24px; font-size:17px">Điều kiện để chuyển sang “go”: bộ câu giữ riêng đạt chuẩn, người thứ hai chấm khớp ≥ 4/5 (hiện 3/5), đo chi phí luồng web, và 2–3 học sinh ngoài nhóm dùng thử.</p>
   </div>
   <div class="foot"><span class="src">Dẫn số: trang 1 (evidence/summary.md), trang 5 (eval/report.md), trang 6 (cost/cost-estimate.md)</span><span>7 / 8</span></div>
 </section>

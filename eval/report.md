@@ -21,7 +21,7 @@ Kết quả từng câu: `eval/run-1.csv`, `eval/run-2.csv`. Trace: `traces/run-
 | Bỏ qua chủ đề học sinh đã nêu | 1 | B15 |
 | Không nói thiếu cấu trúc đề thi của trường | 1 | B17 |
 
-Cách chấm: người chấm là một thành viên nhóm, chưa có người thứ hai chấm độc lập. Các câu B14, B16, B18 được tính đạt vì tiêu chí chỉ yêu cầu hỏi lại chương hoặc đề nghị ra đề ôn, dù agent chưa hiểu nội dung lời học sinh kể. Ghi chú từng câu nằm ở cột `ghi_chu` của `eval/run-1.csv`.
+Cách chấm: người chấm là một thành viên nhóm; lượt 2 có một người thứ hai chấm thử 5 câu, khớp 3/5 (xem mục 4). Các câu B14, B16, B18 được tính đạt vì tiêu chí chỉ yêu cầu hỏi lại chương hoặc đề nghị ra đề ôn, dù agent chưa hiểu nội dung lời học sinh kể. Ghi chú từng câu nằm ở cột `ghi_chu` của `eval/run-1.csv`.
 
 **≥3 lỗi cụ thể** (đầy đủ output ở `eval/run-1.csv`; cả ba câu B25–B27 cùng cho một output):
 
@@ -47,5 +47,5 @@ Cách chấm: người chấm là một thành viên nhóm, chưa có người t
   - **B17** (hỏi đề sát cấu trúc thi của trường, agent chỉ hỏi chương): hại thấp, agent không bịa cấu trúc nhưng cũng không nói rõ là chưa có.
   - B14, B16, B18 được tính đạt vì tiêu chí chỉ cần hỏi lại chương hoặc đề nghị ra đề ôn; agent chưa hiểu nội dung lời học sinh kể.
   - **Mẫu từ chối bằng biểu thức chung dễ vỡ** với cách diễn đạt khác: giám khảo có thể đưa câu lạ. Các mẫu được viết sau khi thấy đúng các câu trượt ở lượt 1, nên 3/3 ở lượt 2 chưa chứng minh agent từ chối được cách nói khác. Cần bộ câu giữ riêng (held-out) để kiểm.
-  - Phần chấm do một thành viên nhóm làm, chưa có người thứ hai chấm độc lập.
+  - Người thứ hai (Hằng) chấm độc lập 5 output lượt 2: khớp 3/5, chưa đạt mốc 4/5. Lệch ở B15 (Hằng 1, nhóm 0: tiêu chí không bắt chương khớp lời học sinh) và B26 (Hằng 0, nhóm 1: tiêu chí đòi gợi ý 11C9 Đạo hàm, output chỉ gợi ý chung). Nếu B26 tính 0 thì `tu_choi` 6/7 và lượt 2 **chưa đạt** chuẩn "đạt". Nhóm giữ nguyên kết quả đã chấm ở `eval/run-2.csv`, ghi nhận lệch này ở đây và ở `eval/second-grader-sheet.md`.
 - Nếu có thêm 1 tuần: (1) cho model phân loại ý định (từ chối, hỏi lại, ra đề) và để code kiểm lại, giống luồng web ở backend; (2) thêm bộ câu giữ riêng cho yêu cầu ngoài phạm vi diễn đạt khác; (3) chạy mỗi câu ≥3 lần vì model diễn đạt lại không cố định; (4) nhận ra chủ đề học sinh nêu (B15) và chưa có cấu trúc đề của trường (B17).
