@@ -11,7 +11,9 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | Vị trí trong `frontend/src/` | Trách nhiệm |
 | --- | --- |
 | `app/(student)/page.tsx` | Entry point `/`. Hiện render landing page cho khách (`features/landing/`). Route group giữ thư mục riêng và giữ URL gốc |
-| `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo |
+| `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo. Trang render `AdminDashboard` (#20): ô học sinh online và màn quản lý người dùng |
+| `features/admin-users/` | Lớp API `/admin/users`, `permissions.ts` (bản sao luật `can_manage` của backend, chỉ để ẩn thao tác), bảng và hộp thoại quản lý người dùng (#20). Xem [user-management-api.md](../api/user-management-api.md) |
+| `features/admin-stats/` | Lớp API thống kê và ô "Học sinh online" tự làm mới mỗi 15 giây (#20) |
 | `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`. Xem [Trang xác thực frontend](frontend-auth.md) |
 | `features/auth/` | Lớp API auth (Axios), reducer `auth`, form và validation |
 | `app/(student)/(app)/`, `app/(student)/(focus)/`, `features/study/` | Trang học sinh (dashboard, tạo đề với AI, đề, làm bài, kết quả, hồ sơ). Xem [Trang học sinh frontend](frontend-student-pages.md) |
@@ -26,6 +28,7 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | `store/provider.tsx` | Bọc app bằng Redux, `MotionConfig`, `ToastProvider` và `SplashScreen` |
 | `lib/config.ts` | Cấu hình công khai (base URL của API) |
 | `lib/api-client.ts` | Axios client dùng chung với base URL và timeout |
+| `lib/api-error.ts` | `ApiError` có `code` theo body lỗi `{detail, code}` của backend, `request()` bọc lời gọi Axios. Lỗi mất phiên vẫn do interceptor của `lib/api-client.ts` xử lý |
 
 ## Luồng dữ liệu và tích hợp
 

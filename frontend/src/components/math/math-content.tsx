@@ -81,6 +81,103 @@ function InlineLine({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
+/* ---------------- Bảng Markdown ---------------- */
+
+type Align = 'left' | 'center' | 'right';
+type TextPart =
+  | { kind: 'line'; value: string }
+  | { kind: 'table'; header: string[]; align: Align[]; rows: string[][] };
+
+/** Tách ô của một dòng bảng; dấu `|` nằm trong `$…$` (vd. `$|x|$`) không tách ô. */
+function splitRow(line: string): string[] {
+  let text = line.trim();
+  if (text.startsWith('|')) text = text.slice(1);
+  if (text.endsWith('|') && !text.endsWith('\\|')) text = text.slice(0, -1);
+  const cells: string[] = [];
+  let cell = '';
+  let inMath = false;
+  for (const ch of text) {
+    if (ch === '$') inMath = !inMath;
+    if (ch === '|' && !inMath) {
+      cells.push(cell.trim());
+      cell = '';
+    } else cell += ch;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+const SEPARATOR_CELL = /^:?-{1,}:?$/;
+
+function isSeparator(line: string): boolean {
+  if (!line.includes('-')) return false;
+  const cells = splitRow(line);
+  return cells.length > 0 && cells.every((c) => SEPARATOR_CELL.test(c));
+}
+
+function alignOf(cell: string): Align {
+  if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+  return cell.endsWith(':') ? 'right' : 'left';
+}
+
+/** Chia đoạn văn thành dòng thường và bảng (`| a | b |` + dòng `| --- | --- |`); dòng trống bị bỏ. */
+function parseTextParts(value: string): TextPart[] {
+  const lines = value.split('\n').map((l) => l.trim()).filter((l) => l !== '');
+  const parts: TextPart[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('|') && i + 1 < lines.length && lines[i + 1].startsWith('|') && isSeparator(lines[i + 1])) {
+      const header = splitRow(line);
+      const align = splitRow(lines[i + 1]).map(alignOf);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length && lines[i].startsWith('|')) rows.push(splitRow(lines[i++]));
+      i--;
+      parts.push({ kind: 'table', header, align, rows });
+    } else parts.push({ kind: 'line', value: line });
+  }
+  return parts;
+}
+
+const ALIGN_CLASS: Record<Align, string> = { left: 'text-left', center: 'text-center', right: 'text-right' };
+
+function MarkdownTable({ header, align, rows }: { header: string[]; align: Align[]; rows: string[][] }) {
+  const columns = Math.max(header.length, ...rows.map((r) => r.length));
+  const cell = (cells: string[], c: number) => <InlineLine text={cells[c] ?? ''} />;
+  return (
+    <div className="-mx-1 max-w-full overflow-x-auto px-1 py-1">
+      <table className="w-full border-collapse text-body leading-relaxed">
+        <thead>
+          <tr>
+            {Array.from({ length: columns }, (_, c) => (
+              <th key={c} scope="col" className={cn('border border-border bg-surface px-3 py-2 font-semibold', ALIGN_CLASS[align[c] ?? 'left'])}>
+                {cell(header, c)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r}>
+              {Array.from({ length: columns }, (_, c) =>
+                c === 0 ? (
+                  <th key={c} scope="row" className={cn('border border-border bg-surface/60 px-3 py-2 font-medium', ALIGN_CLASS[align[c] ?? 'left'])}>
+                    {cell(row, c)}
+                  </th>
+                ) : (
+                  <td key={c} className={cn('border border-border px-3 py-2', ALIGN_CLASS[align[c] ?? 'left'])}>
+                    {cell(row, c)}
+                  </td>
+                ),
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 interface MathContentProps {
   source: string;
   resolveMedia?: MediaResolver;
@@ -123,14 +220,17 @@ export const MathContent = memo(function MathContent({ source, resolveMedia, inl
           );
         }
         if (b.kind === 'image') return <MathImage key={i} media={resolveMedia?.(b.id)} alt={b.alt} printable={printable} />;
-        const lines = b.value.split('\n').filter((line) => line.trim() !== '');
         return (
           <Fragment key={i}>
-            {lines.map((line, j) => (
-              <p key={j} className="leading-relaxed text-pretty">
-                <InlineLine text={line.trim()} />
-              </p>
-            ))}
+            {parseTextParts(b.value).map((part, j) =>
+              part.kind === 'table' ? (
+                <MarkdownTable key={j} header={part.header} align={part.align} rows={part.rows} />
+              ) : (
+                <p key={j} className="leading-relaxed text-pretty">
+                  <InlineLine text={part.value} />
+                </p>
+              ),
+            )}
           </Fragment>
         );
       })}

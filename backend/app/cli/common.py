@@ -15,7 +15,7 @@ from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
 from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
-from app.usecase.admin_accounts import AdminAccountsUseCase
+from app.usecase.default_admin import DefaultAdminUseCase
 from app.usecase.auth import AuthUseCase, normalize_email
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
@@ -51,11 +51,10 @@ def build_auth(session: AsyncSession, settings: Settings) -> AuthUseCase:
     )
 
 
-def build_admin_accounts(session: AsyncSession, settings: Settings) -> AdminAccountsUseCase:
-    users, sessions = UserRepository(session), SessionRepository(session)
-    passwords = PasswordService()
-    auth = AuthUseCase(users, sessions, passwords, TokenService(), settings.session_ttl_hours)
-    return AdminAccountsUseCase(auth=auth, users=users, sessions=sessions, passwords=passwords)
+def build_default_admin(session: AsyncSession, settings: Settings) -> DefaultAdminUseCase:
+    users = UserRepository(session)
+    auth = AuthUseCase(users, SessionRepository(session), PasswordService(), TokenService(), settings.session_ttl_hours)
+    return DefaultAdminUseCase(auth=auth, users=users)
 
 
 def utf8_console() -> None:

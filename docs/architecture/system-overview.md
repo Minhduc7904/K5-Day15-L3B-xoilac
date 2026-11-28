@@ -35,10 +35,16 @@ Backend đọc cấu hình local từ `backend/.env`. Frontend có cấu hình c
 
 ### Xác thực (issue #8)
 
-- Hai vai trò `student` và `admin`. Đăng ký công khai chỉ tạo `student`. Admin đầu tiên do `db-init` tạo từ `ADMIN_EMAIL`/`ADMIN_PASSWORD`; admin khác do admin đã đăng nhập tạo qua `/api/v1/admin/accounts` (kèm nhập lại mật khẩu); `python -m app.cli.create_admin` dùng để cứu hộ. Chi tiết: [Cấp tài khoản admin](backend-auth.md#cấp-tài-khoản-admin).
+- Hai vai trò `student` và `admin`. Đăng ký công khai chỉ tạo `student`. Admin gốc do `db-init` tạo từ `ADMIN_EMAIL`/`ADMIN_PASSWORD`; chỉ admin gốc tạo và quản lý admin khác qua `/api/v1/admin/users` (#20); `python -m app.cli.create_admin` dùng để cứu hộ. Chi tiết: [Cấp tài khoản admin](backend-auth.md#cấp-tài-khoản-admin).
 - Phiên là token opaque nằm trong cookie `examind_session` (HttpOnly, SameSite=Lax). PostgreSQL chỉ lưu SHA-256 của token (bảng `sessions`, migration `0003_auth`). Đăng xuất hoặc khoá tài khoản có hiệu lực ngay.
 - Frontend gọi backend qua rewrites `/api/*` của Next.js nên cùng origin: cookie đi kèm tự động, không cần CORS. `CORS_ORIGINS` mặc định rỗng, chỉ đặt khi dev gọi thẳng backend.
 - Endpoint kiểm quyền bằng dependency trong `app/api/deps.py`. Chi tiết: [backend-auth.md](backend-auth.md), hợp đồng HTTP: [auth-api.md](../api/auth-api.md).
+
+### Realtime (issue #20)
+
+- Socket.IO (python-socketio, `app/api/realtime.py`) gắn cùng tiến trình với FastAPI tại `/api/socket.io`. Client nối thẳng backend qua `NEXT_PUBLIC_SOCKET_URL` vì Vercel rewrites không chuyển WebSocket.
+- Xác thực bằng ticket một lần (`POST /api/v1/auth/socket-ticket`), vào room `role:student`/`role:admin` và `user:{id}`. Đăng xuất, khoá, đặt lại mật khẩu, hạ vai trò thì server gửi `session:revoked` và ngắt socket.
+- Ai đang online nằm trong bộ nhớ tiến trình, nên backend chạy **một worker**. Chi tiết: [backend-realtime.md](backend-realtime.md), hợp đồng: [realtime-api.md](../api/realtime-api.md).
 
 ### Trên VPS
 

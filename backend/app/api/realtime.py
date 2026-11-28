@@ -17,6 +17,7 @@ from app.service.presence import PresenceRegistry, SocketConnection
 from app.service.socket_tickets import SocketTickets
 from app.usecase.exam_attempts import AttemptError, ExamAttempts
 from app.usecase.realtime import RealtimeAuthorization
+from app.usecase.realtime_notifier import RevokeReason
 
 log = logging.getLogger(__name__)
 SOCKET_PATH = "/api/socket.io"
@@ -182,7 +183,7 @@ class RealtimeServer:
             self._ensure_notification_watch()
         delay = max(0, (authorized.expires_at - datetime.now(UTC)).total_seconds())
         self._expiry[sid] = asyncio.get_running_loop().call_later(
-            delay, lambda: asyncio.create_task(self._revoke([sid]))
+            delay, lambda: asyncio.create_task(self._revoke([sid], "expired"))
         )
         return True
 
@@ -193,17 +194,19 @@ class RealtimeServer:
         if timer is not None:
             timer.cancel()
 
-    async def revoke_session(self, session_id: int) -> None:
-        await self._revoke(self.presence.for_session(session_id))
+    async def revoke_session(self, session_id: int, reason: RevokeReason | None = None) -> None:
+        await self._revoke(self.presence.for_session(session_id), reason)
 
-    async def revoke_user(self, user_id: int) -> None:
-        await self._revoke(self.presence.for_user(user_id))
+    async def revoke_user(self, user_id: int, reason: RevokeReason | None = None) -> None:
+        await self._revoke(self.presence.for_user(user_id), reason)
 
-    async def _revoke(self, sids: list[str]) -> None:
+    async def _revoke(self, sids: list[str], reason: RevokeReason | None = None) -> None:
+        # #20: kèm {"reason"} khi biết lý do; không có lý do thì gửi như trước (không payload).
+        payload = {"reason": reason} if reason else None
         for sid in sids:
             try:
                 try:
-                    await self.server.emit(SESSION_REVOKED, to=sid)
+                    await self.server.emit(SESSION_REVOKED, payload, to=sid)
                 finally:
                     await self.server.disconnect(sid)
             except Exception:

@@ -1,6 +1,6 @@
 # API xác thực
 
-Tài liệu này mô tả các endpoint đăng ký, đăng nhập, đăng xuất và lấy người dùng hiện tại của issue #8, cùng endpoint admin mẫu. Người đọc là frontend #9 (gọi và mock API) và backend #3, #4, #5, #11 (áp dụng quyền). Cơ chế bên trong nằm ở [backend-auth.md](../architecture/backend-auth.md). Tạo và quản lý tài khoản admin nằm ở [API quản lý tài khoản admin](admin-accounts-api.md).
+Tài liệu này mô tả các endpoint đăng ký, đăng nhập, đăng xuất và lấy người dùng hiện tại của issue #8, cùng endpoint admin mẫu. Người đọc là frontend #9 (gọi và mock API) và backend #3, #4, #5, #11 (áp dụng quyền). Cơ chế bên trong nằm ở [backend-auth.md](../architecture/backend-auth.md). Quản lý tài khoản (học sinh và admin) nằm ở [API quản lý người dùng](user-management-api.md); kênh socket và ticket nằm ở [API realtime](realtime-api.md).
 
 ## Điều kiện gọi
 
@@ -137,7 +137,8 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
   {"detail": [{"type": "string_too_short", "loc": ["body", "password"], "msg": "String should have at least 8 characters"}]}
   ```
 
-- Không phải mọi 401 đều là mất phiên. API quản lý admin trả 401 `REAUTH_FAILED` khi mật khẩu xác nhận sai, lúc đó phiên vẫn còn ([admin-accounts-api.md](admin-accounts-api.md#lỗi-và-trường-hợp-biên)). Frontend phân nhánh theo `code`: chỉ `SESSION_MISSING`, `SESSION_INVALID`, `SESSION_EXPIRED`, `SESSION_REVOKED` mới chuyển tới trang đăng nhập.
+- Frontend phân nhánh theo `code`, không theo mã HTTP: chỉ `SESSION_MISSING`, `SESSION_INVALID`, `SESSION_EXPIRED`, `SESSION_REVOKED` mới chuyển tới trang đăng nhập. Socket nhận `session:revoked` cũng xử lý như mất phiên ([realtime-api.md](realtime-api.md)).
+- `POST /auth/logout` còn ngắt các socket mở bằng ticket của phiên vừa đăng xuất (#20); socket của phiên khác giữ nguyên.
 
 ## Áp dụng quyền cho #3, #4, #5, #11
 

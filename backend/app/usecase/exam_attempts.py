@@ -9,6 +9,7 @@ from app.repositories.notifications import NotificationRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.schemas.exam_attempt import AttemptSave
 from app.schemas.exam_chat import DraftItem
+from app.service.media_image import load_media_image
 from app.usecase.exam_preview_rules import PreviewRuleError
 from app.usecase.exam_scoring import allocate_points, grade_question
 
@@ -272,8 +273,7 @@ class ExamAttempts:
             if attempt.status == "graded":
                 texts.extend(key["solution"] or "" for key in attempt.key.values())
             if any(marker in text for text in texts):
-                key = await self.repo.media_key(media_id)
-                found = await storage.get(key) if key else None
-                if found and found[1] in {"image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"}:
+                found = await load_media_image(storage, await self.repo.media_object(media_id))
+                if found:
                     return found
         raise AttemptError(404, "MEDIA_NOT_FOUND", "Không tìm thấy ảnh.")

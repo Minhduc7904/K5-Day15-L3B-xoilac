@@ -74,8 +74,12 @@ class ExamAttemptRepository:
             .where(ExamAttempt.attempt_id.in_(ids))
         )).all()
 
-    async def media_key(self, media_id: int) -> str | None:
-        return await self.session.scalar(select(media.c.object_key).where(media.c.media_id == media_id))
+    async def media_object(self, media_id: int) -> tuple[str, str, str] | None:
+        """(bucket, object_key, mime_type) của ảnh; ảnh seed nằm ở bucket riêng nên phải trả cả bucket."""
+        row = (await self.session.execute(
+            select(media.c.bucket_name, media.c.object_key, media.c.mime_type).where(media.c.media_id == media_id)
+        )).first()
+        return (row[0], row[1], row[2]) if row else None
 
     async def has_mutation(self, attempt_id: int, mutation_id: str) -> bool:
         return await self.session.get(ExamAttemptMutation, (attempt_id, mutation_id)) is not None

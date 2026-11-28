@@ -23,6 +23,7 @@ from app.models.exam_chat import ExamChatSession, ExamDraft, ExamPreview
 from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.service.exam_chat_sources import MIN_ANSWERED, ExamTemplateSource, StudentHistorySource
+from app.service.media_image import load_media_image
 from app.usecase import exam_chat_intent as chat_intent
 from app.usecase.exam_preview_rules import (
     DEFAULT_TOTAL,
@@ -171,9 +172,8 @@ class ExamChatUseCase:
         if not any(marker in item["content"] or any(marker in row["content"] for row in item["statements"])
                    for item in draft.items):
             raise SessionNotFound()
-        key = await self._repo.media_key(media_id)
-        result = await storage.get(key) if key else None
-        if not result or result[1] not in {"image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"}:
+        result = await load_media_image(storage, await self._repo.media_object(media_id))
+        if not result:
             raise SessionNotFound()
         return result
 

@@ -31,3 +31,11 @@ class PresenceRegistry:
 
     def users(self, role: str) -> set[int]:
         return {record.user_id for record in self._connections.values() if record.role == role}
+
+    def connections_by_user(self, role: str) -> dict[int, int]:
+        """user_id → số kết nối đang mở, chỉ tính vai trò `role`. Nhiều tab của một người cộng dồn (#20)."""
+        counts: dict[int, int] = {}
+        for record in self._connections.values():
+            if record.role == role:
+                counts[record.user_id] = counts.get(record.user_id, 0) + 1
+        return counts

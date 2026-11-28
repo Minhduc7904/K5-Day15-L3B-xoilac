@@ -28,17 +28,21 @@ class StorageService:
     async def delete(self, key: str) -> None:
         await run_in_threadpool(self._client.delete_object, Bucket=self._bucket, Key=key)
 
-    async def get(self, key: str) -> tuple[bytes, str] | None:
-        def _get() -> tuple[bytes, str] | None:
+    async def get(self, key: str, bucket: str | None = None) -> tuple[bytes, str] | None:
+        """Đọc đối tượng. `bucket` mặc định là bucket của ứng dụng; ảnh nền seed nằm ở bucket riêng (images, documents…)."""
+        def _get(name: str) -> tuple[bytes, str] | None:
             try:
-                obj = self._client.get_object(Bucket=self._bucket, Key=key)
+                obj = self._client.get_object(Bucket=name, Key=key)
             except ClientError as e:
-                if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+                if e.response["Error"]["Code"] in ("NoSuchKey", "NoSuchBucket", "404"):
                     return None
                 raise
             return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
 
-        return await run_in_threadpool(_get)
+        found = await run_in_threadpool(_get, bucket or self._bucket)
+        if found is None and bucket and bucket != self._bucket:
+            found = await run_in_threadpool(_get, self._bucket)
+        return found
 
     async def ping(self) -> bool:
         try:

@@ -126,6 +126,24 @@ docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-
 
 Để kiểm job, dùng cơ sở dữ liệu và hộp thư kiểm thử. Trạng thái `uncertain` nghĩa là chưa xác định được Gmail có nhận yêu cầu. Kiểm tra hộp thư gửi trước khi xử lý bằng tay. Xem [API realtime](../api/realtime-api.md) để kiểm tra WSS và origin.
 
+## Socket và WSS
+
+Kênh Socket.IO (`app/api/realtime.py`) chạy cùng container `backend` tại `/api/socket.io`; #20 dùng nó cho room theo vai trò, ngắt socket khi khoá tài khoản và thống kê học sinh online ([realtime-api.md](../api/realtime-api.md)).
+
+| Mục | Hiện trạng | Ghi chú |
+| --- | --- | --- |
+| nginx | `location ^~ /api/socket.io/` trong `deploy/nginx/conf.d/locations.inc` cho cả cổng 80 và 443: `Upgrade`, `Connection $connection_upgrade`, timeout 1 h, `proxy_buffering off` | Đặt trước location `/api/`. CI kiểm bằng `nginx -t` |
+| Tiến trình | `uvicorn app.main:app --workers 1` (Dockerfile) | **Không tăng số worker**: presence và ticket nằm trong bộ nhớ. Nhiều worker cần Redis ([backend-realtime.md](../architecture/backend-realtime.md#ràng-buộc-một-worker)) |
+| HTTPS/WSS | nginx có khối 443 và chứng chỉ Let's Encrypt | Trang Vercel (HTTPS) chỉ nối được `wss://`. Ngày 2026-11-28 từ ngoài chưa vào được cổng 443 (TCP treo, HTTP cổng 80 vẫn trả 200): kiểm Security Group mở 443 và chứng chỉ đã cấp |
+| `CORS_ORIGINS` trong `prod.env` | Phải chứa origin của frontend, vd `https://examind-frontend.vercel.app` | Cũng là danh sách origin được nối socket. Thiếu thì trình duyệt bị từ chối khi nối |
+| Frontend | `NEXT_PUBLIC_SOCKET_URL=https://examind.duckdns.org` trên Vercel | Socket không đi qua rewrites; API `/api/v1/*` thì có |
+
+Kiểm sau deploy, từ máy ngoài:
+
+```bash
+curl -s "https://examind.duckdns.org/api/socket.io/?EIO=4&transport=polling"   # 0{"sid":"...","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000,...}
+```
+
 ## Kiểm tra kết quả
 
 ```bash
