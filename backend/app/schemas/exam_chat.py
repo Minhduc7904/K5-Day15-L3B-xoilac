@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.usecase.exam_preview_rules import PreviewEdit, PreviewStructure
 from app.usecase.exam_template_plan import TemplatePreviewStructure
@@ -25,10 +25,24 @@ class SessionOut(BaseModel):
     session_id: int
     student_ref: str
     created_at: datetime
+    updated_at: datetime
+
+
+class SessionListItem(SessionOut):
+    title: str
 
 
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
+    version: int | None = Field(None, ge=0)
+
+
+class AttachmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    attachment_id: int
+    position: int
+    mime_type: str
 
 
 class MessageOut(BaseModel):
@@ -39,6 +53,7 @@ class MessageOut(BaseModel):
     content: str
     preview_version: int | None
     created_at: datetime
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class PreviewOut(BaseModel):
@@ -47,10 +62,16 @@ class PreviewOut(BaseModel):
     session_id: int
     mode: Literal["CHAPTER", "EXAM_TEMPLATE"]
     structure: AnyStructure
-    status: Literal["PROPOSED", "EDITED", "CONFIRMED", "BUILT"]
+    status: Literal["PROPOSED", "EDITED", "CONFIRMED", "BUILT", "CANCELLED"]
     version: int
     reason: str | None
     updated_at: datetime
+    offer: dict | None = None
+    operation: dict | None = None
+
+    @field_serializer("offer")
+    def public_offer(self, offer):
+        return {key: value for key, value in offer.items() if key != "ids"} if offer else None
 
 
 class PreviewUpdate(BaseModel):
@@ -64,6 +85,7 @@ class PreviewUpdate(BaseModel):
 
 class ConfirmIn(BaseModel):
     version: int = Field(ge=1)
+    accepted_count: int | None = Field(None, ge=1, le=50)
 
 
 class DraftStatement(BaseModel):
@@ -79,6 +101,7 @@ class DraftItem(BaseModel):
     code: str
     chapter: str | None
     chapter_codes: list[str] = Field(default_factory=list)
+    subchapter_codes: list[str] = Field(default_factory=list)
     difficulty: str | None
     type: str
     content: str

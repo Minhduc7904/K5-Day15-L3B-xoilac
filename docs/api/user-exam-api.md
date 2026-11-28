@@ -2,6 +2,43 @@
 
 Học sinh chat với agent để nhận đề xuất cấu trúc đề (bản xem trước), chỉnh bằng lời hoặc trên giao diện, xác nhận, rồi nhận đề nháp ghép từ câu đã duyệt. Dành cho frontend (#9) và người tích hợp. Thuộc issue #4.
 
+## Luồng chat thật
+
+Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`. Cấu hình
+`OPENAI_API_KEY` và tùy chọn `EXAM_CHAT_MODEL`. Bật `NEXT_PUBLIC_EXAM_CHAT_LIVE=true` và tắt mock
+trên frontend. Giao diện thật dùng tài khoản và hồ sơ #36.
+
+- Model chọn công cụ từ hội thoại, khối lớp, kỳ thi và mục tiêu điểm. Server tự tra dữ liệu và kiểm tra thao tác.
+  Khi chọn chương cha cho đề tự chọn, server phân bổ vào chương con. Nếu người dùng chọn một chương con,
+  chỉ lấy câu trong phạm vi đó. Đề từ mẫu giữ cấu trúc mẫu đã duyệt. Giới hạn chung là 50 câu.
+- `GET /exam-chat/sessions` liệt kê phiên của tài khoản. `GET /exam-chat/sessions/{id}/transcript` nhận
+  `before` là mã tin nhắn và `limit` là số tin để tải lịch sử cũ hơn. `GET /exam-chat/chapters` trả danh mục
+  theo mã với tên và `parent_code`.
+- `PATCH /exam-chat/sessions/{id}/preview` chấp nhận `edit.rows` gồm `chapter`, `difficulty`, `type`, `count`
+  cho đề tự chọn. Bản xem trước có thể kèm `operation` đổi câu hoặc dựng lại bộ câu. Sự kiện SSE
+  `preview` mang `null` khi học sinh bỏ bản xem trước chưa dựng.
+- Xác nhận lần đầu tốn 100 credit khi lưu thành công. Dùng lại `draft_id` cho các lần chỉnh hoặc dựng lại.
+  Nếu thiếu câu, phản hồi có `preview.offer` chứa `requested`, `count` và `shortages`, chưa lưu đề hay
+  tính phí. Gửi lại phiên bản mới kèm `accepted_count` khi học sinh đồng ý đúng số đã báo.
+  Hết credit trả `402 INSUFFICIENT_CREDITS` và giữ preview.
+- `GET /exam-chat/drafts` liệt kê đề hiện hành của tài khoản. `GET /exam-chat/drafts/{id}` đọc nội dung đề và
+  `GET /exam-chat/drafts/{id}/media/{media_id}` đọc ảnh trong đề. Chủ đề và kết quả làm bài cũ không được
+  suy ra từ dữ liệu thử. Đợt này hỗ trợ xem và in đề. Chưa triển khai làm bài trực tuyến.
+
+### Ảnh trong chat
+
+- `POST /exam-chat/sessions/{id}/messages/with-images` nhận multipart với trường lặp `images`, văn bản
+  `text` có thể để trống và `version` là bản xem trước đang thấy (0 nếu chưa có). Tối đa 4 ảnh PNG, JPEG
+  hoặc WebP, tổng 4 MB. Phản hồi dùng cùng SSE với tin nhắn văn bản.
+- Backend lưu ảnh vào bucket MinIO riêng của ứng dụng và lưu metadata theo tin nhắn. `messages[].attachments`
+  trả ID, vị trí và MIME. `GET /exam-chat/sessions/{id}/attachments/{attachment_id}` chỉ trả ảnh cho chủ phiên.
+- Dùng `MISTRAL_API_KEY` và `OCR_MODEL` của service nhập đề PDF. Nếu chưa có khóa hoặc OCR chưa dùng được,
+  ảnh vẫn được lưu và chatbot báo trạng thái. Agent chỉ dùng trích đoạn OCR đã kiểm tra thuộc Toán THPT để
+  lập đề. Không dùng ảnh để xác nhận dựng đề và không lưu nguyên văn OCR vào lịch sử chat.
+
+Các ví dụ phía dưới mô tả hợp đồng cơ sở của issue #4. Phần xác nhận thiếu câu và cập nhật cùng đề hiện hành
+ở trên áp dụng khi bật luồng thật.
+
 ## Điều kiện gọi
 
 - Base URL local: `http://localhost:8000/api/v1`. Tài liệu tự sinh: `http://localhost:8000/docs`.
@@ -24,7 +61,7 @@ Học sinh chat với agent để nhận đề xuất cấu trúc đề (bản x
 }
 ```
 
-Số câu mỗi mức của từng chương được chia từ `count` theo `difficulty_weights` (bỏ mức trong `excluded_difficulties`). Tối đa 50 câu, 5 chương.
+Số câu mỗi mức của từng chương được chia từ `count` theo `difficulty_weights` (bỏ mức trong `excluded_difficulties`). Tối đa 50 câu.
 
 **Chế độ ôn theo mẫu kỳ thi** (`mode = EXAM_TEMPLATE`, `structure.kind = "EXAM_TEMPLATE"`): bản chụp của một mẫu **đã duyệt** từ #5. Mẫu cố định các phần, loại câu, số câu và phân bố độ khó. Học sinh **chỉ được thu hẹp chương** trong phạm vi mẫu; chỉnh khác bị từ chối kèm lý do (xem "Lỗi").
 

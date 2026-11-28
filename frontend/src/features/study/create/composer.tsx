@@ -14,6 +14,8 @@ export interface Attachment {
 
 const MAX_FILES = 4;
 const MAX_BYTES = 5 * 1024 * 1024;
+export const EXAM_CHAT_IMAGES = { mime: ['image/png', 'image/jpeg', 'image/webp'], totalBytes: 4 * 1024 * 1024 };
+type ImageLimits = typeof EXAM_CHAT_IMAGES;
 
 interface Props {
   disabled: boolean;
@@ -21,13 +23,15 @@ interface Props {
   attachments: Attachment[];
   setAttachments: (updater: (prev: Attachment[]) => Attachment[]) => void;
   placeholder?: string;
+  imageLimits?: ImageLimits;
+  maxLength?: number;
 }
 
 /**
  * Ô soạn tin: tự cao theo nội dung, Enter gửi, Shift+Enter xuống dòng.
  * Ảnh: bấm nút, dán (Ctrl+V) hoặc kéo thả vào khung chat. Tối đa 4 ảnh, mỗi ảnh ≤ 5 MB.
  */
-export function Composer({ disabled, onSend, attachments, setAttachments, placeholder }: Props) {
+export function Composer({ disabled, onSend, attachments, setAttachments, placeholder, imageLimits, maxLength }: Props) {
   const [text, setText] = useState('');
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -40,7 +44,7 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [text]);
 
-  const addFiles = (files: File[]) => addImages(files, attachments, setAttachments, toast);
+  const addFiles = (files: File[]) => addImages(files, attachments, setAttachments, toast, imageLimits);
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
@@ -105,7 +109,7 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept={imageLimits?.mime.join(',') ?? 'image/*'}
           multiple
           className="sr-only"
           tabIndex={-1}
@@ -132,6 +136,7 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
           id="chat-input"
           ref={areaRef}
           rows={1}
+          maxLength={maxLength}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
@@ -154,7 +159,7 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
         </motion.button>
       </div>
       <p id="chat-hint" className="hidden px-3 pt-1 pb-0.5 text-[0.6875rem] text-muted-foreground sm:block">
-        Enter để gửi · Shift + Enter xuống dòng · Dán hoặc kéo thả ảnh bài hay sai vào đây
+        Enter để gửi · Shift + Enter xuống dòng · Dán hoặc kéo thả ảnh{imageLimits && ' · PNG, JPG, WebP · tổng tối đa 4 MB'}
       </p>
     </form>
   );
@@ -165,12 +170,22 @@ export function addImages(
   current: Attachment[],
   setAttachments: Props['setAttachments'],
   toast: ReturnType<typeof useToast>,
+  limits?: ImageLimits,
 ) {
-  const images = files.filter((f) => f.type.startsWith('image/'));
+  const images = files.filter((f) => limits ? limits.mime.includes(f.type) : f.type.startsWith('image/'));
   if (images.length < files.length) toast({ tone: 'warning', title: 'Chỉ nhận file ảnh', description: 'PNG, JPG, WebP… Các file khác đã bị bỏ qua.' });
-  const tooBig = images.filter((f) => f.size > MAX_BYTES);
-  if (tooBig.length) toast({ tone: 'warning', title: 'Ảnh quá lớn', description: 'Mỗi ảnh tối đa 5 MB.' });
-  const ok = images.filter((f) => f.size <= MAX_BYTES);
+  const maxBytes = limits?.totalBytes ?? MAX_BYTES;
+  let remaining = limits ? maxBytes - current.reduce((total, item) => total + item.file.size, 0) : maxBytes;
+  const ok: File[] = [];
+  for (const file of images) {
+    if (file.size > remaining) continue;
+    ok.push(file);
+    if (limits) remaining -= file.size;
+  }
+  if (ok.length < images.length) toast({
+    tone: 'warning', title: 'Ảnh vượt dung lượng',
+    description: limits ? 'Tổng ảnh trong một tin tối đa 4 MB.' : 'Mỗi ảnh tối đa 5 MB.',
+  });
   const room = MAX_FILES - current.length;
   if (ok.length > room) toast({ tone: 'info', title: `Tối đa ${MAX_FILES} ảnh mỗi tin nhắn` });
   const added = ok.slice(0, Math.max(0, room)).map((file) => ({

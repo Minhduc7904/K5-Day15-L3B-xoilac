@@ -10,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.repositories.pdf_imports import PdfImportRepository
 from app.schemas.pdf_import import DraftEdit
-from app.service.pdf_import_models import MAX_IMAGE_BYTES, OcrPage, PdfImportModels
+from app.service.pdf_import_models import OcrPage, PdfImportModels, image_mime
 from app.service.storage_service import StorageService
 from app.usecase.pdf_import_answers import STATEMENT_TYPES, build_drafts, media_ids
 from app.usecase.pdf_import_classification import classify_drafts
@@ -37,18 +37,6 @@ def count_pdf_pages(data: bytes) -> int:
         return len(reader.pages)
     except Exception:
         raise ImportErrorDetail(422, "PDF không đọc được hoặc được mã hóa.") from None
-
-
-def image_mime(data: bytes | None) -> str:
-    if not data or len(data) > MAX_IMAGE_BYTES:
-        raise ValueError("Kích thước ảnh không hợp lệ.")
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "image/png"
-    if data.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp"
-    raise ValueError("Định dạng ảnh không được hỗ trợ.")
 
 
 class PdfImportUseCase:

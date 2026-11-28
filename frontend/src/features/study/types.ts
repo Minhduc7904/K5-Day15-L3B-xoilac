@@ -5,7 +5,7 @@
  */
 
 export type Difficulty = 'NB' | 'TH' | 'VD' | 'VDC';
-export type QuestionType = 'SINGLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER';
+export type QuestionType = 'SINGLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'MULTIPLE_CHOICE' | 'ESSAY';
 
 export interface Chapter {
   code: string;
@@ -35,6 +35,9 @@ export interface Question {
 /** Câu hỏi khi đang làm bài: không có đáp án, không có lời giải. */
 export type PublicQuestion = Omit<Question, 'answer' | 'solution' | 'statements'> & {
   statements: Array<Omit<Statement, 'correct'>>;
+  remoteDraftId?: number;
+  order?: number;
+  difficultyKnown?: boolean;
 };
 
 export interface ExamSection {
@@ -50,6 +53,7 @@ export interface Exam {
   id: string;
   title: string;
   source: ExamSource;
+  remote?: boolean;
   /** Lời nhắn đã dùng để tạo đề với agent (nếu có). */
   prompt?: string;
   reason?: string;

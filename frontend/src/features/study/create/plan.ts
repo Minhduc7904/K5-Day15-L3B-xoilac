@@ -6,7 +6,7 @@ import { chapterOf, chapters } from '../fixtures/chapters';
 import { subchapters } from '../fixtures/subchapters';
 import type { Chapter, Difficulty, QuestionType, StructureRow } from '../types';
 
-export const MAX_QUESTIONS = 30;
+export const MAX_QUESTIONS = 50;
 export const TYPES: QuestionType[] = ['SINGLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER'];
 export const DIFFS: Difficulty[] = ['NB', 'TH', 'VD', 'VDC'];
 
@@ -49,7 +49,7 @@ export const planTotal = (plan: ExamPlan) => TYPES.reduce((s, t) => s + plan.typ
 
 export function planFromRows(rows: StructureRow[]): ExamPlan {
   const chapterCounts = new Map<string, number>();
-  const types = { SINGLE_CHOICE: 0, TRUE_FALSE: 0, SHORT_ANSWER: 0 } as Record<QuestionType, number>;
+  const types = { SINGLE_CHOICE: 0, TRUE_FALSE: 0, SHORT_ANSWER: 0, MULTIPLE_CHOICE: 0, ESSAY: 0 };
   const diffCounts = { NB: 0, TH: 0, VD: 0, VDC: 0 } as Record<Difficulty, number>;
   for (const row of rows) {
     const parent = parentOf(row.chapter);
@@ -123,7 +123,7 @@ export function defaultPlan(codes: string[], minutes: number): ExamPlan {
   const [sc, tf, sa] = distribute(total, [12, 4, 6]);
   return {
     chapters: codes.map((code, i) => ({ code, count: distribute(total, codes.map(() => 1))[i] })),
-    types: { SINGLE_CHOICE: sc, TRUE_FALSE: tf, SHORT_ANSWER: sa },
+    types: { SINGLE_CHOICE: sc, TRUE_FALSE: tf, SHORT_ANSWER: sa, MULTIPLE_CHOICE: 0, ESSAY: 0 },
     difficulty: { NB: 30, TH: 35, VD: 25, VDC: 10 },
   };
 }

@@ -56,6 +56,7 @@ class CreditLedger(Base):
         CheckConstraint("delta <> 0", name="ck_credit_ledger_delta"),
         CheckConstraint("balance_after BETWEEN 0 AND 500", name="ck_credit_ledger_balance"),
         Index("ix_credit_ledger_history", "user_id", "id"),
+        Index("uq_credit_exam_session", "exam_session_id", unique=True),
         Index(
             "uq_credit_initial", "user_id", unique=True,
             postgresql_where=text("reason = 'initial_grant'"), sqlite_where=text("reason = 'initial_grant'"),
@@ -68,6 +69,7 @@ class CreditLedger(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("credit_accounts.user_id", ondelete="CASCADE"))
+    exam_session_id: Mapped[int | None]
     delta: Mapped[int]
     balance_after: Mapped[int]
     reason: Mapped[str] = mapped_column(String(32))

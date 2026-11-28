@@ -16,6 +16,8 @@ export const typeColor: Record<QuestionType, string> = {
   SINGLE_CHOICE: 'bg-primary',
   TRUE_FALSE: 'bg-accent',
   SHORT_ANSWER: 'bg-ember',
+  MULTIPLE_CHOICE: 'bg-info',
+  ESSAY: 'bg-warning',
 };
 export const diffColor: Record<Difficulty, string> = {
   NB: 'bg-success',
@@ -23,7 +25,7 @@ export const diffColor: Record<Difficulty, string> = {
   VD: 'bg-warning',
   VDC: 'bg-danger',
 };
-const typeShort: Record<QuestionType, string> = { SINGLE_CHOICE: 'Trắc nghiệm', TRUE_FALSE: 'Đúng sai', SHORT_ANSWER: 'Trả lời ngắn' };
+const typeShort: Record<QuestionType, string> = { SINGLE_CHOICE: 'Trắc nghiệm', TRUE_FALSE: 'Đúng sai', SHORT_ANSWER: 'Trả lời ngắn', MULTIPLE_CHOICE: 'Nhiều đáp án', ESSAY: 'Tự luận' };
 
 interface Props {
   proposal: StructureProposal;

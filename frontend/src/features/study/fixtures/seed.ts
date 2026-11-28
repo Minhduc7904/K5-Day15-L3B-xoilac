@@ -111,7 +111,7 @@ const unit = (key: string) => {
  * theo trọng số dạng câu × mức độ, nhân thêm dao động ngẫu nhiên cố định; câu sai và bỏ trống nặng hơn.
  */
 function sampleSeconds(plan: AttemptPlan, ids: string[]): Record<string, number> {
-  const typeW = { SINGLE_CHOICE: 1, TRUE_FALSE: 2.2, SHORT_ANSWER: 2.6 } as const;
+  const typeW = { SINGLE_CHOICE: 1, TRUE_FALSE: 2.2, SHORT_ANSWER: 2.6, MULTIPLE_CHOICE: 1.5, ESSAY: 3 } as const;
   const diffW = { NB: 0.7, TH: 1, VD: 1.5, VDC: 2 } as const;
   const weights = ids.map((id) => {
     const q = byId.get(id)!;

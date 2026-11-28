@@ -110,13 +110,13 @@ function Hero({ exam, total, attempts, onPaper }: { exam: Data['exam']; total: n
             ))}
           </dl>
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Link
+            {!exam.remote && <Link
               href={`/exams/${exam.id}/take`}
               className="inline-flex h-12 items-center gap-2 rounded-xl bg-flame-strong px-6 text-body font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-danger-hover active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Play className="size-5" aria-hidden="true" />
               {attempts.length ? 'Làm lại đề này' : 'Bắt đầu làm bài'}
-            </Link>
+            </Link>}
             <button
               type="button"
               onClick={onPaper}
@@ -214,7 +214,7 @@ function Questions({ sections }: { sections: Section[] }) {
       {section && (
         <ol id="part-panel" role="tabpanel" aria-labelledby={`part-tab-${active}`} className="grid gap-4">
           {section.qs.map((q, i) => (
-            <QuestionCard key={q.id} n={i + 1} q={q} />
+            <QuestionCard key={q.id} n={q.order ?? i + 1} q={q} />
           ))}
         </ol>
       )}
@@ -233,21 +233,21 @@ function QuestionCard({ n, q }: { n: number; q: PublicQuestion }) {
           <span className="sr-only">Câu </span>
           {n}
         </span>
-        <span className={cn('inline-flex items-center gap-1.5 text-caption font-semibold', diffText[q.difficulty])}>
+        {q.difficultyKnown !== false && <span className={cn('inline-flex items-center gap-1.5 text-caption font-semibold', diffText[q.difficulty])}>
           <i className={cn('size-2 rounded-full', diffColor[q.difficulty])} aria-hidden="true" />
           {difficultyLabels[q.difficulty]}
-        </span>
+        </span>}
         <span className="min-w-0 truncate text-caption text-muted-foreground">{chapterOf(q.chapter).name}</span>
       </div>
 
-      <QuestionContent source={q.content} className="text-body-lg" />
+      <QuestionContent draftId={q.remoteDraftId} source={q.content} className="text-body-lg" />
 
-      {q.type === 'SINGLE_CHOICE' && q.statements.length > 0 && (
+      {(q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE') && q.statements.length > 0 && (
         <ul className={cn('mt-4 grid gap-2', twoCols && 'sm:grid-cols-2')}>
           {q.statements.map((s) => (
             <li key={s.label} className="flex items-start gap-3 rounded-xl border border-border px-3 py-2.5 text-body">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-primary/25 text-caption font-bold text-primary">{s.label}</span>
-              <QuestionContent source={s.content} inline className="min-w-0 self-center" />
+              <QuestionContent draftId={q.remoteDraftId} source={s.content} inline className="min-w-0 self-center" />
             </li>
           ))}
         </ul>
@@ -258,7 +258,7 @@ function QuestionCard({ n, q }: { n: number; q: PublicQuestion }) {
           {q.statements.map((s) => (
             <li key={s.label} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 text-body">
               <b className="w-5 text-primary">{s.label})</b>
-              <QuestionContent source={s.content} inline className="min-w-0" />
+              <QuestionContent draftId={q.remoteDraftId} source={s.content} inline className="min-w-0" />
               <span className="flex gap-1 text-caption font-semibold text-muted-foreground" aria-hidden="true">
                 <span className="rounded-md border border-border px-1.5 py-0.5">Đ</span>
                 <span className="rounded-md border border-border px-1.5 py-0.5">S</span>
@@ -285,7 +285,7 @@ function QuestionCard({ n, q }: { n: number; q: PublicQuestion }) {
 /* ---------------- Cột phụ ---------------- */
 
 function Structure({ sections, total, questions }: { sections: Section[]; total: number; questions: PublicQuestion[] }) {
-  const diffs = DIFFS.map((d) => ({ d, n: questions.filter((q) => q.difficulty === d).length })).filter((x) => x.n);
+  const diffs = DIFFS.map((d) => ({ d, n: questions.filter((q) => q.difficultyKnown !== false && q.difficulty === d).length })).filter((x) => x.n);
   const chapters = [...new Set(questions.map((q) => q.chapter))]
     .map((c) => ({ c, n: questions.filter((q) => q.chapter === c).length }))
     .sort((a, b) => b.n - a.n);

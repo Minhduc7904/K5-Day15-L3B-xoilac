@@ -132,10 +132,10 @@ export function NextExamCard({ pick, onStructure }: { pick: NonNullable<ReturnTy
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
           <Link
-            href={`/exams/${exam.id}/take`}
+            href={exam.remote ? `/exams/${exam.id}` : `/exams/${exam.id}/take`}
             className="group inline-flex h-11 items-center gap-2 rounded-xl bg-flame-strong px-5 text-label font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-danger-hover active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <Play className="size-4" aria-hidden="true" /> {pick.cta}
+            <Play className="size-4" aria-hidden="true" /> {exam.remote ? 'Xem đề' : pick.cta}
           </Link>
           <button
             type="button"

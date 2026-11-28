@@ -29,6 +29,8 @@ class Settings(BaseSettings):
 
     mistral_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
+    exam_chat_live: bool = False
+    exam_chat_model: str = "gpt-5.4-mini"
     ocr_provider: Literal["mistral"] = "mistral"
     ocr_model: str = "mistral-ocr-4-1"
     pdf_import_extraction_model: str = "gpt-5.4-mini"

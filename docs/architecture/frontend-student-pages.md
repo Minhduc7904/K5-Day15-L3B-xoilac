@@ -87,6 +87,8 @@ Tổng điểm được quy về thang 10 theo tỉ lệ điểm đạt trên đ
 
 ### Luồng tạo đề với agent
 
+Với `NEXT_PUBLIC_EXAM_CHAT_LIVE=true` và mock tắt, chat, danh sách phiên, Đề của tôi và Xem đề lấy dữ liệu từ backend. Học sinh dán, tải hoặc kéo thả ảnh vào ô nhập, xem thumbnail trước khi gửi và mở lại ảnh trong lịch sử. Học sinh chỉnh ma trận tới 50 câu theo chương con và xác nhận trước khi dựng. Mỗi phiên dùng một đề nháp hiện hành. Xem [hợp đồng API](../api/user-exam-api.md#luồng-chat-thật). Nội dung phía dưới mô tả luồng demo khi tắt cờ.
+
 1. Học sinh nhắn, có thể kèm tối đa 4 ảnh, mỗi ảnh tối đa 5 MB. Từ dashboard, lối tắt mở `/exams/new?q=…` và tin nhắn được gửi tự động.
 2. `agentApi.run` trả về một async generator. Generator phát các sự kiện `text` (từng đoạn chữ), `proposal` (cấu trúc đề đề xuất) và `built` (đề đã dựng).
 3. Bảng xem trước hiện cấu trúc đề. Học sinh sửa tên đề, thời gian, số câu từng phần (không vượt số câu có trong ngân hàng) và độ khó. Học sinh cũng có thể nhắn "thêm", "bớt", "khó hơn" hoặc "45 phút".
@@ -137,7 +139,7 @@ Chạy `npm run dev`, đăng nhập rồi mở `http://localhost:3000/dashboard`
 - Công thức không có phần tử `.katex-error`.
 - Có thể làm bài, tải lại trang rồi làm tiếp, sau đó nộp bài và xem kết quả.
 - Trong `/exams/new`, gửi "Ôn chương mình hay sai, đề 30 phút", bấm "Dựng đề", rồi mở đề vừa tạo.
-- Trong bảng cấu trúc đề: chọn thời gian ∞ (không giới hạn), kéo vạch cuối của "Dạng câu" để đổi tổng (tối đa 30), thấy nút đổi thành "Để agent phân bổ lại"; bấm nút đó, rồi mở "Nâng cao" để sửa từng ô ma trận chương con × dạng × mức độ và "Áp dụng ma trận". Tải lại trang, đoạn chat vẫn còn ở cột trái.
+- Trong bảng cấu trúc đề: chọn thời gian ∞ (không giới hạn), kéo vạch cuối của "Dạng câu" để đổi tổng (tối đa 50), thấy nút đổi thành "Để agent phân bổ lại"; bấm nút đó, rồi mở "Nâng cao" để sửa từng ô ma trận chương con × dạng × mức độ và "Áp dụng ma trận". Tải lại trang, đoạn chat vẫn còn ở cột trái.
 
 Nút "Khôi phục dữ liệu mẫu" trong trang hồ sơ đưa kho mock về dữ liệu ban đầu.
 
