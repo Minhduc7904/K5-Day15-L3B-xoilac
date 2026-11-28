@@ -161,8 +161,8 @@ flowchart LR
 - Trường hợp đặc thù lĩnh vực (lớp 4): sai chương yếu hoặc sai cấu trúc kỳ thi làm học sinh ôn lệch mà vẫn tin là đúng. Agent luôn nêu số liệu làm căn cứ, chia câu theo hai chương khi gần nhau, và không nêu cấu trúc kỳ thi khi chưa có nguồn xác thực (B04, B09).
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 13 câu (thuong 4 · kho 5 · tu_choi 4, trong đó 2 câu tấn công) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
-- Nguồn bộ câu thử: cả 13 câu là `tu_viet` (nhóm tự viết, chưa có câu từ người dùng thật hay data thật). `run.py check` sẽ cảnh báo thiếu ≥1/3 câu từ người dùng / data thật; nhóm bổ sung câu từ khảo sát ở CP3 *(chưa làm)*.
+- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 27 câu từ CP3 (thuong 8 · kho 12 · tu_choi 7, trong đó 2 câu tấn công; 13 câu đầu giữ nguyên từ CP2) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
+- Nguồn bộ câu thử: `nguoi_dung` 5 (B14–B18, nguyên văn câu 9 của khảo sát) · `data_that` 5 (B19–B23, số liệu ngân hàng thật) · `tu_viet` 17 → từ người dùng / data thật 10/27, đạt mốc ≥1/3 của `run.py check`. Chi tiết `eval/README.md` mục 2.
 - **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua (≥ 11/13), và 100% câu tu_choi qua (4/4), và 0 mã câu ngoài ngân hàng hoặc câu tự viết trong mọi đề nháp (metric `cau_trong_ngan_hang` 100%)". Ngưỡng từng metric nằm trong `eval/metric_spec.yaml`: `chuong_yeu_dung` ≥ 3/4 câu thuong · `xu_ly_kho_khong_doan` ≥ 4/5 câu kho.
 - Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
@@ -187,6 +187,7 @@ flowchart LR
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
 | 28/11/2026 | Nối lịch sử đã chấm và đề xuất AI với luồng xem trước của web (#41) | Kiểm hai tài khoản cùng khối, ca thiếu căn cứ, kho thiếu, cập nhật sau lượt mới và luồng xác nhận. Giữ bộ câu thử và tiêu chí CP2 tại §7. |
+| 28/11/2026 | Thêm 14 câu thử B14–B27 (chỉ thêm, không sửa B01–B13): 27 câu, từ người dùng / data thật 10/27 | Đủ 20–30 câu cho CP3 và ≥1/3 câu từ khảo sát / data thật; bổ sung độ phủ chưa nêu chương, ngân hàng thiếu câu theo mức, ngoài phạm vi (`eval/README.md` mục 2). |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 
