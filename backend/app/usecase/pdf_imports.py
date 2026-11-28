@@ -14,6 +14,7 @@ from app.service.pdf_import_models import OcrPage, PdfImportModels, image_mime
 from app.service.storage_service import StorageService
 from app.usecase.pdf_import_answers import STATEMENT_TYPES, build_drafts, media_ids
 from app.usecase.pdf_import_classification import classify_drafts
+from app.usecase.pdf_import_question_source import reconcile_vector_choices
 from app.usecase.pdf_import_solutions import worked_solutions
 
 MAX_PDF_BYTES = 20 * 1024 * 1024
@@ -134,6 +135,10 @@ class PdfImportUseCase:
             drafts = build_drafts(extraction, normalized)
             if not drafts:
                 raise ValueError("Không tìm thấy câu hỏi có nguồn.")
+            try:
+                await run_in_threadpool(reconcile_vector_choices, original[0], drafts)
+            except Exception as exc:
+                logger.warning("PDF import %s text-layer comparison unavailable (%s)", import_id, type(exc).__name__)
             stage = row.stage = "classify"
             await session.commit()
             try:

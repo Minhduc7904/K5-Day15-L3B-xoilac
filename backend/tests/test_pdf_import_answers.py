@@ -1,7 +1,10 @@
+from types import SimpleNamespace
+
 import pytest
 
 from app.schemas.pdf_import import AnswerEvidence, ExtractedQuestion, Extraction
 from app.usecase.pdf_import_answers import build_drafts
+from app.usecase.pdf_import_question_source import reconcile_vector_choices
 
 
 def question(section, kind, statements=None, number="1"):
@@ -196,6 +199,25 @@ def test_restores_omitted_question_images_and_reads_explicit_worked_answers():
     assert [option["isCorrect"] for option in true_false["statements"]] == [True, False, True, False]
     assert short["answerState"] == "resolved" and short["correctAnswer"] == "13,9"
     assert short["evidence"][0]["excerpt"] == "Đáp số: 13,9"
+
+
+@pytest.mark.parametrize("third_vector", ["CC", "CD"])
+def test_verifies_vector_prime_marks_against_pdf_text_without_changing_the_answer(monkeypatch, third_vector):
+    source = f"Câu 1: Khẳng định nào sai?\nA.−→AA′=−→BB′.B.−→A′B′=−→AB.C.−→{third_vector}′=−→DD′.D.−→BA′=−→BC′."
+    reader = SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: source)])
+    monkeypatch.setattr("app.usecase.pdf_import_question_source.PdfReader", lambda _: reader)
+    options = [
+        r"$\overrightarrow{AA'} = \overrightarrow{BB'}$.",
+        r"$\overrightarrow{A'B'} = \overrightarrow{AB'}$.",
+        r"$\overrightarrow{CC'} = \overrightarrow{DD'}$.",
+        r"$\overrightarrow{BA'} = \overrightarrow{BC'}$.",
+    ]
+    draft = {"type": "SINGLE_CHOICE", "number": "1", "sourcePages": [1],
+             "statements": [{"content": value, "isCorrect": i == 3} for i, value in enumerate(options)]}
+    reconcile_vector_choices(b"%PDF", [draft])
+    expected = r"$\overrightarrow{A'B'} = \overrightarrow{AB}$." if third_vector == "CC" else options[1]
+    assert draft["statements"][1]["content"] == expected
+    assert [option["isCorrect"] for option in draft["statements"]] == [False, False, False, True]
 
 
 @pytest.mark.parametrize("repeated", [False, True])

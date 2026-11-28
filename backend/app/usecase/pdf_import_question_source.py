@@ -1,5 +1,8 @@
 import re
 from collections import Counter
+from io import BytesIO
+
+from pypdf import PdfReader
 
 from app.schemas.pdf_import import ExtractedQuestion
 from app.service.pdf_import_models import order_image_options
@@ -13,6 +16,15 @@ PAGE_NUMBER = re.compile(r"trang\s+\d+(?:\s*/\s*\d+)?", re.IGNORECASE)
 IMAGE = re.compile(r"!\[[^\]\n]*\]\(media(?:-missing)?:[^)\s]+\)")
 CHOICE_LABEL = re.compile(r"(?<!\S)(?:\*\*|__)?([A-D])[.)](?:\*\*|__)?(?=\s|$)")
 TRUE_FALSE_LABEL = re.compile(r"(?m)^[ \t]*(?:\*\*|__)?([a-d])[.)](?:\*\*|__)?(?=\s|$)")
+VECTOR_NAME = r"[A-Z]['′]?[A-Z]['′]?"
+VECTOR_MATH = re.compile(
+    rf"(\$\\overrightarrow\{{)({VECTOR_NAME})(\}}\s*=\s*\\overrightarrow\{{)"
+    rf"({VECTOR_NAME})(\}}\$\.?)"
+)
+VECTOR_TEXT = re.compile(
+    rf"([A-D])[.)]\s*[-−\s]*→\s*({VECTOR_NAME})\s*=\s*[-−\s]*→\s*({VECTOR_NAME})\s*\."
+)
+TEXT_QUESTION = re.compile(r"(?im)^\s*câu\s*(\d+)\s*[.):]")
 
 
 def question_source_blocks(pages: dict[int, str]) -> dict[tuple[str, str], list[tuple[int, str]] | None]:
@@ -90,3 +102,40 @@ def restore_source_question(
         "content": content, "statements": statements,
         "pages": sorted({page for page, line in source if line.strip()}),
     })
+
+
+def reconcile_vector_choices(pdf: bytes, drafts: list[dict]) -> None:
+    """Check prime marks when all four vector equalities agree with the PDF text layer."""
+    candidates = []
+    for draft in drafts:
+        options = draft["statements"]
+        if draft["type"] in {"SINGLE_CHOICE", "MULTIPLE_CHOICE"} and len(options) == 4:
+            matches = [VECTOR_MATH.fullmatch(option["content"].strip()) for option in options]
+            if all(matches):
+                candidates.append((draft, matches))
+    if not candidates:
+        return
+
+    reader = PdfReader(BytesIO(pdf))
+    page_text = {page: reader.pages[page - 1].extract_text()
+                 for page in {page for draft, _ in candidates for page in draft["sourcePages"]}}
+    for draft, matches in candidates:
+        text = "\n".join(page_text[page] for page in draft["sourcePages"])
+        headings = list(TEXT_QUESTION.finditer(text))
+        endings = [heading.start() for heading in headings[1:]] + [len(text)]
+        possible = []
+        for heading, end in zip(headings, endings, strict=False):
+            if heading[1] == draft["number"]:
+                options = VECTOR_TEXT.findall(text[heading.end():end])
+                if "".join(label for label, _, _ in options) == "ABCD":
+                    possible.append(options)
+        if len(possible) != 1:
+            continue
+        source = possible[0]
+        if any(
+            re.sub("['′]", "", left + right) != re.sub("['′]", "", match[2] + match[4])
+            for (_, left, right), match in zip(source, matches, strict=True)
+        ):
+            continue
+        for option, (_, left, right), match in zip(draft["statements"], source, matches, strict=True):
+            option["content"] = match[1] + left.replace("′", "'") + match[3] + right.replace("′", "'") + match[5]
