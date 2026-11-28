@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { studyApi } from '@/features/study/api';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useAppSelector } from '@/store';
+import { DEMO_RESULT_ID } from './demo-result';
 import { readOnboarding, writeOnboarding, type OnboardingResult } from './storage';
 import { TOUR_CHAPTERS, TOUR_STEPS } from './steps';
 import { TourOverlay } from './tour-overlay';
@@ -46,7 +47,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const direction = useRef<1 | -1>(1);
   const autoTried = useRef<number | null>(null);
 
-  // Tài khoản chưa có lượt làm nào (backend thật) thì bỏ chặng Kết quả.
+  // Không tra được dashboard thì bỏ chặng Kết quả; dashboard rỗng thì chặng này mở kết quả minh hoạ.
   const steps = useMemo(() => TOUR_STEPS.filter((s) => s.chapter !== 'result' || resultPath), [resultPath]);
   const chapters = useMemo(() => TOUR_CHAPTERS.filter((c) => steps.some((s) => s.chapter === c.id)), [steps]);
   const step = steps[Math.min(index, steps.length - 1)];
@@ -59,7 +60,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
     let path: string | null = null;
     try {
       const latest = (await studyApi.getDashboard()).recent[0]?.attempt.id;
-      path = latest ? `/results/${latest}` : null;
+      // Chưa có lượt thật thì dùng kết quả minh hoạ (có biểu ngữ, không ghi vào dữ liệu của học sinh).
+      path = `/results/${latest ?? DEMO_RESULT_ID}`;
     } catch {
       /* không tra được lượt làm: tour vẫn chạy, chỉ thiếu chặng Kết quả */
     }

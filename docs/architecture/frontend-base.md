@@ -12,10 +12,10 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | --- | --- |
 | `app/(student)/page.tsx` | Entry point `/`. Hiện render landing page cho khách (`features/landing/`). Route group giữ thư mục riêng và giữ URL gốc |
 | `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo |
-| `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password` (đang chạy mock). Xem [Trang xác thực frontend](frontend-auth.md) |
-| `features/auth/` | Lớp API auth (mock hoặc Axios), reducer `auth`, form và validation |
-| `app/(student)/(app)/`, `app/(student)/(focus)/`, `features/study/` | Trang học sinh (dashboard, tạo đề với AI, đề, làm bài, kết quả, hồ sơ) đang chạy mock. Xem [Trang học sinh frontend](frontend-student-pages.md) |
-| `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở dev hoặc chế độ mock |
+| `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`. Xem [Trang xác thực frontend](frontend-auth.md) |
+| `features/auth/` | Lớp API auth (Axios), reducer `auth`, form và validation |
+| `app/(student)/(app)/`, `app/(student)/(focus)/`, `features/study/` | Trang học sinh (dashboard, tạo đề với AI, đề, làm bài, kết quả, hồ sơ). Xem [Trang học sinh frontend](frontend-student-pages.md) |
+| `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở môi trường dev |
 | `app/layout.tsx` | Layout gốc: font, favicon, metadata và `AppProvider` |
 | `components/ui/`, `components/layout/`, `components/motion/` | Component dùng chung, xem [Design system frontend](frontend-design-system.md) |
 | `components/splash/`, `lib/bootstrap.ts` | Splash và các bước khởi động app |
@@ -24,7 +24,7 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | `../public/brand/` | Logo chữ WebP, biểu tượng PNG và các cỡ icon cho trình duyệt |
 | `store/index.ts` | Khởi tạo Redux store với reducer `auth` và cung cấp hook có kiểu |
 | `store/provider.tsx` | Bọc app bằng Redux, `MotionConfig`, `ToastProvider` và `SplashScreen` |
-| `lib/config.ts` | Cấu hình công khai, gồm base URL và cờ chế độ mock |
+| `lib/config.ts` | Cấu hình công khai (base URL của API) |
 | `lib/api-client.ts` | Axios client dùng chung với base URL và timeout |
 
 ## Luồng dữ liệu và tích hợp
@@ -60,7 +60,7 @@ import { BookOpen } from 'lucide-react';
 
 ## Quyết định và cách kiểm chứng
 
-Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin`, các trang auth và `/design-system` (khi bật chế độ mock) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
+Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin`, các trang auth và `/design-system` (ở môi trường dev) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
 
 ## Tài liệu liên quan
 

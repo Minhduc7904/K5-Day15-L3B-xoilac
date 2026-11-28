@@ -1,19 +1,24 @@
 /**
- * Lớp gọi dữ liệu duy nhất của phần học sinh. Component chỉ gọi `studyApi`, không đụng tới mock hay Axios.
+ * Lớp gọi dữ liệu duy nhất của phần học sinh. Component chỉ gọi `studyApi`, không đụng tới Axios.
  *
- * Đề, lượt làm bài, thống kê và chat tạo đề trên web hiện dùng dữ liệu mẫu.
- * Tích hợp hồ sơ và credit nằm ở profile/student-account-api.ts.
+ * Mọi dữ liệu đến từ backend. Ngoại lệ duy nhất là `DEMO_RESULT_ID`: trang kết quả minh hoạ cho chặng "Kết quả"
+ * của tour hướng dẫn khi học sinh chưa có lượt nào (xem `onboarding/demo-result.ts`).
+ * Hồ sơ và credit nằm ở profile/student-account-api.ts.
  */
-import { liveExamChat } from '@/lib/config';
+import { DEMO_RESULT_ID, demoResult } from '../onboarding/demo-result';
 import { adaptAttempt, attemptApi } from './attempt-api';
+import { loadChapterCatalog } from './chapters';
+import { dashboardApi } from './dashboard-api';
+import { notFoundError, orNotFound } from './errors';
 import { adaptDraft, draftSummary, examChatApi } from './exam-chat-api';
-import { mockStudyApi, runAgent } from './mock';
 
 export const studyApi = {
-  ...mockStudyApi,
+  async getDashboard() {
+    const [data] = await Promise.all([dashboardApi.get(), loadChapterCatalog()]);
+    return data;
+  },
   async listExams() {
-    if (!liveExamChat) return mockStudyApi.listExams();
-    const [drafts, attempts] = await Promise.all([examChatApi.drafts(), attemptApi.summaries()]);
+    const [drafts, attempts] = await Promise.all([examChatApi.drafts(), attemptApi.summaries(), loadChapterCatalog()]);
     return drafts.map((draft) => {
       const summary = attempts[draft.draft_id];
       return { ...draftSummary(draft), attempts: summary?.count ?? 0, bestScore: summary?.best_score ?? null,
@@ -21,16 +26,18 @@ export const studyApi = {
     });
   },
   async getExam(id: string) {
-    if (liveExamChat && id.startsWith('draft-')) {
-      const [draft, overview] = await Promise.all([examChatApi.draft(id.slice('draft-'.length)), attemptApi.overview(id)]);
-      return { ...adaptDraft(draft), attempts: overview.history.map(adaptAttempt), activeAttempt: overview.latest };
-    }
-    return { ...await mockStudyApi.getExam(id), activeAttempt: null };
+    if (!/^draft-\d+$/.test(id)) throw notFoundError('Không tìm thấy đề.');
+    const [draft, overview] = await Promise.all([
+      examChatApi.draft(id.slice('draft-'.length)), orNotFound(attemptApi.overview(id), 'Không tìm thấy đề.'), loadChapterCatalog(),
+    ]);
+    return { ...adaptDraft(draft), attempts: overview.history.map(adaptAttempt), activeAttempt: overview.latest };
   },
   async getResult(id: string) {
-    return liveExamChat && /^online-\d+$/.test(id) ? attemptApi.result(Number(id.slice(7))) : mockStudyApi.getResult(id);
+    if (id === DEMO_RESULT_ID) return demoResult();
+    if (!/^online-\d+$/.test(id)) throw notFoundError('Không tìm thấy kết quả.');
+    const [result] = await Promise.all([
+      orNotFound(attemptApi.result(Number(id.slice('online-'.length))), 'Không tìm thấy kết quả.'), loadChapterCatalog(),
+    ]);
+    return result;
   },
 };
-export const agentApi = { run: runAgent };
-
-export type { AgentEvent, AgentInput } from './mock';

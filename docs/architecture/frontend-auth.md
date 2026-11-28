@@ -1,6 +1,6 @@
 # Trang xác thực frontend
 
-Dành cho người phát triển frontend cần sửa hoặc nối API cho các trang đăng nhập, đăng ký, quên mật khẩu, nhập mã OTP và đặt mật khẩu mới, và cho lớp chặn route theo vai trò. Mọi luồng đều dùng được API thật. Mock chỉ bật khi đặt `NEXT_PUBLIC_MOCK_MODE=true` hoặc chạy dev mà không đặt biến này.
+Dành cho người phát triển frontend cần sửa hoặc nối API cho các trang đăng nhập, đăng ký, quên mật khẩu, nhập mã OTP và đặt mật khẩu mới, và cho lớp chặn route theo vai trò. Mọi luồng gọi API thật của backend.
 
 ## Bối cảnh và ràng buộc
 
@@ -16,8 +16,7 @@ Backend auth có từ PR #26. Issue #25 bổ sung xác minh đăng ký và Googl
 | `app/(auth)/template.tsx` | Hiệu ứng trượt vào mỗi khi đổi trang auth |
 | `app/(auth)/login/page.tsx` | `/login`. Đọc `?reason=session-expired \| password-reset \| logged-out`, giá trị khác bị bỏ qua |
 | `app/(auth)/register`, `forgot-password`, `verify-otp`, `reset-password` | Mỗi trang chỉ render form tương ứng |
-| `features/auth/api.ts` | `authApi`: gọi API theo cùng origin. Bật mock bằng `NEXT_PUBLIC_MOCK_MODE=true`. Lỗi 422 đổi thành lỗi từng trường |
-| `features/auth/mock.ts` | API giả lập, lưu trạng thái ở `sessionStorage` key `examind:mock-auth` |
+| `features/auth/api.ts` | `authApi`: gọi API theo cùng origin. Lỗi 422 đổi thành lỗi từng trường |
 | `features/auth/types.ts` | `User`, `AuthErrorCode`, lớp `AuthError` và `toAuthError` |
 | `features/auth/validation.ts` | Kiểm tra email, mật khẩu mới (8–128 ký tự), xác nhận mật khẩu, tên hiển thị, độ mạnh mật khẩu, che email |
 | `features/auth/use-auth-form.ts` | Hook form: giá trị, lỗi, trạng thái gửi, gộp lỗi từ server, focus trường sai đầu tiên |
@@ -68,33 +67,14 @@ Web có hai vai trò tài khoản là học sinh và admin. Khách vào được
 
 Backend đã có, xem [API xác thực](../api/auth-api.md#quên-mật-khẩu). Backend không trả số lần thử còn lại, nên ở API thật trang OTP chỉ báo "mã chưa đúng". Gửi lại quá sớm (429 `OTP_RESEND_LIMIT`) hoặc lỗi gửi thư (503) hiện thông báo từ máy chủ thay cho lỗi mạng.
 
-### Mock
-
-Mỗi lời gọi mock chờ khoảng 0,25–0,9 giây để thấy trạng thái đang gửi. Tài khoản chỉ dùng cho mock, email thuộc tên miền tài liệu `example.com`, mật khẩu là giá trị mẫu.
-
-| Email | Mật khẩu mẫu | Kết quả |
-| --- | --- | --- |
-| `hs01@example.com` | `hs01-demo` | Học sinh, đăng nhập thành công |
-| `admin@example.com` | `admin-demo-123` | Quản trị, chuyển tới `/admin` |
-| `khoa@example.com` | `khoa-demo` | `ACCOUNT_DISABLED` |
-| `loimang@example.com` | bất kỳ | Giả lập lỗi mạng ở mọi thao tác nhận email |
-
-| Mã OTP | Kết quả |
-| --- | --- |
-| `123456` | Đúng, cấp `reset_token` |
-| `000000` | `OTP_EXPIRED` |
-| Mã khác | `OTP_INVALID`. Sai 5 lần thì `TOO_MANY_ATTEMPTS` |
-
-Trong mock, mã hết hạn sau 5 phút. Toast trên trang quên mật khẩu hiện sẵn mã để dễ thử. Đăng ký tài khoản mới bằng mock thì đăng nhập lại được trong cùng tab. Trên trang đăng nhập có ô "Tài khoản thử" để điền nhanh, chỉ hiện ở chế độ mock.
-
 ## Quyết định và cách kiểm chứng
 
-- Mock nằm sau cùng interface `authApi` nên nối API thật chỉ cần đặt `NEXT_PUBLIC_MOCK_MODE=false`, không sửa form.
+- Mọi form chỉ gọi qua `authApi`, nên đổi cách gọi API không phải sửa form.
 - Store chỉ giữ `UserOut`. Phiên do cookie `HttpOnly` của backend giữ.
 - Email của luồng quên mật khẩu lưu ở `sessionStorage` thay vì query string, để không lộ trong lịch sử trình duyệt và log.
 - UI phụ thuộc user chỉ render sau khi hydrate (`useHydrated`). Splash nạp user trước khi các route segment hydrate xong, nên render ngay sẽ lệch HTML từ server.
 
-Đã kiểm ngày 2026-11-28 trong trình duyệt (dev, mock), màn hình 1280px:
+Đã kiểm ngày 2026-11-28 trong trình duyệt (dev), màn hình 1280px:
 
 - Đăng nhập: gửi form trống (lỗi và focus email), tài khoản bị khoá, lỗi mạng, sai mật khẩu, học sinh và admin thành công. Tải lại vẫn giữ phiên. Đăng xuất hoạt động.
 - Đăng ký: lỗi từng trường, `EMAIL_TAKEN`, thành công.

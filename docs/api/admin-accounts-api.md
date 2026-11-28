@@ -99,23 +99,9 @@ Thứ tự kiểm: mật khẩu xác nhận → tài khoản đích là admin �
 
 **Chưa làm:** hạ admin thành student, xoá tài khoản, admin đặt lại mật khẩu cho người khác, khoá hoặc mở khoá tài khoản student, giới hạn số lần nhập sai `current_password`. Xem [backend-auth.md](../architecture/backend-auth.md#chưa-làm).
 
-## Hướng dẫn mock cho frontend
+## Gợi ý giao diện
 
-Tài khoản mock giống [auth-api.md](auth-api.md#hướng-dẫn-mock-cho-frontend): admin `admin@example.com`, mật khẩu mock `mock-admin`. Đây là **giá trị mock, chỉ dùng phía frontend ở chế độ mock**, không tồn tại trên backend thật. Mock theo bảng sau, với trạng thái giữ trong bộ nhớ:
-
-| Request | Mock trả |
-| --- | --- |
-| `GET /api/v1/admin/accounts` | 200, mảng hai admin như ví dụ ở trên |
-| `POST /api/v1/admin/accounts` với `current_password` = `mock-admin`, email mới | 201, `AdminAccountOut` với `created_by: 1`, `last_login_at: null` |
-| `POST` với `current_password` khác | 401 `{"detail": "Mật khẩu xác nhận không đúng", "code": "REAUTH_FAILED"}` |
-| `POST` với email `admin@example.com` hoặc `hs01@example.com` | 409 `{"detail": "Email này đã được đăng ký", "code": "EMAIL_TAKEN"}` |
-| `PATCH /api/v1/admin/accounts/2/status` hợp lệ | 200, `AdminAccountOut` với `status` mới |
-| `PATCH /api/v1/admin/accounts/1/status` (chính mình, còn admin active khác) | 409 `{"detail": "Không thể đổi trạng thái tài khoản của chính mình", "code": "CANNOT_MODIFY_SELF"}` |
-| `PATCH` khoá admin active cuối cùng | 409 `{"detail": "Không thể khóa admin đang hoạt động cuối cùng", "code": "LAST_ADMIN"}` |
-| `PATCH /api/v1/admin/accounts/999/status` | 404 `{"detail": "Không có tài khoản admin này", "code": "ACCOUNT_NOT_FOUND"}` |
-| Mọi request khi đăng nhập bằng student | 403 `FORBIDDEN_ROLE` |
-
-Gợi ý giao diện: hộp thoại tạo admin, khoá và mở khoá đều có ô "Mật khẩu của bạn"; ẩn nút khoá ở dòng của chính mình; hiện `created_by` bằng email tra từ cùng danh sách.
+Hộp thoại tạo admin, khoá và mở khoá đều có ô "Mật khẩu của bạn"; ẩn nút khoá ở dòng của chính mình; hiện `created_by` bằng email tra từ cùng danh sách.
 
 ## Luồng kiểm thử
 

@@ -177,39 +177,11 @@ Với SSE, dùng cùng dependency. `EventSource` tự gửi cookie khi cùng ori
 
 Trong test, tạo người dùng rồi đăng nhập qua API như `tests/test_auth.py`. Admin tạo bằng `AuthUseCase.create_user(..., "admin")` (hàm `make_admin` trong cùng file).
 
-## Hướng dẫn mock cho frontend
+## Gợi ý cho frontend
 
-Hai tài khoản dưới đây là **giá trị mock, chỉ dùng phía frontend ở chế độ mock** (`NEXT_PUBLIC_MOCK_MODE=true`). Backend thật không có sẵn tài khoản hay mật khẩu nào: không dùng các giá trị này cho DB local, EC2 hay bất kỳ môi trường thật nào. Email dùng tên miền `example.com` dành cho tài liệu.
+Chỉ lưu `UserOut` trong store Redux, không lưu token. Khi nhận 401 với `code` bắt đầu bằng `SESSION_` thì xoá user khỏi store và chuyển tới trang đăng nhập; 401 `REAUTH_FAILED` chỉ là sai mật khẩu xác nhận, giữ phiên. Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền.
 
-| Vai trò | Email | Mật khẩu mock (chỉ chế độ mock) |
-| --- | --- | --- |
-| student | `hs01@example.com` | `mock-hs01` |
-| admin | `admin@example.com` | `mock-admin` |
-
-Mock theo bảng sau (đường dẫn tương đối, cùng origin):
-
-| Request | Mock trả |
-| --- | --- |
-| `POST /api/v1/auth/login` đúng tài khoản student | 200, body bên dưới |
-| `POST /api/v1/auth/login` đúng tài khoản admin | 200, body bên dưới |
-| `POST /api/v1/auth/login` sai | 401 `{"detail": "Email hoặc mật khẩu không đúng", "code": "INVALID_CREDENTIALS"}` |
-| `POST /api/v1/auth/register` email mới | 202, dùng mã mock `123456` để tạo tài khoản học sinh |
-| `POST /api/v1/auth/register` email `hs01@example.com` | 409 `{"detail": "Email này đã được đăng ký", "code": "EMAIL_TAKEN"}` |
-| `GET /api/v1/auth/me` khi đã đăng nhập | 200, `UserOut` của người đã đăng nhập |
-| `GET /api/v1/auth/me` khi chưa đăng nhập | 401 `{"detail": "Chưa đăng nhập", "code": "SESSION_MISSING"}` |
-| `POST /api/v1/auth/logout` | 204, xoá trạng thái đăng nhập của mock |
-| `GET /api/v1/admin/ping` với student | 403 `{"detail": "Tài khoản không có quyền dùng chức năng này", "code": "FORBIDDEN_ROLE"}` |
-
-```json
-// student
-{"user_id": 1, "email": "hs01@example.com", "role": "student", "status": "active", "display_name": "Học sinh 01", "created_at": "2026-11-27T15:52:23.845134Z"}
-// admin
-{"user_id": 2, "email": "admin@example.com", "role": "admin", "status": "active", "display_name": "Quản trị", "created_at": "2026-11-27T15:52:41.085593Z"}
-```
-
-Gợi ý cho Redux: chỉ lưu `UserOut` trong store, không lưu token. Khi nhận 401 với `code` bắt đầu bằng `SESSION_` thì xoá user khỏi store và chuyển tới trang đăng nhập; 401 `REAUTH_FAILED` chỉ là sai mật khẩu xác nhận, giữ phiên. Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền. Mock cho trang quản lý admin: [admin-accounts-api.md](admin-accounts-api.md#hướng-dẫn-mock-cho-frontend).
-
-Muốn có tài khoản tương tự trên DB local thật: đặt `ADMIN_EMAIL` và `ADMIN_PASSWORD` (mật khẩu của riêng bạn, không dùng giá trị mock) trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký một học sinh qua API ([run-local-stack.md](../operations/run-local-stack.md)).
+Muốn có tài khoản trên DB local: đặt `ADMIN_EMAIL` và `ADMIN_PASSWORD` (mật khẩu của riêng bạn) trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký một học sinh qua API ([run-local-stack.md](../operations/run-local-stack.md)).
 
 ## Luồng kiểm thử
 

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.study_time import study_date
 from app.models.exam_chat import ExamChatAttachment, ExamChatMessage, ExamDraft
 from app.repositories.credits import CreditRepository
+from app.repositories.notifications import NotificationRepository
 from app.repositories.student_profiles import StudentProfileRepository
 from app.service.exam_chat_model import ChatAction, ExamChatModel, ExamChatModelError
 from app.service.exam_chat_ocr import ExamChatImageError, ExamChatOcr, PreparedImage
@@ -401,6 +402,12 @@ class LiveExamChat(ExamChatUseCase):
         draft.shortages = shortages if not operation else previous.shortages
         self.db.add(draft)
         await self.db.flush()
+        if not previous:
+            await NotificationRepository(self.db).add(
+                requester.user_id, "draft_ready", "Đề nháp đã sẵn sàng", body=f"{draft.title}: {len(items)} câu.",
+                link=f"/exams/draft-{draft.draft_id}", dedupe_key=f"draft:{draft.draft_id}",
+                payload={"draft_id": draft.draft_id},
+            )
         preview = await self._repo.save_preview(sid, {"status": "BUILT", "offer": None, "operation": None}, commit=False)
         return ChatTurn(f"Đã lưu đề {len(items)} câu. " + ("Lần tạo này đã trừ 100 credit." if not previous else
                         "Chỉnh đề miễn phí."), preview=preview, preview_changed=True, draft=draft)

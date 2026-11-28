@@ -9,8 +9,10 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.repositories.exam_attempts import ExamAttemptRepository
+from app.repositories.notifications import NotificationRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.schemas.exam_attempt import AttemptSave
+from app.schemas.notification import NotificationOut
 from app.service.presence import PresenceRegistry, SocketConnection
 from app.service.socket_tickets import SocketTickets
 from app.usecase.exam_attempts import AttemptError, ExamAttempts
@@ -19,6 +21,7 @@ from app.usecase.realtime import RealtimeAuthorization
 log = logging.getLogger(__name__)
 SOCKET_PATH = "/api/socket.io"
 SESSION_REVOKED = "session:revoked"
+NOTIFICATION_NEW = "notification:new"
 
 
 def rooms_for(connection: SocketConnection) -> tuple[str, str]:
@@ -37,6 +40,7 @@ class RealtimeServer:
         self._attempts: dict[str, int] = {}
         self._attempt_revisions: dict[int, int] = {}
         self._attempt_watch: asyncio.Task | None = None
+        self._notice_watch: asyncio.Task | None = None
         self.server.on("connect", self.connect)
         self.server.on("disconnect", self.disconnect)
         self.server.on("attempt:join", self.join_attempt)
@@ -121,6 +125,37 @@ class RealtimeServer:
                 log.exception("Could not broadcast attempt updates")
             await asyncio.sleep(1)
 
+    def _ensure_notification_watch(self):
+        if self._notice_watch is None or self._notice_watch.done():
+            self._notice_watch = asyncio.create_task(self._watch_notifications())
+
+    async def _watch_notifications(self):
+        """Tiến trình API phát thông báo mới cho học sinh đang kết nối.
+
+        Worker chạy tiến trình riêng nên ghi thông báo vào DB; ở đây đọc bản ghi mới theo id và đẩy vào `user:<id>`.
+        Học sinh vắng mặt không cần phát, vì lần mở sau client tải danh sách từ API.
+        """
+        try:
+            async with self._get_sessions()() as session:
+                last = await NotificationRepository(session).latest_id()
+            while self.presence.users("student"):
+                try:
+                    async with self._get_sessions()() as session:
+                        rows = await NotificationRepository(session).after(last)
+                    online = self.presence.users("student")
+                    for row in rows:
+                        last = row.id
+                        if row.user_id in online:
+                            await self.server.emit(
+                                NOTIFICATION_NEW, jsonable_encoder(NotificationOut.model_validate(row)),
+                                to=f"user:{row.user_id}",
+                            )
+                except Exception:
+                    log.exception("Could not broadcast notifications")
+                await asyncio.sleep(2)
+        finally:
+            self._notice_watch = None
+
     async def connect(self, sid: str, environ: dict, auth: object) -> bool:
         ticket = auth.get("ticket") if isinstance(auth, dict) else None
         session_id = self.tickets.consume(ticket) if isinstance(ticket, str) else None
@@ -143,6 +178,8 @@ class RealtimeServer:
             self.presence.remove(sid)
             log.error("Socket handshake failed")
             return False
+        if authorized.connection.role == "student":
+            self._ensure_notification_watch()
         delay = max(0, (authorized.expires_at - datetime.now(UTC)).total_seconds())
         self._expiry[sid] = asyncio.get_running_loop().call_later(
             delay, lambda: asyncio.create_task(self._revoke([sid]))

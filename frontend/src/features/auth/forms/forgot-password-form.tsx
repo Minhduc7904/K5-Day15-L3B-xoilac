@@ -8,10 +8,8 @@ import { Alert } from '@/components/ui/feedback';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-import { mockMode } from '@/lib/config';
 import { authApi } from '../api';
-import { AuthHeader, AuthSwitch, MockNote } from '../components/auth-shell';
-import { MOCK_OTP } from '../mock';
+import { AuthHeader, AuthSwitch } from '../components/auth-shell';
 import { readResetFlow, writeResetFlow } from '../reset-flow';
 import { toAuthError } from '../types';
 import { useAuthForm } from '../use-auth-form';
@@ -41,7 +39,7 @@ export function ForgotPasswordForm() {
       toast({
         tone: 'success',
         title: 'Đã gửi mã xác minh',
-        description: mockMode ? `Mock: mã của bạn là ${MOCK_OTP}.` : 'Kiểm tra hộp thư, kể cả mục Spam.',
+        description: 'Kiểm tra hộp thư, kể cả mục Spam.',
       });
       router.push('/verify-otp');
     } catch (error) {
@@ -103,11 +101,6 @@ export function ForgotPasswordForm() {
       </form>
 
       <AuthSwitch question="Nhớ ra mật khẩu rồi?" href="/login" label="Đăng nhập" />
-
-      <MockNote>
-        Dùng <code>hs01@example.com</code> để nhận mã thật trong mock. Email chưa đăng ký vẫn báo đã gửi (để không lộ tài
-        khoản) nhưng mã sẽ không dùng được.
-      </MockNote>
     </div>
   );
 }

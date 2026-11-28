@@ -2,8 +2,9 @@
 
 Mỗi nguồn là một giao diện nhỏ, kèm cài đặt mặc định an toàn để backend chạy được ngay:
 
-- Lịch sử làm bài: chưa có bảng kết quả làm bài trong DB (dữ liệu nền không có học sinh). Mặc định NoHistory,
-  agent sẽ nói chưa có lịch sử và hỏi chương, không đoán (giống ca B05). StaticHistory dùng cho test và demo.
+- Lịch sử làm bài: bản chạy thật dùng AttemptHistory (usecase/study_dashboard.py) đọc các lượt đã chấm. Học sinh chưa
+  có lượt nào thì trả None, agent sẽ nói chưa có lịch sử và hỏi chương, không đoán (giống ca B05). NoHistory và
+  StaticHistory chỉ dùng cho test.
 - Mẫu cấu trúc đề: thuộc issue #5, nối qua TemplateLookupSource(ExamTemplateUseCase.lookup) trong deps.py.
   NoTemplates (không có mẫu nào, agent nói chưa có cấu trúc đã xác thực như ca B09) chỉ dùng cho test.
 - Diễn đạt lại bằng model: chưa chốt nhà cung cấp và key. Mặc định PlainReplyWriter trả nguyên văn bản dựng bằng code.

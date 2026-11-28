@@ -3,7 +3,6 @@
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/feedback';
-import { mockMode } from '@/lib/config';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useAppSelector } from '@/store';
 import { studyApi } from '../api';
@@ -28,7 +27,6 @@ export function DashboardPage() {
   return (
     <div className="min-h-[calc(100dvh-var(--student-header-height))] bg-surface">
       <PageContainer className="grid gap-5 sm:gap-6">
-        {mockMode && <p className="-mb-2 justify-self-end text-caption text-muted-foreground">Dữ liệu mẫu</p>}
         {res.status === 'loading' && <DashboardSkeleton />}
         {res.status === 'error' && <ErrorState onRetry={res.reload} />}
         {res.status === 'ready' && <DashboardBody name={name} data={res.data} />}

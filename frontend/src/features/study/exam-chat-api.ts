@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios';
 import { apiClient } from '@/lib/api-client';
 import { apiBaseUrl } from '@/lib/config';
+import { notFoundError } from './errors';
 import type { Difficulty, Exam, ExamSummary, PublicQuestion, QuestionType, StructureRow } from './types';
 
 export interface ServerSession {
@@ -127,7 +128,7 @@ export const examChatApi = {
     return (await apiClient.get<ServerMessage[]>(sessionPath(id) + '/transcript', { params: { before } })).data;
   },
   async chapters(signal?: AbortSignal) {
-    return (await apiClient.get<Record<string, { name: string; parent_code: string | null }>>(root + '/chapters', { signal })).data;
+    return (await apiClient.get<Record<string, { name: string; parent_code: string | null; grade?: number | null }>>(root + '/chapters', { signal })).data;
   },
   async edit(id: number, version: number, edit: { rows?: StructureRow[]; chapter_codes?: string[]; duration_minutes?: number; type_point_weights?: PointWeights }) {
     return (await apiClient.patch<ServerPreview>(sessionPath(id) + '/preview', { version, edit })).data;
@@ -189,11 +190,7 @@ export const examChatApi = {
     try {
       return (await apiClient.get<ServerDraft>(root + '/drafts/' + id)).data;
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        const missing = new Error('Không tìm thấy đề.');
-        missing.name = 'NotFoundError';
-        throw missing;
-      }
+      if (isAxiosError(error) && error.response?.status === 404) throw notFoundError('Không tìm thấy đề.');
       throw error;
     }
   },
@@ -209,7 +206,7 @@ export function adaptDraft(draft: ServerDraft): { exam: Exam; questions: PublicQ
   }
   return {
     exam: {
-      id: 'draft-' + draft.draft_id, remote: true, title: draft.title, source: 'ai',
+      id: 'draft-' + draft.draft_id, title: draft.title, source: 'ai',
       createdAt: draft.created_at, durationMinutes: draft.structure.duration_minutes ?? 0,
       chapters: [...new Set(draft.items.flatMap((item) => item.chapter ? [item.chapter] : []))],
       sections: [...sections.values()],

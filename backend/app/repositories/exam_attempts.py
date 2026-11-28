@@ -50,6 +50,13 @@ class ExamAttemptRepository:
             .order_by(ExamAttempt.attempt_id.desc())
         )).all()
 
+    async def graded(self, user_id: int, limit: int) -> list[ExamAttempt]:
+        """Các lượt đã chấm gần nhất của học sinh, dùng cho dashboard và lịch sử của agent."""
+        return list(await self.session.scalars(
+            select(ExamAttempt).where(ExamAttempt.user_id == user_id, ExamAttempt.status == "graded")
+            .order_by(ExamAttempt.attempt_id.desc()).limit(limit)
+        ))
+
     async def due_ids(self, now: datetime) -> list[int]:
         return list(await self.session.scalars(
             select(ExamAttempt.attempt_id)

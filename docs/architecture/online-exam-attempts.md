@@ -6,7 +6,7 @@ Học sinh có thể rời trang, mở lại cùng lượt làm trên thiết b�
 
 | Phần | Hiện trạng tại `9ec4028` | Việc cần triển khai |
 | --- | --- | --- |
-| Trang làm bài và kết quả | `take-exam-page.tsx` lưu nháp theo ID đề trong `localStorage`; `studyApi.submitAttempt` và luồng kết quả dùng mock. Timer hiện chạy ở trình duyệt. | Lưu lượt làm theo tài khoản trên PostgreSQL và đọc kết quả từ backend. Giữ các thao tác điều hướng và đánh dấu câu của trang hiện tại. |
+| Trang làm bài và kết quả | Lúc lập kế hoạch: `take-exam-page.tsx` lưu nháp trong `localStorage`, luồng kết quả dùng mock và timer chạy ở trình duyệt. Nay chỉ còn luồng server, không còn nhánh cục bộ. | Lưu lượt làm theo tài khoản trên PostgreSQL và đọc kết quả từ backend. Giữ các thao tác điều hướng và đánh dấu câu của trang hiện tại. |
 | Tạo đề | `ExamChatUseCase._confirm_and_build` và `LiveExamChat._build` dùng chung phương thức chọn câu. Mẫu có `points_per_question` tùy chọn; đề cá nhân hóa có thể thiếu `points`. Live cập nhật đề khi đổi câu. | Gọi chung một hàm phân bổ sau khi danh sách câu đã được chốt. Lượt đang làm dùng bản đề đã được cố định lúc bắt đầu. |
 | Chấm điểm | `frontend/src/features/study/grading.ts` dùng điểm cố định theo loại rồi quy đổi tổng sang thang 10. `QuestionBankRepository.load_items` chủ động loại đáp án và lời giải khỏi đề nháp. | Chấm ở backend với điểm tối đa đã ghi vào đề. Dùng truy vấn nội bộ riêng để nạp khóa chấm. |
 | Realtime và tác vụ nền | Đã có Socket.IO với vé xác thực dùng một lần, room theo vai trò và theo người dùng. `app.worker` chạy riêng tiến trình trên production. | Thêm room riêng theo lượt làm và đường truyền từ tác vụ hết giờ đến tiến trình Socket.IO. |
@@ -29,7 +29,7 @@ Từ BeeV2, áp dụng cách `CompetitionGateway.subscribeAttempt` kiểm quyề
 - Giới hạn một lượt `in_progress` trên mỗi cặp học sinh–đề bằng unique index có điều kiện. Nhấn **Bắt đầu** từ hai tab trả về cùng lượt. Sau khi đã chấm, **Làm lại** tạo lượt mới bằng phiên bản đề mới nhất. Việc đổi câu trong chat giữa chừng chỉ ảnh hưởng lượt mới.
 - Cố định thứ tự, nội dung, lựa chọn, điểm, và thời lượng đề khi bắt đầu. Khóa chấm, lời giải và phiên bản quy tắc được lưu nội bộ cùng bản đề. Nếu khóa chấm thiếu hoặc dữ liệu câu không hợp lệ, báo lỗi trước khi mở lượt. DTO đang làm bài chỉ chứa nội dung, điểm tối đa và dữ liệu của chính học sinh.
 - Đáp án lưu theo mã câu trong tiến độ của lượt cùng phiên bản câu. ID thao tác đã xử lý được lưu riêng. Kết quả lưu điểm và trạng thái từng câu cùng tổng điểm, thời gian từng câu và lý do nộp. Bản ghi đã chấm được đọc lại nguyên vẹn khi tải lại trang.
-- Đề cũ thiếu điểm được phân bổ lần đầu khi tạo lượt. Bản nháp mock trên trình duyệt dùng cho chế độ demo. Chế độ thật chỉ khôi phục lượt đã ghi nhận theo tài khoản trên server.
+- Đề cũ thiếu điểm được phân bổ lần đầu khi tạo lượt. Chỉ khôi phục lượt đã ghi nhận theo tài khoản trên server; trình duyệt không giữ bản nháp cục bộ.
 
 ## Luồng dữ liệu và tích hợp
 
@@ -97,7 +97,7 @@ Nếu loại câu vắng mặt, chỉ tính trọng số của các loại có c
 
 1. **Phân bổ điểm trong luồng tạo đề.** Thêm hàm thuần, DTO và kiểm thử đề theo mẫu, đề theo loại, đề thiếu câu và đổi câu. Nghiệm thu khi backend tạo và trả đủ điểm trước khi mở lượt, và chat hiện tại vẫn dùng được.
 2. **Lưu lượt và chấm qua HTTP.** Thêm migration, quyền truy cập, khóa chấm nội bộ, lưu đáp án và nộp tay. Nghiệm thu khi cùng tài khoản mở hai trình duyệt đều khôi phục đúng lượt, và kết quả vẫn ổn định sau khi đổi phiên bản đề.
-3. **Nộp hết giờ và realtime.** Thêm room, outbox, job vào `app.worker`, thời gian server và xử lý khi kết nối lại. Nghiệm thu khi đóng tất cả tab mà bài có giờ vẫn tự chấm. Bài vô hạn vẫn tiếp tục được sau nhiều ngày.
+3. **Nộp hết giờ và realtime.** Thêm room, job vào `app.worker`, thời gian server và xử lý khi kết nối lại. Nghiệm thu khi đóng tất cả tab mà bài có giờ vẫn tự chấm. Bài vô hạn vẫn tiếp tục được sau nhiều ngày.
 4. **Nối trang học sinh và đo thời gian câu.** Nối danh sách đề, nút Làm tiếp, màn hình làm bài và kết quả. Hoàn thiện hàng đợi cục bộ, xung đột giữa tab, trạng thái hết giờ và thống kê nhịp độ. Bật luồng thật sau khi migration và worker cùng chạy trên môi trường thử.
 
 ### Các kịch bản nghiệm thu

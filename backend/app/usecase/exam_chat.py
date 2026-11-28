@@ -482,6 +482,7 @@ class ExamChatUseCase:
             "items": items,
             "shortages": shortages,
         })
+        await self._repo.notify_draft_ready(sid, draft)
         preview = await self._repo.save_preview(sid, {"status": "BUILT"})
         return preview, draft, self._draft_text(draft, structure)
 

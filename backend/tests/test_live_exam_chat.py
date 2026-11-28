@@ -74,6 +74,8 @@ async def test_context_scope_shortage_and_free_replacement(live):
         no_answers(first_draft)
         retry = (await confirm(client, sid, offer_version, 4)).json()
         assert retry["draft"]["draft_id"] == first_draft["draft_id"]
+        notices = (await client.get("/api/v1/student/me/notifications")).json()
+        assert [(n["kind"], n["link"]) for n in notices["items"]] == [("draft_ready", f"/exams/draft-{first_draft['draft_id']}")]
 
         _, preview, _ = await say(client, sid, "Bớt còn 3 để có thể thay câu sau")
         context = live.call_args.args[0]
@@ -88,6 +90,7 @@ async def test_context_scope_shortage_and_free_replacement(live):
         codes = [item["code"] for item in changed["items"]]
         assert codes == [original_codes[0], "Q00004", original_codes[2]]
         assert changed["draft_id"] == first_draft["draft_id"]
+        assert len((await client.get("/api/v1/student/me/notifications")).json()["items"]) == 1  # sửa tại chỗ không báo lại
         wallet = (await client.get(CREDITS)).json()
         assert wallet["balance"] == 400
         assert [entry["delta"] for entry in wallet["history"] if entry["reason"] == "exam_creation"] == [-100]

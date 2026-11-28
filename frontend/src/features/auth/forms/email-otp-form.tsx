@@ -7,13 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/feedback';
 import { OtpInput } from '@/components/ui/otp-input';
 import { useToast } from '@/components/ui/toast';
-import { mockMode } from '@/lib/config';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
 import { homeFor } from '../route-guard';
-import { AuthHeader, MockNote } from '../components/auth-shell';
-import { MOCK_OTP } from '../mock';
+import { AuthHeader } from '../components/auth-shell';
 import { toAuthError, type OtpPurpose, type PendingOtp } from '../types';
 import { maskEmail } from '../validation';
 
@@ -113,7 +111,6 @@ export function EmailOtpForm({
         </Button>
         <Button variant="ghost" disabled={Boolean(operation)} onClick={onBack}>Quay lại</Button>
       </div>
-      {mockMode && <MockNote>Mã thử: <code>{MOCK_OTP}</code></MockNote>}
     </div>
   );
 }

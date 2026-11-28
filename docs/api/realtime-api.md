@@ -15,6 +15,10 @@ Frontend gọi API ticket cùng origin qua Next.js rewrite và dùng cookie phi�
 | `user:{id}` | Các kết nối của tài khoản đó |
 | `attempt:{id}` | Các tab đã xác minh thuộc học sinh sở hữu lượt làm. Xem [API làm bài online](online-exam-attempts-api.md#room-socketio). |
 
+### Sự kiện `notification:new`
+
+Server phát vào room `user:{id}` khi học sinh có thông báo mới (bài hết giờ đã tự chấm, đề nháp dựng xong, cộng credit hằng ngày, nhắc lịch học). Payload là một thông báo như phần tử `items` của [API thông báo](notifications-api.md): `id`, `kind`, `title`, `body`, `link`, `created_at`, `read_at`. Worker chạy ở tiến trình riêng nên chỉ ghi cơ sở dữ liệu; tiến trình API kiểm tra thông báo mới khoảng mỗi 2 giây cho các học sinh đang kết nối. Client có thể lỡ sự kiện lúc mất mạng, nên tải lại danh sách qua HTTP khi kết nối lại.
+
 Server quyết định room từ dữ liệu phiên. Frontend mở một kết nối mỗi tab sau khi đăng nhập hoặc khôi phục phiên. Chuyển giữa hoàn tất hồ sơ và onboarding tour giữ kết nối đang mở.
 
 Server phát `session:revoked` rồi đóng socket khi phiên hết hạn hoặc bị thu hồi. Đăng xuất thu hồi đúng phiên. Khóa tài khoản, đổi mật khẩu qua luồng quên mật khẩu và thu hồi mọi phiên khi liên kết Google cho tài khoản cũ sẽ đóng mọi socket tương ứng.
@@ -28,5 +32,6 @@ Server phát `session:revoked` rồi đóng socket khi phiên hết hạn hoặc
 
 ## Tài liệu liên quan
 
+- [API thông báo](notifications-api.md)
 - [Deploy backend và nginx](../operations/deploy-backend-ci-cd.md)
 - [Issue #36](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/36)

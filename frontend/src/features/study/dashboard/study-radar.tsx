@@ -1,7 +1,6 @@
 'use client';
 
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, type TooltipContentProps } from 'recharts';
-import { hasAnswer } from '../grading';
 import type { DashboardData } from '../types';
 
 type Props = { recent: DashboardData['recent']; days: DashboardData['streak']['days'] };
@@ -21,8 +20,7 @@ function getMetrics({ recent, days }: Props): Metric[] {
   let reachedTarget = 0;
 
   for (const { attempt, exam } of recent) {
-    const answeredInExam = exam.sections.reduce((count, section) =>
-      count + section.questionIds.filter((id) => hasAnswer(attempt.answers[id])).length, 0);
+    const answeredInExam = attempt.answered ?? 0;
     total += attempt.total;
     answered += answeredInExam;
     correct += attempt.correct;

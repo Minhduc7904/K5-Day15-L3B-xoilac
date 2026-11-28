@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/feedback';
-import { mockMode } from '@/lib/config';
 import { authApi } from '../api';
 import { prepareGoogleLogin } from '../google-flow';
 import { toAuthError } from '../types';
@@ -35,8 +34,6 @@ function GoogleLogo() {
 export function GoogleSignIn() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string>();
-
-  if (mockMode) return null;
 
   async function openGoogle() {
     setStarting(true);

@@ -1,7 +1,6 @@
 /**
  * Cờ "đã xem hướng dẫn" theo từng tài khoản. Đổi `VERSION` khi nội dung tour thay đổi đủ nhiều
- * để người đã xem nên xem lại. Khoá nằm ngoài `examind:mock-study` nên "Khôi phục dữ liệu mẫu"
- * không xoá nó: đây là lựa chọn của người dùng, không phải dữ liệu mẫu.
+ * để người đã xem nên xem lại. Khoá này là lựa chọn của người dùng nên không bị dọn cùng các khoá dữ liệu cũ.
  */
 const VERSION = 'v1';
 

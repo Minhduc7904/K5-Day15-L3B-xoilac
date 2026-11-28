@@ -6,6 +6,7 @@ from sqlalchemy.orm import noload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exam_chat import ExamChatAttachment, ExamChatMessage, ExamChatSession, ExamDraft, ExamPreview
+from app.repositories.notifications import NotificationRepository
 from app.repositories.pdf_imports import media
 
 
@@ -113,6 +114,18 @@ class ExamChatRepository:
         await self._session.commit()
         await self._session.refresh(item)
         return item
+
+    async def notify_draft_ready(self, session_id: int, draft: ExamDraft) -> None:
+        """Thông báo đề mới cho chủ phiên (nhánh dựng không dùng model). Phiên không có chủ thì bỏ qua."""
+        chat = await self._session.get(ExamChatSession, session_id)
+        if chat is None or chat.user_id is None:
+            return
+        await NotificationRepository(self._session).add(
+            chat.user_id, "draft_ready", "Đề nháp đã sẵn sàng", body=f"{draft.title}: {len(draft.items)} câu.",
+            link=f"/exams/draft-{draft.draft_id}", dedupe_key=f"draft:{draft.draft_id}",
+            payload={"draft_id": draft.draft_id},
+        )
+        await self._session.commit()
 
     async def latest_draft(self, session_id: int) -> ExamDraft | None:
         result = await self._session.execute(

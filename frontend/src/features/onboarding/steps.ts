@@ -103,7 +103,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     path: 'result',
     target: 'result-score',
     title: 'Nộp bài xong là thấy điểm ngay',
-    body: 'Đây là một lượt làm mẫu. Điểm chỉ để bạn luyện tập, không xếp hạng ai và không so với bạn khác.',
+    body: 'Đây là trang điểm sau mỗi lần nộp bài. Điểm chỉ để bạn luyện tập, không xếp hạng ai và không so với bạn khác.',
     pose: 'success',
   },
   {

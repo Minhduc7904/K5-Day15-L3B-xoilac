@@ -22,7 +22,7 @@ Dành cho người viết giao diện trong `frontend/`. Tài liệu này ghi fo
 | `frontend/src/components/splash/splash-screen.tsx`, `lib/bootstrap.ts` | Splash khởi động và danh sách bước khởi động |
 | `frontend/src/store/provider.tsx` | Bọc app bằng Redux, `MotionConfig`, `ToastProvider` và `SplashScreen` |
 | `frontend/src/features/landing/` | Landing page tại `/` |
-| `frontend/src/features/design-system/`, `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở dev hoặc `NEXT_PUBLIC_MOCK_MODE` khác `false` |
+| `frontend/src/features/design-system/`, `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở môi trường dev |
 
 ### Component dùng chung
 

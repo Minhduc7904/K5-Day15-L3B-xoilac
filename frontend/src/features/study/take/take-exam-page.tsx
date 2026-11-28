@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, Bookmark, CheckCheck, Clock3, Grid3x3, LogOut, Play, RotateCcw, Send, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bookmark, CheckCheck, Clock3, Grid3x3, LogOut, Play, Send, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -15,58 +15,19 @@ import { studyApi } from '../api';
 import { answerValues, attemptApi, attemptError, attemptResultId, type AttemptState, type AttemptSummary } from '../attempt-api';
 import { ErrorState } from '../components/page-states';
 import { QuestionContent } from '../components/question-content';
-import { chapterOf, difficultyLabels, typeLabels } from '../fixtures/chapters';
+import { chapterOf } from '../chapters';
+import { difficultyLabels, typeLabels } from '../labels';
 import { clock, examDuration } from '../format';
 import { adaptDraft } from '../exam-chat-api';
 import type { Answer, Exam, PublicQuestion } from '../types';
 import { useResource } from '../use-resource';
 import { useOnlineAttempt } from './use-online-attempt';
 
-interface Draft {
-  startedAt: string;
-  answers: Record<string, Answer>;
-  flags: string[];
-  current: number;
-  /** Giây đã mở từng câu. */
-  times?: Record<string, number>;
-}
-
-const draftKey = (examId: string) => `examind:attempt-draft:${examId}`;
-
-function readDraft(examId: string): Draft | null {
-  try {
-    const raw = window.localStorage.getItem(draftKey(examId));
-    return raw ? (JSON.parse(raw) as Draft) : null;
-  } catch {
-    return null;
-  }
-}
-
-const writeDraft = (examId: string, draft: Draft) => {
-  try {
-    window.localStorage.setItem(draftKey(examId), JSON.stringify(draft));
-  } catch {
-    // Không lưu được thì vẫn làm bài bình thường trong phiên này.
-  }
-};
-
-const clearDraft = (examId: string) => {
-  try {
-    window.localStorage.removeItem(draftKey(examId));
-  } catch {
-    // bỏ qua
-  }
-};
-
 export const isAnswered = (a: Answer | undefined) =>
   a !== undefined && a !== null && (typeof a === 'string' ? a.trim() !== '' : a.some((v) => v !== null));
 
 export function TakeExamPage({ id }: { id: string }) {
   const res = useResource(() => studyApi.getExam(id), `take-${id}`);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [existing, setExisting] = useState<Draft | null | undefined>(undefined);
-
-  useEffect(() => setExisting(readDraft(id)), [id]);
 
   if (res.status === 'error') {
     return (
@@ -75,7 +36,7 @@ export function TakeExamPage({ id }: { id: string }) {
       </div>
     );
   }
-  if (res.status === 'loading' || existing === undefined) {
+  if (res.status === 'loading') {
     return (
       <div className="mx-auto grid max-w-3xl gap-4 p-6" aria-busy="true">
         <Skeleton className="h-14 rounded-2xl" />
@@ -85,22 +46,7 @@ export function TakeExamPage({ id }: { id: string }) {
   }
 
   const { exam, questions, activeAttempt } = res.data;
-  if (exam.remote) return <OnlineTake exam={exam} count={questions.length} latest={activeAttempt} />;
-  if (!draft) {
-    return (
-      <StartScreen
-        exam={exam}
-        count={questions.length}
-        existing={existing}
-        onStart={(resume) => {
-          const next = resume && existing ? existing : { startedAt: new Date().toISOString(), answers: {}, flags: [], current: 0 };
-          writeDraft(exam.id, next);
-          setDraft(next);
-        }}
-      />
-    );
-  }
-  return <ExamRunner exam={exam} questions={questions} initial={draft} />;
+  return <OnlineTake exam={exam} count={questions.length} latest={activeAttempt} />;
 }
 
 function OnlineTake({ exam, count, latest }: { exam: Exam; count: number; latest: AttemptSummary | null }) {
@@ -123,21 +69,18 @@ function OnlineTake({ exam, count, latest }: { exam: Exam; count: number; latest
     }
   }
 
-  const existing = last?.status === 'in_progress'
-    ? { startedAt: last.started_at, answers: answerValues(last), current: 0, flags: [] } : null;
-  if (!active) return <StartScreen exam={exam} count={count} existing={existing} onStart={start}
+  const answered = last?.status === 'in_progress' ? Object.values(answerValues(last)).filter(isAnswered).length : null;
+  if (!active) return <StartScreen exam={exam} count={count} answered={answered} onStart={start}
     latest={last} error={error} busy={busy} />;
   const fixed = adaptDraft(active.draft);
-  const initial = { startedAt: active.started_at, answers: answerValues(active), flags: [],
-    current: Math.max(0, fixed.questions.findIndex((question) => question.id === active.current)) };
-  return <ExamRunner key={active.attempt_id} exam={fixed.exam} questions={fixed.questions} initial={initial} remote={active} />;
+  const initialIndex = Math.max(0, fixed.questions.findIndex((question) => question.id === active.current));
+  return <ExamRunner key={active.attempt_id} exam={fixed.exam} questions={fixed.questions} initialIndex={initialIndex} remote={active} />;
 }
 
-function StartScreen({ exam, count, existing, onStart, latest, busy, error }: {
-  exam: Exam; count: number; existing: Draft | null; onStart: (resume: boolean) => void;
+function StartScreen({ exam, count, answered, onStart, latest, busy, error }: {
+  exam: Exam; count: number; answered: number | null; onStart: () => void;
   latest?: AttemptSummary | null; busy?: boolean; error?: string;
 }) {
-  const answered = existing ? Object.values(existing.answers).filter(isAnswered).length : 0;
   return (
     <div className="grid min-h-dvh place-items-center bg-gradient-to-b from-primary-subtle to-surface px-4 py-10">
       <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="grid w-full max-w-lg justify-items-center gap-5 rounded-[2rem] bg-background p-6 text-center shadow-lift sm:p-8">
@@ -165,20 +108,9 @@ function StartScreen({ exam, count, existing, onStart, latest, busy, error }: {
             </Link>
           </p>
         )}
-        {existing ? (
-          <div className="grid w-full gap-2">
-            <Button size="lg" fullWidth loading={busy} leftIcon={<Play aria-hidden="true" />} onClick={() => onStart(true)} data-autofocus autoFocus>
-              Làm tiếp ({answered}/{count} câu đã trả lời)
-            </Button>
-            {!exam.remote && <Button size="lg" variant="outline" fullWidth leftIcon={<RotateCcw aria-hidden="true" />} onClick={() => onStart(false)}>
-              Làm lại từ đầu
-            </Button>}
-          </div>
-        ) : (
-          <Button size="lg" fullWidth loading={busy} leftIcon={<Play aria-hidden="true" />} onClick={() => onStart(false)} data-autofocus autoFocus>
-            {latest?.status === 'graded' ? 'Làm lại đề này' : 'Bắt đầu làm bài'}
-          </Button>
-        )}
+        <Button size="lg" fullWidth loading={busy} leftIcon={<Play aria-hidden="true" />} onClick={onStart} data-autofocus autoFocus>
+          {answered !== null ? `Làm tiếp (${answered}/${count} câu đã trả lời)` : latest?.status === 'graded' ? 'Làm lại đề này' : 'Bắt đầu làm bài'}
+        </Button>
         <Link href={`/exams/${exam.id}`} className="rounded-lg text-label font-semibold text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-ring">
           Quay lại chi tiết đề
         </Link>
@@ -187,15 +119,13 @@ function StartScreen({ exam, count, existing, onStart, latest, busy, error }: {
   );
 }
 
-function ExamRunner({ exam, questions, initial, remote }: {
-  exam: Exam; questions: PublicQuestion[]; initial: Draft; remote?: AttemptState;
+function ExamRunner({ exam, questions, initialIndex, remote }: {
+  exam: Exam; questions: PublicQuestion[]; initialIndex: number; remote: AttemptState;
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [localAnswers, setAnswers] = useState(initial.answers);
-  const [flags, setFlags] = useState<string[]>(initial.flags);
-  const [times, setTimes] = useState<Record<string, number>>(initial.times ?? {});
-  const [current, setCurrent] = useState(Math.min(initial.current, questions.length - 1));
+  const [flags, setFlags] = useState<string[]>([]);
+  const [current, setCurrent] = useState(Math.min(initialIndex, questions.length - 1));
   const [direction, setDirection] = useState(1);
   const [now, setNow] = useState(() => performance.now());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -205,12 +135,12 @@ function ExamRunner({ exam, questions, initial, remote }: {
 
   const q = questions[current];
   const online = useOnlineAttempt(remote, q.id);
-  const answers = remote ? online.answers : localAnswers;
-  const untimed = remote ? remote.deadline_at === null : exam.durationMinutes <= 0;
-  const deadline = remote?.deadline_at ? Date.parse(remote.deadline_at) : Date.parse(initial.startedAt) + exam.durationMinutes * 60_000;
-  const serverNow = remote ? online.clock.now + Math.max(0, now - online.clock.local) : Date.now();
-  const remaining = Math.max(0, Math.ceil((deadline - serverNow) / 1000));
-  const ended = Boolean(remote && (online.state?.status === 'graded' || (!untimed && remaining <= 0)));
+  const answers = online.answers;
+  const untimed = remote.deadline_at === null;
+  const deadline = remote.deadline_at ? Date.parse(remote.deadline_at) : Infinity;
+  const serverNow = online.clock.now + Math.max(0, now - online.clock.local);
+  const remaining = untimed ? 0 : Math.max(0, Math.ceil((deadline - serverNow) / 1000));
+  const ended = online.state?.status === 'graded' || (!untimed && remaining <= 0);
   const locked = ended || submitting;
   const answeredCount = questions.filter((q) => isAnswered(answers[q.id])).length;
 
@@ -227,51 +157,23 @@ function ExamRunner({ exam, questions, initial, remote }: {
     return () => window.clearInterval(t);
   }, [untimed]);
 
-  useEffect(() => {
-    if (!remote) writeDraft(exam.id, { startedAt: initial.startedAt, answers: localAnswers, flags, current, times });
-  }, [remote, exam.id, initial.startedAt, localAnswers, flags, current, times]);
-
-  // Cộng thời gian cho câu đang mở, mỗi giây một lần; bỏ qua lúc tab bị ẩn.
-  const currentId = questions[current]?.id;
-  useEffect(() => {
-    if (remote || !currentId) return;
-    const t = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !submittedRef.current) setTimes((m) => ({ ...m, [currentId]: (m[currentId] ?? 0) + 1 }));
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [currentId, remote]);
-
   const { flush, sync, checkpoint, apply } = online;
 
-  const submit = useCallback(
-    async (auto = false) => {
-      if (submittedRef.current) return;
-      submittedRef.current = true;
-      setSubmitting(true);
-      try {
-        if (remote) {
-          checkpoint(q.id, true);
-          if (!await flush()) throw new Error('Đáp án chưa được đồng bộ. Hãy lưu xong rồi nộp lại.');
-          apply(await attemptApi.submit(remote.attempt_id));
-          return;
-        }
-        const attempt = await studyApi.submitAttempt(exam.id, localAnswers, initial.startedAt, times);
-        clearDraft(exam.id);
-        if (auto) toast({ tone: 'info', title: 'Hết giờ, bài đã được nộp' });
-        router.push(`/results/${attempt.id}`);
-      } catch (error) {
-        submittedRef.current = false;
-        setSubmitting(false);
-        toast({ tone: 'danger', title: 'Chưa nộp được bài', description:
-          remote && error instanceof Error ? error.message : 'Bài vẫn được lưu trên máy. Kiểm tra mạng rồi nộp lại nhé.' });
-      }
-    },
-    [remote, checkpoint, flush, apply, q.id, localAnswers, exam.id, initial.startedAt, router, toast, times],
-  );
-
-  useEffect(() => {
-    if (!remote && !untimed && remaining <= 0) void submit(true);
-  }, [remote, untimed, remaining, submit]);
+  const submit = useCallback(async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setSubmitting(true);
+    try {
+      checkpoint(q.id, true);
+      if (!await flush()) throw new Error('Đáp án chưa được đồng bộ. Hãy lưu xong rồi nộp lại.');
+      apply(await attemptApi.submit(remote.attempt_id));
+    } catch (error) {
+      submittedRef.current = false;
+      setSubmitting(false);
+      toast({ tone: 'danger', title: 'Chưa nộp được bài', description:
+        error instanceof Error ? error.message : 'Kiểm tra mạng rồi nộp lại nhé.' });
+    }
+  }, [remote.attempt_id, checkpoint, flush, apply, q.id, toast]);
 
   useEffect(() => {
     if (!ended || online.state?.status === 'graded') return;
@@ -299,17 +201,16 @@ function ExamRunner({ exam, questions, initial, remote }: {
       setDirection(index > current ? 1 : -1);
       setCurrent(index);
       setNavOpen(false);
-      if (remote) void flush();
+      void flush();
     },
-    [current, questions.length, remote, flush],
+    [current, questions.length, flush],
   );
 
   const changeRemote = online.change;
   const setAnswer = useCallback((value: Answer | ((prev: Answer) => Answer)) => {
     if (locked) return;
-    if (remote) changeRemote(q.id, value, q.type === 'SHORT_ANSWER');
-    else setAnswers((a) => ({ ...a, [q.id]: typeof value === 'function' ? value(a[q.id] ?? null) : value }));
-  }, [locked, remote, changeRemote, q.id, q.type]);
+    changeRemote(q.id, value, q.type === 'SHORT_ANSWER');
+  }, [locked, changeRemote, q.id, q.type]);
   const toggleFlag = useCallback(() => setFlags((f) => (f.includes(q.id) ? f.filter((x) => x !== q.id) : [...f, q.id])), [q.id]);
 
   // Phím tắt (không bắt khi đang gõ trong ô nhập).
@@ -345,7 +246,7 @@ function ExamRunner({ exam, questions, initial, remote }: {
             <p className="truncate text-label font-semibold text-foreground">{exam.title}</p>
             <p className="text-caption text-muted-foreground tabular-nums">
               Đã trả lời {answeredCount}/{questions.length}
-              {remote && <span aria-live="polite"> · {online.error ? 'Chưa đồng bộ' : online.pendingAnswers ? 'Đang lưu' : 'Đã lưu'}</span>}
+              <span aria-live="polite"> · {online.error ? 'Chưa đồng bộ' : online.pendingAnswers ? 'Đang lưu' : 'Đã lưu'}</span>
             </p>
           </div>
           <motion.div
@@ -428,10 +329,10 @@ function ExamRunner({ exam, questions, initial, remote }: {
               </div>
 
               <p className="text-caption text-muted-foreground">{chapterOf(q.chapter).name}</p>
-              <QuestionContent source={q.content} draftId={q.remoteDraftId} attemptId={remote?.attempt_id} />
+              <QuestionContent source={q.content} draftId={q.remoteDraftId} attemptId={remote.attempt_id} />
 
-              <fieldset disabled={locked} className="min-w-0" onBlur={remote ? () => void flush() : undefined}>
-                <AnswerInput question={q} value={answers[q.id] ?? null} onChange={setAnswer} attemptId={remote?.attempt_id} />
+              <fieldset disabled={locked} className="min-w-0" onBlur={() => void flush()}>
+                <AnswerInput question={q} value={answers[q.id] ?? null} onChange={setAnswer} attemptId={remote.attempt_id} />
               </fieldset>
             </motion.article>
           </AnimatePresence>
@@ -459,7 +360,7 @@ function ExamRunner({ exam, questions, initial, remote }: {
             <Button disabled={locked} fullWidth leftIcon={<Send aria-hidden="true" />} onClick={() => setConfirmOpen(true)}>
               Nộp bài
             </Button>
-            <Link href={`/exams/${exam.id}`} onClick={remote ? () => checkpoint(q.id, true) : undefined} className="inline-flex items-center justify-center gap-1.5 rounded-lg text-caption font-semibold text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-ring">
+            <Link href={`/exams/${exam.id}`} onClick={() => checkpoint(q.id, true)} className="inline-flex items-center justify-center gap-1.5 rounded-lg text-caption font-semibold text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-ring">
               <LogOut className="size-3.5" aria-hidden="true" /> Thoát (bài vẫn được lưu)
             </Link>
           </div>

@@ -6,6 +6,7 @@ Các bảng nội dung chưa có model ORM chung, nên ở đây khai báo bản
 Giả định cần nhóm xác nhận (#3, #11): "câu đã duyệt, dùng được" = questions.visibility = 'PUBLISHED'.
 Đổi ở một chỗ: APPROVED_VISIBILITY.
 """
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -55,6 +56,15 @@ statements = Table(
 )
 
 
+_GRADE_PREFIX = re.compile(r"^(\d{1,2})C")
+
+
+def grade_of(chapter_code: str) -> int | None:
+    """Khối lớp từ tiền tố mã chương (`12C11` → 12). Mã không theo dạng này trả None."""
+    match = _GRADE_PREFIX.match(chapter_code)
+    return int(match.group(1)) if match else None
+
+
 def question_code(question_id: int) -> str:
     """Mã câu hiển thị, cùng dạng Q + 5 chữ số với data/question_bank.csv và script chấm #6."""
     return f"Q{question_id:05d}"
@@ -74,12 +84,13 @@ class QuestionBankRepository:
         rows = await self._session.execute(select(chapters.c.code, chapters.c.name).where(chapters.c.code.is_not(None)))
         return {code: name for code, name in rows.all()}
 
-    async def chapter_catalog(self) -> dict[str, dict[str, str | None]]:
+    async def chapter_catalog(self) -> dict[str, dict[str, str | int | None]]:
+        """Mã chương → tên, mã chương cha và khối lớp (suy từ tiền tố mã, vd `12C11` → 12)."""
         parent = chapters.alias("chapter_parent")
         query = (select(chapters.c.code, chapters.c.name, parent.c.code)
                  .outerjoin(parent, parent.c.chapter_id == chapters.c.parent_chapter_id)
                  .where(chapters.c.code.is_not(None)).order_by(chapters.c.chapter_id))
-        return {code: {"name": name, "parent_code": parent_code}
+        return {code: {"name": name, "parent_code": parent_code, "grade": grade_of(code)}
                 for code, name, parent_code in (await self._session.execute(query)).all()}
 
     def _pool(
