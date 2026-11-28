@@ -30,7 +30,7 @@ class MemoryStorage:
             raise OSError("storage unavailable")
         self.objects[key] = data, mime
 
-    async def get(self, key):
+    async def get(self, key, bucket=None):
         return self.objects.get(key)
 
     async def delete(self, key):

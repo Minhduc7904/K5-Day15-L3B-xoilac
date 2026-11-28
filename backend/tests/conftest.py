@@ -41,7 +41,7 @@ class FakeStorage:
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         self.objects[key] = (data, content_type)
 
-    async def get(self, key: str):
+    async def get(self, key: str, bucket: str | None = None):
         return self.objects.get(key)
 
     async def ping(self) -> bool:
