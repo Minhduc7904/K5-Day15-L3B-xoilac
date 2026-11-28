@@ -7,30 +7,37 @@ Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E · [x] F — bài toán nhóm t
 Data BTC cấp đã dùng (nếu có — không commit nguyên file): chưa ghi nhận trong repo.
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
-- Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin):
-- Công cụ / AI đang được dùng cho việc này (nếu có) + nguồn. Không kiểm được thì ghi "chưa kiểm":
+- Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin). Luồng dưới đây dựng từ khảo sát 23 học sinh (`evidence/survey/results.csv`), không phải quan sát một ứng dụng cụ thể nên không có ảnh chụp:
+  1. Làm đề Toán: 10/23 học thêm trực tiếp, 10/23 tự ôn ngoài giờ, 10/23 làm bài hoặc đề thầy cô ở trường giao (câu 3, chọn nhiều đáp án).
+  2. Chữa đề bằng đáp án và lời giải, hoặc nhờ thầy cô. Nguyên văn: "Thường thì xem lời giải xong rồi làm đề khác luôn" (S10); "vẫn cần sự trợ giúp từ thầy cô giáo để làm" (S3).
+  3. Xác định chỗ yếu: chỉ 6/23 biết rõ chương hoặc dạng cần luyện; 13/23 chưa xác định rõ (5 biết câu sai nhưng chưa rõ chương, 5 không xác định được, 3 biết một phần); 4/23 chưa xem lại đề nào hoặc không nhớ (câu 6).
+  4. Tìm đề luyện tiếp: 9/23 báo tìm được ít đề hoặc ít đề đúng nội dung và dạng cần ôn (câu 5).
+  5. Luyện thêm: 6/23 tìm được bài phù hợp và đã luyện; 1/23 luyện bài chỉ khớp một phần; 3/23 biết phần cần ôn nhưng chưa luyện (câu 7). 13/23 chưa xác định được phần cần ôn, chưa xem lại đề hoặc không nhớ.
+- Công cụ / AI đang được dùng cho việc này (nếu có) + nguồn. Không kiểm được thì ghi "chưa kiểm": trong 12 học sinh có tự ôn (11/23 chọn "không tự ôn"), nguồn đề phổ biến là đề tham khảo công khai của trường hoặc cơ quan thi 8/12, nhóm học tập hoặc mạng xã hội 5/12, đề thầy cô giao 4/12; website hoặc ứng dụng ôn luyện chỉ 2/12 (câu 4). Khảo sát không hỏi tên website hay ứng dụng, và không hỏi có dùng AI hay không, nên việc học sinh đang dùng công cụ hay AI nào để chọn phần ôn là **chưa kiểm**.
 
 ## §1. Người dùng & bằng chứng *(guide 1.1, 1.2)*
 - Người dùng chính (một vai cụ thể): học sinh lớp 10–12 tại Việt Nam đã làm ít nhất một đề Toán và đang tự ôn cho bài kiểm tra, thi học kỳ hoặc thi tốt nghiệp THPT.
 - Việc họ cố làm xong: chọn và làm một đề Toán tiếp theo phù hợp với phần mình còn yếu sau khi chữa đề.
 - Cách hiện tại *(giả thuyết)*: xem điểm và đáp án, tự nhóm lỗi hoặc hỏi người hỗ trợ, rồi tìm bài tương tự. Điểm tổng có thể khó chuyển thành nội dung cần ôn, trong khi đề có sẵn dễ tiếp cận. Cần hỏi học sinh đã làm gì ở lần gần nhất.
 - Pain *(giả thuyết)*: học sinh đang tự ôn Toán khó xác định chương cần ưu tiên sau khi làm đề và mất thời gian tìm bài luyện tiếp. Giả thuyết phụ là học sinh khó tự đối chiếu đề ôn với kỳ thi/năm mình nhắm tới.
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __ *(chờ bằng chứng thật, gồm số người gặp, tần suất, thời gian và trích dẫn ẩn danh)*.
+- Bằng chứng khảo sát sơ bộ: **19/23 (82,6%)** phản hồi báo từng chữa đề mà chưa biết ôn gì tiếp trong 30 ngày qua. **8/23** biết câu sai hoặc biết một phần nhưng chưa xác định được chương, dạng bài hoặc thứ tự ưu tiên. **7/23** gặp khó khi tìm đề đúng nội dung hoặc dạng câu. Kết quả ủng hộ hướng đề ôn theo chương yếu trong mẫu khảo sát. Cả 23 phiếu đã được đội trưởng xác nhận; số phút mất mỗi lần chưa đo (§2 dùng số phút *(tự ước tính)*). Xem [tổng hợp và trích dẫn ẩn danh](evidence/summary.md).
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-| Đề ôn theo chương yếu | __ | __ | __ phút tìm phần cần ôn và bài tập | __ | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
-| Đề theo ma trận từng kỳ thi/năm | __ | __ | __ phút tìm và kiểm tra cấu trúc | __ | Cần kho đủ dạng câu và nguồn đã xác thực theo kỳ thi/năm | Định hướng sản phẩm |
-| Báo cáo phần hay sai sau khi chữa đề | __ | __ | __ phút tự rà và nhóm lỗi | __ | Có thể thử với lịch sử làm bài giả lập đã gắn nhãn | Chưa chọn làm hướng riêng |
+| Đề ôn theo chương yếu | 19/23 (82,6%) phiếu báo gặp (khảo sát câu 8) | ≥ 1,43 lần/người: 14 phiếu có nêu số lần (8 phiếu 1 lần, 6 phiếu 2–3 lần, tính cận dưới); 5 phiếu "không nhớ số lần" không tính | 20 phút tìm phần cần ôn và bài luyện *(tự ước tính, chưa đo; khoảng 10–30)* | ≈ 39 giờ / 100 học sinh (khoảng 20–59 giờ) | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
+| Đề theo ma trận từng kỳ thi/năm | 9/23 (39,1%) tìm được ít đề hoặc ít đề đúng nội dung/dạng (câu 5: 7 + 2); chỉ 1 phiếu (S14) nhắc cấu trúc đề thi ở trường | 1 lần, ôn trước mỗi kỳ thi *(tự ước tính, chưa đo)* | 15 phút tìm và kiểm tra cấu trúc *(tự ước tính)* | ≈ 10 giờ / 100 học sinh | Cần kho đủ dạng câu và nguồn đã xác thực theo kỳ thi/năm | Định hướng sản phẩm |
+| Báo cáo phần hay sai sau khi chữa đề | 13/23 (56,5%) chưa xác định rõ chỗ yếu (câu 6: 5 biết câu sai nhưng chưa rõ chương, 5 không xác định được, 3 biết một phần) | ≥ 1,43 lần/người *(dùng số lần của câu 8, chưa đo riêng)* | 10 phút tự rà và nhóm lỗi *(tự ước tính)* | ≈ 13,5 giờ / 100 học sinh | Có thể thử với lịch sử làm bài giả lập đã gắn nhãn | Chưa chọn làm hướng riêng |
 
-- **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
+- **Impact / tháng** của hướng chọn = 82,6 người (mỗi 100 học sinh) × 1,43 lần × 20 phút ≈ 2.360 phút ≈ 39 giờ — nguồn từng thừa số: 82,6% = 19/23 phiếu (khảo sát câu 8) · 1,43 lần = (8×1 + 6×2)/14 phiếu có nêu số lần, cận dưới (khảo sát câu 8) · 20 phút *(tự ước tính)*. Hai hướng còn lại tính cùng cách: ma trận kỳ thi ≈ 39,1 × 1 × 15 ≈ 587 phút; báo cáo phần hay sai ≈ 56,5 × 1,43 × 10 ≈ 808 phút. Số học sinh thật của trung tâm chưa có nên tính trên 100 học sinh; mẫu từ một trung tâm nên không suy rộng ra học sinh cả nước.
 - Lý do chọn sơ bộ: đề ôn theo chương yếu giúp học sinh có bài để làm tiếp ngay sau khi chữa đề. Báo cáo phần hay sai vẫn là đầu vào hữu ích, còn đề theo nhiều ma trận cần thêm nguồn và ngân hàng đủ dạng câu. Sẽ đối chiếu lựa chọn với bằng chứng và bảng impact.
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8): ôn rải rác __ · ôn đều __ · ôn dồn trước kỳ thi __. Nguồn: __.
+- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8): ôn rải rác 1 lần (8/14 phiếu có nêu số lần) · ôn đều 2–3 lần (6/14 phiếu) · ôn dồn trước kỳ thi 4 lần *(tự ước tính, khảo sát không hỏi riêng)*. Nguồn: khảo sát câu 8, `evidence/survey/results.csv`.
+- Lý do chọn: đề ôn theo chương yếu có impact lớn nhất trong ba hướng (≈ 39 giờ so với ≈ 10 và ≈ 13,5 giờ trên 100 học sinh) và là hướng duy nhất có số lần có nguồn trực tiếp. Giờ phụ thuộc số phút tự ước tính, nên kết luận chỉ có nghĩa về thứ tự các hướng. Hướng bị loại giữ lại ở bảng.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
-- [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
+- **Azota** (nền tảng giao và chấm bài của giáo viên Việt Nam; tính năng theo [tài liệu hướng dẫn chính thức](https://docs.azota.vn/docs/huong-dan-su-dung/de-thi/thong-ke-de-thi/), xem ngày 28/11/2026): đáng học — có thống kê đúng/sai theo từng câu, danh sách học sinh làm sai để giáo viên giao bài luyện thêm, và [thống kê theo năng lực](https://docs.azota.vn/docs/huong-dan-su-dung/thi-online/thong-ke-theo-nang-luc/) gom kết quả theo "yêu cầu cần đạt". Đáng né — chỗ yếu do giáo viên đọc thống kê rồi tự chọn bài, học sinh tự ôn một mình vẫn phải tự rà. Mình khác — dành cho học sinh tự ôn: học sinh nhắn bằng lời, agent chỉ ra chương yếu bằng số liệu và dựng đề từ ngân hàng đã duyệt. Việc Azota có tự dựng đề luyện cho học sinh hay không: **chưa kiểm** (tài liệu tìm được không nhắc tới).
+- **Khan Academy** (học trực tuyến, tiếng Anh): [Readiness Check](https://support.khanacademy.org/hc/en-us/articles/47686822980365-What-is-the-Readiness-Check) là bài kiểm tra ngắn thích ứng, sau đó tạo luyện tập cá nhân hóa; [Learning Paths](https://support.khanacademy.org/hc/en-us/articles/360050959352-How-do-I-purchase-Khan-Academy-Districts-Enterprise-Learning-Paths-for-my-district) dựng lộ trình theo điểm MAP Growth cho học khu có mua gói. Đáng học — kết quả đánh giá chuyển thẳng thành luyện tập đúng kỹ năng, đúng ý tưởng "sau khi làm, ôn đúng chỗ yếu". Đáng né — Khan nói rõ Readiness Check không phải bài chẩn đoán chính thức, nên nhóm cũng không nói ôn theo chương yếu là đánh giá chính thức. Mình khác — nội dung theo chương và khối lớp 10–12 của chương trình Việt Nam, câu hỏi từ ngân hàng của trung tâm, học sinh xem trước và chỉnh cấu trúc đề bằng lời trước khi dựng; chưa so cách tính độ chính xác với Khan.
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
 - **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả): học sinh THPT nhắn yêu cầu ôn phần hay sai; agent dựa trên lịch sử làm bài đề xuất cấu trúc đề ôn (chương, số câu, độ khó) để học sinh xem trước và chỉnh, rồi dựng đề nháp từ các câu đã duyệt trong ngân hàng.
@@ -161,10 +168,10 @@ flowchart LR
 - Trường hợp đặc thù lĩnh vực (lớp 4): sai chương yếu hoặc sai cấu trúc kỳ thi làm học sinh ôn lệch mà vẫn tin là đúng. Agent luôn nêu số liệu làm căn cứ, chia câu theo hai chương khi gần nhau, và không nêu cấu trúc kỳ thi khi chưa có nguồn xác thực (B04, B09).
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 13 câu (thuong 4 · kho 5 · tu_choi 4, trong đó 2 câu tấn công) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
-- Nguồn bộ câu thử: cả 13 câu là `tu_viet` (nhóm tự viết, chưa có câu từ người dùng thật hay data thật). `run.py check` sẽ cảnh báo thiếu ≥1/3 câu từ người dùng / data thật; nhóm bổ sung câu từ khảo sát ở CP3 *(chưa làm)*.
+- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 27 câu từ CP3 (thuong 8 · kho 12 · tu_choi 7, trong đó 2 câu tấn công; 13 câu đầu giữ nguyên từ CP2) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
+- Nguồn bộ câu thử: `nguoi_dung` 5 (B14–B18, nguyên văn câu 9 của khảo sát) · `data_that` 5 (B19–B23, số liệu ngân hàng thật) · `tu_viet` 17 → từ người dùng / data thật 10/27, đạt mốc ≥1/3 của `run.py check`. Chi tiết `eval/README.md` mục 2.
 - **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua (≥ 11/13), và 100% câu tu_choi qua (4/4), và 0 mã câu ngoài ngân hàng hoặc câu tự viết trong mọi đề nháp (metric `cau_trong_ngan_hang` 100%)". Ngưỡng từng metric nằm trong `eval/metric_spec.yaml`: `chuong_yeu_dung` ≥ 3/4 câu thuong · `xu_ly_kho_khong_doan` ≥ 4/5 câu kho.
-- Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Kết quả: lượt 1 22/27 (81%) · lượt 2 __/__ (__%) — run ID: `run-1@20261128-090856` / __ (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
 - Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
@@ -187,6 +194,10 @@ flowchart LR
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
 | 28/11/2026 | Nối lịch sử đã chấm và đề xuất AI với luồng xem trước của web (#41) | Kiểm hai tài khoản cùng khối, ca thiếu căn cứ, kho thiếu, cập nhật sau lượt mới và luồng xác nhận. Giữ bộ câu thử và tiêu chí CP2 tại §7. |
+| 28/11/2026 | Thêm 14 câu thử B14–B27 (chỉ thêm, không sửa B01–B13): 27 câu, từ người dùng / data thật 10/27 | Đủ 20–30 câu cho CP3 và ≥1/3 câu từ khảo sát / data thật; bổ sung độ phủ chưa nêu chương, ngân hàng thiếu câu theo mức, ngoài phạm vi (`eval/README.md` mục 2). |
+| 28/11/2026 | Ghi cách quy đổi ngưỡng "đạt" sang 27 câu: ≥ 22/27 · tu_choi 7/7 · thuong ≥ 6/8 · kho ≥ 10/12 | Chuẩn §7 và `metric_spec.yaml` giữ nguyên chữ, chỉ giữ tỷ lệ % đã chốt ở CP2 (80%, 100%, 75%, 80%) và làm tròn lên cho bộ câu lớn hơn; chi tiết `eval/README.md` mục 3. |
+| 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
+| 28/11/2026 | Điền §0 (luồng hiện tại từ khảo sát) và §3 (Azota, Khan Academy) | Cần §0–§7 đủ nội dung cho CP3; §3 lấy từ tài liệu chính thức của hai sản phẩm, phần không kiểm được ghi "chưa kiểm". |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 

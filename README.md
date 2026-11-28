@@ -91,8 +91,8 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 
 | Thành phần | Thật / Giả | Ghi chú |
 |---|---|---|
-| Lời gọi AI ở quyết định trung tâm | Yêu cầu dùng model thật từ CP3 | Model: ____ |
-|  |  |  |
+| Lời gọi AI, bản CLI (`run.py eval`) | Thật từ 28/11/2026 | Model: gpt-5.4-mini (OpenAI), nối trong `codebase/ai.py`. Ở bản CLI model chỉ diễn đạt lại tin nhắn; chương và số câu do quy tắc quyết định (xem `spec.md` §4) |
+| Lời gọi AI, luồng web (backend) | Thật | Model chọn công cụ và đề xuất phân bổ; server kiểm lại (`spec.md` §4, luồng CP3 #41) |
 
 ## Dùng AI vào việc gì
 
@@ -130,5 +130,5 @@ Codex hỗ trợ chỉnh phạm vi CP1 và nháp câu hỏi tìm hiểu cách h�
 | 4 | Bản chạy thử làm trọn lát cắt | `codebase/` · lệnh ở mục "Lệnh" |
 | 5 | Định nghĩa "tốt" + bộ câu thử | `data/DATA_CARD.md` · `eval/` |
 | 6 | Mô phỏng chi phí khi dùng thật | `cost/` |
-| 7 | Slide + demo + video dự phòng | `demo-slides.pdf` ở thư mục gốc · link video: ____ |
+| 7 | Slide + demo + video dự phòng | `demo-slides.pdf` ở thư mục gốc · link video demo (30 giây, gọi AI thật, nộp CP3): [Google Drive](https://drive.google.com/drive/folders/1F7REkMX2KSdoWrGfLZYcdNP5P0CPiDj9?usp=sharing) |
 | + | *Bonus:* người dùng thử | `validation/log.md` |
