@@ -10,6 +10,7 @@ from app.api.cookies import cookie_name_for, request_scope
 from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session, get_sessionmaker
+from app.repositories.admin_analytics_repository import AdminAnalyticsRepository
 from app.repositories.admin_chapter_repository import AdminChapterRepository
 from app.repositories.admin_question_repository import AdminQuestionRepository
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
@@ -37,6 +38,7 @@ from app.service.password_service import PasswordService
 from app.service.pdf_import_models import PdfImportModels
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
+from app.usecase.admin_analytics import AdminAnalytics
 from app.usecase.admin_chapters import AdminChapterUseCase
 from app.usecase.admin_questions import AdminQuestionUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, SessionMissing, ensure_role
@@ -171,6 +173,14 @@ def get_online_stats_usecase(request: Request, session: SessionDep) -> OnlineSta
 
 
 OnlineStatsUseCaseDep = Annotated[OnlineStatsUseCase, Depends(get_online_stats_usecase)]
+
+
+def get_admin_analytics(session: SessionDep) -> AdminAnalytics:
+    """Dashboard admin: thống kê phân tích tổng hợp, chỉ đọc."""
+    return AdminAnalytics(AdminAnalyticsRepository(session), QuestionBankRepository(session))
+
+
+AdminAnalyticsDep = Annotated[AdminAnalytics, Depends(get_admin_analytics)]
 
 
 def get_admin_question_usecase(session: SessionDep, storage: StorageDep, settings: SettingsDep) -> AdminQuestionUseCase:
