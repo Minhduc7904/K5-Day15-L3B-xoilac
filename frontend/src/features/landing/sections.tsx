@@ -63,7 +63,7 @@ export function ChapterMarquee() {
   return (
     <section aria-label="Các chương có thể ôn" className="border-y border-border bg-surface py-8">
       <p className="mb-5 text-center text-label font-semibold text-muted-foreground">
-        Ôn theo các chương của chương trình Toán 10, 11, 12
+        Ôn theo 24 chương của chương trình Toán 10, 11, 12
       </p>
       <div className="grid gap-3">
         <ChapterRow items={chapters.slice(0, half)} />
