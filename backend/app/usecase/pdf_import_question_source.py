@@ -17,12 +17,13 @@ IMAGE = re.compile(r"!\[[^\]\n]*\]\(media(?:-missing)?:[^)\s]+\)")
 CHOICE_LABEL = re.compile(r"(?<!\S)(?:\*\*|__)?([A-D])[.)](?:\*\*|__)?(?=\s|$)")
 TRUE_FALSE_LABEL = re.compile(r"(?m)^[ \t]*(?:\*\*|__)?([a-d])[.)](?:\*\*|__)?(?=\s|$)")
 VECTOR_NAME = r"[A-Z]['′]?[A-Z]['′]?"
+VECTOR_TEXT_NAME = r"[A-Z]['′]?[ \t]*[A-Z]['′]?"
 VECTOR_MATH = re.compile(
     rf"(\$\\overrightarrow\{{)({VECTOR_NAME})(\}}\s*=\s*\\overrightarrow\{{)"
     rf"({VECTOR_NAME})(\}}\$\.?)"
 )
 VECTOR_TEXT = re.compile(
-    rf"([A-D])[.)]\s*[-−\s]*→\s*({VECTOR_NAME})\s*=\s*[-−\s]*→\s*({VECTOR_NAME})\s*\."
+    rf"([A-D])[.)]\s*[-−\s]*→\s*({VECTOR_TEXT_NAME})\s*=\s*[-−\s]*→\s*({VECTOR_TEXT_NAME})\s*\."
 )
 TEXT_QUESTION = re.compile(r"(?im)^\s*câu\s*(\d+)\s*[.):]")
 
@@ -131,7 +132,8 @@ def reconcile_vector_choices(pdf: bytes, drafts: list[dict]) -> None:
                     possible.append(options)
         if len(possible) != 1:
             continue
-        source = possible[0]
+        source = [(label, re.sub(r"[ \t]+", "", left), re.sub(r"[ \t]+", "", right))
+                  for label, left, right in possible[0]]
         if any(
             re.sub("['′]", "", left + right) != re.sub("['′]", "", match[2] + match[4])
             for (_, left, right), match in zip(source, matches, strict=True)

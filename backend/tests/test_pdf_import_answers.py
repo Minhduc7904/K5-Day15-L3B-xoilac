@@ -201,9 +201,14 @@ def test_restores_omitted_question_images_and_reads_explicit_worked_answers():
     assert short["evidence"][0]["excerpt"] == "Đáp số: 13,9"
 
 
-@pytest.mark.parametrize("third_vector", ["CC", "CD"])
-def test_verifies_vector_prime_marks_against_pdf_text_without_changing_the_answer(monkeypatch, third_vector):
-    source = f"Câu 1: Khẳng định nào sai?\nA.−→AA′=−→BB′.B.−→A′B′=−→AB.C.−→{third_vector}′=−→DD′.D.−→BA′=−→BC′."
+@pytest.mark.parametrize(("second_vector", "third_vector"), [("A′B′", "CC"), ("A′ B′", "CC"), ("A′B′", "CD")])
+def test_verifies_vector_prime_marks_against_pdf_text_without_changing_the_answer(
+    monkeypatch, second_vector, third_vector,
+):
+    source = (
+        f"Câu 1: Khẳng định nào sai?\nA.−→AA′=−→BB′.B.−→{second_vector}=−→AB."
+        f"C.−→{third_vector}′=−→DD′.D.−→BA′=−→BC′."
+    )
     reader = SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: source)])
     monkeypatch.setattr("app.usecase.pdf_import_question_source.PdfReader", lambda _: reader)
     options = [
