@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Container } from '@/components/layout/container';
 import { Logo } from '@/components/layout/logo';
+import { AdminShell } from '@/features/admin/admin-shell';
 import { UserMenu } from '@/features/auth/components/user-menu';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -14,7 +15,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </Container>
       </header>
-      {children}
+      <AdminShell>{children}</AdminShell>
     </>
   );
 }

@@ -11,8 +11,14 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | Vị trí trong `frontend/src/` | Trách nhiệm |
 | --- | --- |
 | `app/(student)/page.tsx` | Entry point `/`. Hiện render landing page cho khách (`features/landing/`). Route group giữ thư mục riêng và giữ URL gốc |
-| `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo. Trang render `AdminDashboard` (#20): ô học sinh online và màn quản lý người dùng |
-| `features/admin-users/` | Lớp API `/admin/users`, `permissions.ts` (bản sao luật `can_manage` của backend, chỉ để ẩn thao tác), bảng và hộp thoại quản lý người dùng (#20). Xem [user-management-api.md](../api/user-management-api.md) |
+| `app/admin/layout.tsx`, `features/admin/admin-shell.tsx` | Khu quản trị (#11): header có logo, thanh điều hướng (`ADMIN_LINKS`) liệt kê mọi trang admin và đánh dấu trang đang mở (`aria-current`). `AdminShell` không render trang cho người không phải admin; `AuthGuard` đã chuyển học sinh về `/dashboard` |
+| `app/admin/page.tsx`, `features/admin/admin-dashboard.tsx` | `/admin`: ô học sinh online (#20), số câu theo trạng thái và lối tắt tới các trang |
+| `features/admin/admin-ui.tsx` | Mảnh dùng chung của các trang admin: `PageHeader`, `Pagination`, `ConfirmModal`, `EmptyState`, `selectClass` |
+| `app/admin/questions/**`, `features/admin-questions/` | `/admin/questions` (bộ lọc nằm trên URL: `?q=&grade=&chapter=&type=&difficulty=&status=&page=`), `/admin/questions/[id]`, `/new`, `/[id]/edit`. `validation.ts` là bản sao luật kiểm câu của backend. Ảnh `media:ID` hiển thị qua `/admin/questions/media/{id}`. Xem [admin-data-api.md](../api/admin-data-api.md) |
+| `app/admin/chapters/`, `features/admin-chapters/` | `/admin/chapters`: cây chương theo khối, tạo, sửa, chuyển cha, xoá. `api.ts` cũng cấp cây cho ô chọn chương của feature câu hỏi |
+| `app/admin/pdf-imports/**`, `features/admin-pdf-imports/` | Giao diện duyệt nhập đề PDF cho API của #3: tải PDF, theo dõi trạng thái, sửa và duyệt từng bản nháp. Xem [API nhập đề](../ai/pdf-import/api.md) |
+| `app/admin/exam-templates/**`, `features/admin-exam-templates/` | Giao diện mẫu cấu trúc đề cho API của #5: lọc, tạo, sửa từng phần, duyệt. Xem [API mẫu cấu trúc đề](../api/exam-templates-api.md) |
+| `app/admin/users/`, `features/admin-users/` | `/admin/users`: lớp API `/admin/users`, `permissions.ts` (bản sao luật `can_manage` của backend, chỉ để ẩn thao tác), bảng và hộp thoại quản lý người dùng (#20). Xem [user-management-api.md](../api/user-management-api.md) |
 | `features/admin-stats/` | Lớp API thống kê và ô "Học sinh online" tự làm mới mỗi 15 giây (#20) |
 | `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`. Xem [Trang xác thực frontend](frontend-auth.md) |
 | `features/auth/` | Lớp API auth (Axios), reducer `auth`, form và validation |
@@ -63,7 +69,7 @@ import { BookOpen } from 'lucide-react';
 
 ## Quyết định và cách kiểm chứng
 
-Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin`, các trang auth và `/design-system` (ở môi trường dev) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
+Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin` và các trang con (`/admin/questions`, `/admin/chapters`, `/admin/pdf-imports`, `/admin/exam-templates`, `/admin/users`), các trang auth và `/design-system` (ở môi trường dev) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
 
 ## Tài liệu liên quan
 

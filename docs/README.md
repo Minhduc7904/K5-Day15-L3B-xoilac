@@ -14,6 +14,7 @@
 | Đọc số liệu dashboard: điểm, chuỗi ngày học, thống kê chương | [API dashboard học tập](api/study-dashboard-api.md) |
 | Liệt kê, đánh dấu đã đọc và nhận thông báo trong ứng dụng | [API thông báo](api/notifications-api.md) |
 | Admin tìm, tạo, sửa, khoá tài khoản học sinh và admin (thay `/admin/accounts`) | [API quản lý người dùng](api/user-management-api.md) |
+| Admin tìm, lọc, tạo, sửa, ngừng sử dụng câu hỏi; quản lý cây chương; định nghĩa "câu khả dụng" cho #4 | [API quản lý ngân hàng câu hỏi và chương](api/admin-data-api.md) |
 | Viết tính năng mới trong frontend | [Kiến trúc frontend](architecture/frontend-base.md) |
 | Dùng font, thang chữ và token màu chung của giao diện | [Design system frontend](architecture/frontend-design-system.md) |
 | Sửa trang đăng nhập, đăng ký, quên mật khẩu hoặc OTP | [Trang xác thực frontend](architecture/frontend-auth.md) |

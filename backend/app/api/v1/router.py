@@ -2,6 +2,8 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     admin,
+    admin_chapters,
+    admin_questions,
     admin_stats,
     admin_users,
     admin_import,
@@ -27,6 +29,8 @@ api_router.include_router(google_auth.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_users.router)
 api_router.include_router(admin_stats.router)
+api_router.include_router(admin_questions.router)
+api_router.include_router(admin_chapters.router)
 api_router.include_router(sample_items.router)
 api_router.include_router(sample_files.router)
 api_router.include_router(admin_import.router)
