@@ -4,7 +4,7 @@
 
 Khảo sát Google Form gửi tới học sinh lớp 10–12 tại một trung tâm dạy thêm. Bản dữ liệu gồm **23 phản hồi** từ ngày 27–28/11/2026, trong đó 6 lớp 10, 6 lớp 11 và 11 lớp 12. Nguồn và cách đếm đã định trước nằm trong [bộ câu hỏi đã phát](survey/questions.md). [Log ẩn danh](survey/results.csv) giữ ngày, bỏ giờ chính xác và trường liên hệ.
 
-Phiếu S1 đã được đội trưởng xác nhận. Các phiếu còn lại có thông tin lớp và câu trả lời cho câu 8, đang chờ xác nhận người trả lời khác nhau và ngoài nhóm. Nguồn khảo sát đạt ngưỡng CP3 khi có ít nhất 20 phản hồi hợp lệ. Các số dưới đây tính trên toàn bộ 23 phiếu trước bước xác nhận này.
+Đội trưởng đã xác nhận cả 23 phiếu (S1 ngày 27/11, S2–S23 ngày 28/11/2026) sau khi đối chiếu bản xuất Form gốc: mỗi phiếu là một lượt gửi riêng, thời điểm khác nhau (từ chiều 27/11 đến sáng 28/11), người trả lời ngoài nhóm. Bản xuất gốc có cột liên hệ tuỳ chọn nên được lưu ngoài repo. Nguồn khảo sát đạt ngưỡng CP3 (≥20 phản hồi hợp lệ): **23/23 phiếu hợp lệ**. Mọi số dưới đây tính trên 23 phiếu này.
 
 ## 2. Số chính
 
@@ -31,4 +31,4 @@ Các câu đóng và câu mở trong cùng khảo sát cho thấy hai khó khăn
 
 ## 5. Kết luận
 
-Kết quả sơ bộ **19/23** vượt mốc **2/3** trong [giả thuyết đã đặt trước](hypothesis.md). Cần tính lại sau khi xác nhận các phiếu hợp lệ. Với lát cắt hiện tại, nhóm ưu tiên giúp học sinh xác định chương hoặc dạng bài cần ôn sau khi chữa đề, rồi tìm bài luyện tương ứng. Mẫu thu từ một trung tâm và chưa đo số phút mất mỗi lần, nên chưa đủ để suy rộng tỷ lệ hoặc tính số giờ tiết kiệm mỗi tháng.
+Kết quả sơ bộ **19/23** vượt mốc **2/3** trong [giả thuyết đã đặt trước](hypothesis.md). Với lát cắt hiện tại, nhóm ưu tiên giúp học sinh xác định chương hoặc dạng bài cần ôn sau khi chữa đề, rồi tìm bài luyện tương ứng. Mẫu thu từ một trung tâm và chưa đo số phút mất mỗi lần, nên chưa đủ để suy rộng tỷ lệ hoặc tính số giờ tiết kiệm mỗi tháng.
