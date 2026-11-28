@@ -14,7 +14,7 @@ import type { StructureRow } from '../types';
 import { addImages, Composer, EXAM_CHAT_IMAGES, type Attachment } from './composer';
 
 const field = 'min-w-0 rounded-lg border border-border bg-background px-2 py-2 text-label text-foreground';
-const starter = ['Ôn theo mẫu kỳ thi trong hồ sơ của mình', 'Ra 20 câu nguyên hàm và tích phân'];
+const starter = ['Tạo đề ôn tiếp', 'Ôn theo mẫu kỳ thi trong hồ sơ của mình', 'Ra 20 câu nguyên hàm và tích phân'];
 const DIFFICULTIES = Object.keys(difficultyLabels) as StructureRow['difficulty'][];
 const TYPES = Object.keys(defaultPointWeights) as Array<keyof PointWeights>;
 

@@ -94,7 +94,6 @@ function Result({ data, demo }: { data: Data; demo: boolean }) {
     }
     return [...map.entries()].map(([code, v]) => ({ code, ...v })).sort((a, b) => a.correct / a.total - b.correct / b.total);
   }, [graded]);
-  const weakest = chapters[0] && chapters[0].correct < chapters[0].total ? chapterOf(chapters[0].code).name : null;
 
   let offset = 0;
   const sections = exam.sections.map((s) => {
@@ -207,12 +206,12 @@ function Result({ data, demo }: { data: Data; demo: boolean }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-primary-foreground/12 px-5 py-4 sm:px-8">
-          {weakest && !demo && (
+          {!demo && (
             <Link
-              href={`/exams/new?q=${encodeURIComponent(`Ôn chương ${weakest}`)}`}
+              href={`/exams/new?q=${encodeURIComponent('Tạo đề ôn tiếp')}`}
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-flame-strong px-5 text-label font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-danger-hover active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              <Sparkles className="size-4" aria-hidden="true" /> Tạo đề ôn phần sai
+              <Sparkles className="size-4" aria-hidden="true" /> Tạo đề ôn tiếp
             </Link>
           )}
           {demo ? (
