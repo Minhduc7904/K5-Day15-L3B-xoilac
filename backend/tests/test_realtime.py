@@ -48,7 +48,8 @@ async def test_session_handshake_and_scoped_logout(client, db, monkeypatch):
     assert await realtime.connect("device-2", {}, {"ticket": (await client.post(TICKET)).json()["ticket"]})
     outstanding = (await client.post(TICKET)).json()["ticket"]
     assert (await client.post(f"{API}/auth/logout")).status_code == 204
-    server.emit.assert_awaited_once_with("session:revoked", to="device-2")
+    # #20: đăng xuất gửi kèm lý do để frontend báo đúng thông báo.
+    server.emit.assert_awaited_once_with("session:revoked", {"reason": "logout"}, to="device-2")
     assert not await realtime.connect("revoked", {}, {"ticket": outstanding})
     assert realtime.presence.for_user(user_id) == ["tab-1", "tab-2"]
 

@@ -9,10 +9,11 @@
 | Hiểu đăng nhập, phiên và phân quyền; kiểm quyền cho endpoint mới | [Xác thực và phân quyền backend](architecture/backend-auth.md) |
 | Gọi API đăng ký, đăng nhập, đăng xuất | [API xác thực](api/auth-api.md) |
 | Đọc và lưu hồ sơ, lịch nhắc học, xem credit học sinh | [API hồ sơ học sinh](api/student-profile-api.md) |
-| Nối Socket.IO bằng ticket và tham gia room sau đăng nhập | [API realtime](api/realtime-api.md) |
+| Nối Socket.IO bằng ticket, room theo vai trò, sự kiện `session:revoked`, thống kê học sinh online | [API realtime](api/realtime-api.md) |
+| Hiểu kênh realtime: ticket, presence, ràng buộc một worker, kế hoạch Redis | [Kiến trúc realtime](architecture/backend-realtime.md) |
 | Đọc số liệu dashboard: điểm, chuỗi ngày học, thống kê chương | [API dashboard học tập](api/study-dashboard-api.md) |
 | Liệt kê, đánh dấu đã đọc và nhận thông báo trong ứng dụng | [API thông báo](api/notifications-api.md) |
-| Tạo, khoá, mở khoá tài khoản admin | [API quản lý tài khoản admin](api/admin-accounts-api.md) |
+| Admin tìm, tạo, sửa, khoá tài khoản học sinh và admin (thay `/admin/accounts`) | [API quản lý người dùng](api/user-management-api.md) |
 | Viết tính năng mới trong frontend | [Kiến trúc frontend](architecture/frontend-base.md) |
 | Dùng font, thang chữ và token màu chung của giao diện | [Design system frontend](architecture/frontend-design-system.md) |
 | Sửa trang đăng nhập, đăng ký, quên mật khẩu hoặc OTP | [Trang xác thực frontend](architecture/frontend-auth.md) |

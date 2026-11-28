@@ -2,7 +2,7 @@ from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -34,7 +34,6 @@ from app.service.password_service import PasswordService
 from app.service.pdf_import_models import PdfImportModels
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
-from app.usecase.admin_accounts import AdminAccountsUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.exam_chat import ExamChatUseCase, Requester
 from app.usecase.live_exam_chat import LiveExamChat
@@ -42,12 +41,14 @@ from app.service.exam_chat_model import ExamChatModel
 from app.service.exam_chat_ocr import ExamChatOcr
 from app.usecase.exam_templates import ExamTemplateUseCase
 from app.usecase.notifications import Notifications
+from app.usecase.online_stats import OnlineStatsUseCase
 from app.usecase.pdf_imports import PdfImportUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 from app.usecase.student_auth import StudentAuthUseCase
 from app.usecase.student_profile import StudentProfileUseCase
 from app.usecase.study_dashboard import AttemptHistory, StudyDashboard
+from app.usecase.user_management import UserManagementUseCase
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -140,17 +141,31 @@ def get_student_auth(
 StudentAuthDep = Annotated[StudentAuthUseCase, Depends(get_student_auth)]
 
 
-def get_admin_accounts_usecase(
+def get_user_management_usecase(
+    request: Request,
     session: SessionDep,
     auth: AuthUseCaseDep,
     passwords: Annotated[PasswordService, Depends(get_password_service)],
-) -> AdminAccountsUseCase:
-    return AdminAccountsUseCase(
-        auth=auth, users=UserRepository(session), sessions=SessionRepository(session), passwords=passwords
+) -> UserManagementUseCase:
+    """#20: notifier là RealtimeServer của app (revoke_user ngắt mọi socket của người bị khoá)."""
+    return UserManagementUseCase(
+        auth=auth,
+        users=UserRepository(session),
+        sessions=SessionRepository(session),
+        passwords=passwords,
+        notifier=request.app.state.realtime,
     )
 
 
-AdminAccountsUseCaseDep = Annotated[AdminAccountsUseCase, Depends(get_admin_accounts_usecase)]
+UserManagementUseCaseDep = Annotated[UserManagementUseCase, Depends(get_user_management_usecase)]
+
+
+def get_online_stats_usecase(request: Request, session: SessionDep) -> OnlineStatsUseCase:
+    """#20: đọc PresenceRegistry của RealtimeServer (một tiến trình, trong bộ nhớ)."""
+    return OnlineStatsUseCase(presence=request.app.state.realtime.presence, users=UserRepository(session))
+
+
+OnlineStatsUseCaseDep = Annotated[OnlineStatsUseCase, Depends(get_online_stats_usecase)]
 
 # auto_error=False: thiếu header không báo lỗi ở đây; cookie vẫn được xét. Hiện nút Authorize trong Swagger.
 _bearer = HTTPBearer(auto_error=False, description="Token phiên (dùng cho curl/Swagger). Cookie được ưu tiên.")

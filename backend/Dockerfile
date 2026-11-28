@@ -16,4 +16,6 @@ COPY . .
 
 EXPOSE 8000
 # Sau nginx: tin header X-Forwarded-* để URL chuyển hướng giữ đúng https. Cổng 8000 không mở ra Internet.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# ĐÚNG MỘT worker: presence online và ticket socket (app/api/realtime.py) nằm trong bộ nhớ tiến trình.
+# Nhiều worker cần Redis, xem docs/architecture/backend-realtime.md (#20).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]

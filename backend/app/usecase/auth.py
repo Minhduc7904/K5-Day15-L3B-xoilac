@@ -14,7 +14,7 @@ from app.repositories.user_repository import DuplicateEmailError, UserRepository
 from app.service.google_identity import GoogleIdentity
 from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
-from app.usecase.realtime_notifier import RealtimeNotifier
+from app.usecase.realtime_notifier import RealtimeNotifier, RevokeReason
 
 ROLES = (ROLE_STUDENT, ROLE_ADMIN)
 # Mật khẩu MỚI phải dài 8–128 ký tự (từ review PR #17; trước đó là 6). Đăng nhập không kiểm độ dài,
@@ -173,7 +173,7 @@ class AuthUseCase:
         created_by: int | None = None,
     ) -> User:
         """Tạo tài khoản. Được dùng bởi CLI create_admin / ensure_admin (admin,
-        created_by=None) và AdminAccountsUseCase.create_admin (admin, created_by = admin đang thao tác)."""
+        created_by=None) và UserManagementUseCase.create_user (#20, created_by = admin đang thao tác)."""
         if role not in ROLES:
             raise InvalidInput(f"Vai trò không hợp lệ: {role}")
         if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
@@ -260,12 +260,12 @@ class AuthUseCase:
             user.email_verified_at = self._now()
         await self._sessions.revoke_all_for_user(user.user_id, self._now())
         await self._users.commit()
-        await self.revoke_user_sockets(user.user_id)
+        await self.revoke_user_sockets(user.user_id, "password_reset")
         return True
 
-    async def revoke_user_sockets(self, user_id: int) -> None:
+    async def revoke_user_sockets(self, user_id: int, reason: RevokeReason | None = None) -> None:
         if self._realtime is not None:
-            await self._realtime.revoke_user(user_id)
+            await self._realtime.revoke_user(user_id, reason)
 
     async def get_current_user(self, token: str | None) -> CurrentUser:
         """Kiểm phiên: tồn tại, chưa thu hồi, chưa hết hạn, user còn active. Cập nhật last_used_at."""
@@ -285,7 +285,7 @@ class AuthUseCase:
         if row.revoked_at is None:
             await self._sessions.revoke(row.session_id, self._now())
         if self._realtime is not None:
-            await self._realtime.revoke_session(row.session_id)
+            await self._realtime.revoke_session(row.session_id, "logout")
 
     async def _load_session(self, token: str | None) -> tuple[UserSession, User]:
         if not token:
