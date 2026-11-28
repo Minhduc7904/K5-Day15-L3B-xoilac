@@ -67,3 +67,46 @@ def clear_winner(hints: list[dict]) -> dict | None:
     if len(hints) == 1 or hints[0]["score"] >= CLEAR_LEAD * hints[1]["score"]:
         return hints[0]
     return None
+
+
+LEVEL_NAME = {"NB": "nhận biết", "TH": "thông hiểu", "VD": "vận dụng", "VDC": "vận dụng cao"}
+TYPE_NAME = {"SINGLE_CHOICE": "trắc nghiệm", "TRUE_FALSE": "đúng/sai", "SHORT_ANSWER": "trả lời ngắn"}
+
+
+def matrix_rows(tags) -> list[dict]:
+    """Group per-question tags into matrix cells (chapter x level x type), keeping first-seen order."""
+    cells = Counter((tag.chapter_code, tag.difficulty, tag.type) for tag in tags)
+    return [{"chapter": chapter, "difficulty": level, "type": kind, "count": count}
+            for (chapter, level, kind), count in cells.items()]
+
+
+def scale_rows(rows: list[dict], total: int) -> list[dict]:
+    """Keep the picture's proportions but make the exam `total` questions (largest-remainder split)."""
+    size = sum(row["count"] for row in rows)
+    if not rows or total == size:
+        return rows
+    raw = [total * row["count"] / size for row in rows]
+    counts = [int(value) for value in raw]
+    for index in sorted(range(len(rows)), key=lambda i: raw[i] - counts[i], reverse=True)[: total - sum(counts)]:
+        counts[index] += 1
+    return [{**row, "count": count} for row, count in zip(rows, counts) if count]
+
+
+def describe_rows(rows: list[dict], catalog: dict[str, dict]) -> str:
+    """Plain-language matrix for the agent's reply: totals first, then one line per chapter."""
+    total = sum(row["count"] for row in rows)
+    by_type = Counter()
+    by_level = Counter()
+    by_chapter: dict[str, list[dict]] = {}
+    for row in rows:
+        by_type[row["type"]] += row["count"]
+        by_level[row["difficulty"]] += row["count"]
+        by_chapter.setdefault(row["chapter"], []).append(row)
+    lines = [f"Ma trận đề rút ra từ ảnh ({total} câu):",
+             "- Dạng câu: " + ", ".join(f"{n} {TYPE_NAME[k]}" for k, n in by_type.items()),
+             "- Mức độ: " + ", ".join(f"{by_level[k]} {LEVEL_NAME[k]}" for k in LEVEL_NAME if by_level[k])]
+    for code, cells in by_chapter.items():
+        name = catalog.get(code, {}).get("name", code)
+        detail = ", ".join(f"{c['count']} {LEVEL_NAME[c['difficulty']]} {TYPE_NAME[c['type']]}" for c in cells)
+        lines.append(f"- {code} {name}: {sum(c['count'] for c in cells)} câu ({detail})")
+    return chr(10).join(lines)

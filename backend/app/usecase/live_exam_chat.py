@@ -1,5 +1,6 @@
 """Authenticated, model-directed exam authoring with atomic draft and credit writes."""
 import logging
+import re
 from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
@@ -15,7 +16,7 @@ from app.repositories.notifications import NotificationRepository
 from app.repositories.student_profiles import StudentProfileRepository
 from app.service.exam_chat_model import ChatAction, ExamChatModel, ExamChatModelError
 from app.service.exam_chat_ocr import ExamChatImageError, ExamChatOcr, PreparedImage
-from app.service.exam_chat_topics import chapter_hints, clear_winner
+from app.service.exam_chat_topics import chapter_hints, clear_winner, describe_rows, matrix_rows, scale_rows
 from app.service.storage_service import StorageService
 from app.usecase.exam_chapter_scope import expand_chapters, leaf_codes
 from app.usecase.exam_chat import (
@@ -164,6 +165,20 @@ class LiveExamChat(ExamChatUseCase):
         context.update(summary=summary, recent=pending[len(older):][-32:], past_references=related)
         return context, latest, current_version, summary, cutoff
 
+    async def _tag_exercises(self, images: list[PreparedImage], texts: list[str], topics: list[dict], catalog):
+        """The model looks at the picture itself (OCR only as a text aid) and tags every question it finds."""
+        if not topics:
+            return []
+        numbers = [item["image"] for item in topics]
+        try:
+            return await self.model.analyze_exercises(
+                {number: (images[number - 1].data, images[number - 1].mime) for number in numbers},
+                {number: texts[number - 1] for number in numbers}, catalog,
+            )
+        except ExamChatModelError as exc:
+            log.info("exam_chat exercise analysis unavailable reason=%s", exc)
+            return []
+
     async def _interpret_images(self, images: list[PreparedImage], context: dict) -> tuple[ChatAction | None, str]:
         try:
             texts = await self.ocr.recognize(images)
@@ -177,19 +192,33 @@ class LiveExamChat(ExamChatUseCase):
                 return None, reason + " " + hint
             context["ocr_evidence"] = evidence
             topics = [item for item in evidence if item.get("kind") == "topic"]
+            only_exercises = len(topics) == len(evidence)
+            tags = await self._tag_exercises(images, texts, topics, context["catalog"]) if only_exercises else []
+            rows = matrix_rows(tags)
+            if tags:
+                context["image_analysis"] = [{key: getattr(tag, key) for key in ("label", "chapter_code", "difficulty", "type")}
+                                             for tag in tags]
             hints = chapter_hints(" ".join(texts[item["image"] - 1] for item in topics), context["catalog"])
             if hints:
                 context["chapter_hints"] = [{key: hint[key] for key in ("code", "name", "leaves")} for hint in hints]
             # Exercise images name their chapter by content, so the server's own reading backs up the model.
             fallback = (ChatAction(action="chapter", chapters=[winner["code"]])
-                        if len(topics) == len(evidence) and (winner := clear_winner(hints)) else None)
+                        if only_exercises and (winner := clear_winner(hints)) else None)
             try:
                 action = await self.model.interpret(context)
             except ExamChatModelError:
-                if fallback is None:
+                if fallback is None and not rows:
                     raise
-                action = fallback
-            if fallback and action.action in {"clarify", "unsupported"}:
+                action = None
+            if rows and (action is None or action.action in {"chapter", "clarify", "unsupported"}):
+                # The picture's own questions are the matrix; a number only counts when the student typed one.
+                asked = action.total if action and action.action == "chapter" and re.search(r"[0-9]", context["request"]) else None
+                rows = scale_rows(rows, asked) if asked else rows
+                counts: dict[str, int] = {}
+                for row in rows:
+                    counts[row["chapter"]] = counts.get(row["chapter"], 0) + row["count"]
+                action = ChatAction(action="chapter", rows=rows, chapter_counts=counts, total=sum(counts.values()))
+            elif fallback and (action is None or action.action in {"clarify", "unsupported"}):
                 action = fallback
         except ExamChatImageError as exc:
             return None, str(exc)
@@ -205,11 +234,14 @@ class LiveExamChat(ExamChatUseCase):
         catalog = context["catalog"]
         named = [catalog[code]["name"] for code in dict.fromkeys([*action.chapters, *action.chapter_counts])
                  if code in catalog]
-        if named and action.action == "chapter":
+        if action.rows:
+            found = describe_rows(action.rows, catalog)
+            notice = notice + "\n" + found if notice else found
+        elif named and action.action == "chapter":
             source = ("ma trận trong ảnh" if any(item.get("kind") == "matrix" for item in evidence)
                       else "nội dung ảnh")
             found = f"Từ {source}, mình thấy các chương: {', '.join(named)}."
-            notice = f"{notice}\n{found}" if notice else found
+            notice = notice + "\n" + found if notice else found
         return action, notice
 
     async def respond(self, session_id: int, text: str, requester=None, *, version=None, images=None, plan=None,
@@ -439,7 +471,7 @@ class LiveExamChat(ExamChatUseCase):
         return PreviewEdit(chapter_codes=(action.chapters or None) if include_chapters else None, total=action.total,
                            chapter_counts=action.chapter_counts or None,
                            difficulty_counts=action.difficulty_counts or None, type_counts=action.type_counts or None,
-                           duration_minutes=action.duration_minutes)
+                           duration_minutes=action.duration_minutes, rows=action.rows or None)
 
     async def confirm(self, session_id, expected_version, requester=None, *, accepted_count=None):
         session = await self._lock(session_id, requester)

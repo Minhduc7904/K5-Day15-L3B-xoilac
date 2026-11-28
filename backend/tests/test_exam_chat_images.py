@@ -10,9 +10,9 @@ from app.api.deps import get_pdf_import_models, get_storage
 from app.core.config import Settings, get_settings
 from app.main import app
 from app.repositories.question_bank_repository import QuestionBankRepository
-from app.service.exam_chat_model import ChatAction, ExamChatModel, ExamChatModelError
+from app.service.exam_chat_model import ChatAction, ExamChatModel, ExamChatModelError, ExerciseTag
 from app.service.exam_chat_ocr import MAX_CHAT_IMAGE_BYTES, plain_math
-from app.service.exam_chat_topics import chapter_hints, clear_winner
+from app.service.exam_chat_topics import chapter_hints, clear_winner, describe_rows, matrix_rows, scale_rows
 from app.service.pdf_import_models import PdfImportModels
 from tests.exam_chat_support import BASE, chat_client, login_as, new_session
 
@@ -301,3 +301,113 @@ async def test_exercise_image_still_resolves_chapter_when_model_hesitates(image_
     state = (await client.get(f"{BASE}/sessions/{sid}")).json()
     assert state["preview"]["structure"]["chapters"] and state["draft"] is None
     assert (await client.get(CREDITS)).json()["balance"] == 500
+
+
+def tag(image, label, chapter, level, kind):
+    return ExerciseTag(image=image, label=label, chapter_code=chapter, difficulty=level, type=kind)
+
+
+EXERCISE_TAGS = [tag(1, "Câu 3", "12C22", "VD", "TRUE_FALSE"), tag(1, "Câu 4", "12C21", "TH", "TRUE_FALSE")]
+
+
+def test_matrix_rows_come_from_each_question_the_model_saw():
+    rows = matrix_rows(EXERCISE_TAGS + [tag(1, "Câu 5", "12C21", "TH", "TRUE_FALSE")])
+    assert rows == [{"chapter": "12C22", "difficulty": "VD", "type": "TRUE_FALSE", "count": 1},
+                    {"chapter": "12C21", "difficulty": "TH", "type": "TRUE_FALSE", "count": 2}]
+    scaled = scale_rows(rows, 6)
+    assert sum(row["count"] for row in scaled) == 6 and [row["count"] for row in scaled] == [2, 4]
+    text = describe_rows(rows, CATALOG)
+    assert "3 câu" in text and "3 đúng/sai" in text and "2 thông hiểu, 1 vận dụng" in text
+    assert "12C21 Vectơ trong không gian: 2 câu (2 thông hiểu đúng/sai)" in text
+
+
+async def test_model_receives_the_picture_and_only_catalog_chapters(monkeypatch):
+    model = ExamChatModel(Settings())
+    reply = {"content": json.dumps({"questions": [
+        {"image": 1, "label": "Câu 3", "chapter_code": "12C22", "difficulty": "VD", "type": "TRUE_FALSE"}]})}
+    call = AsyncMock(return_value=reply)
+    monkeypatch.setattr(model, "_call", call)
+    tags = await model.analyze_exercises({1: (PNG, "image/png")}, {1: "Trong không gian Oxyz"}, CATALOG)
+    assert [(t.chapter_code, t.difficulty, t.type) for t in tags] == [("12C22", "VD", "TRUE_FALSE")]
+    assert call.call_args.kwargs["images"] == [(PNG, "image/png")]
+    schema = call.call_args.kwargs["response_format"]["json_schema"]["schema"]
+    item = schema["properties"]["questions"]["items"]["properties"]
+    assert "12C22" in item["chapter_code"]["enum"] and "12C2" not in item["chapter_code"]["enum"]
+    bad = {"content": json.dumps({"questions": [
+        {"image": 1, "label": "Câu 1", "chapter_code": "99C9", "difficulty": "TH", "type": "TRUE_FALSE"}]})}
+    monkeypatch.setattr(model, "_call", AsyncMock(return_value=bad))
+    with pytest.raises(ExamChatModelError):
+        await model.analyze_exercises({1: (PNG, "image/png")}, {1: ""}, CATALOG)
+
+
+async def test_call_sends_image_as_data_url_with_the_text(monkeypatch):
+    model = ExamChatModel(Settings(openai_api_key=SecretStr("sk-test")))
+    sent = {}
+
+    class Reply:
+        def raise_for_status(self): pass
+        def json(self): return {"choices": [{"message": {"content": "{}"}}]}
+
+    class Client:
+        def __init__(self, **kwargs): sent["timeout"] = kwargs["timeout"]
+        async def __aenter__(self): return self
+        async def __aexit__(self, *exc): return False
+        async def post(self, url, headers, json): sent["body"] = json; return Reply()
+
+    monkeypatch.setattr("app.service.exam_chat_model.httpx.AsyncClient", Client)
+    await model._call("system", {"ocr": "x"}, images=[(PNG, "image/png")], timeout=45)
+    user = sent["body"]["messages"][1]["content"]
+    assert sent["timeout"] == 45 and user[0]["type"] == "text"
+    assert user[2]["image_url"]["url"].startswith("data:image/png;base64,") and user[2]["image_url"]["detail"] == "high"
+
+
+@pytest.fixture
+def seen_exercises(image_client, monkeypatch):
+    monkeypatch.setattr(QuestionBankRepository, "chapter_catalog", AsyncMock(return_value=CATALOG))
+    analyze = AsyncMock(return_value=EXERCISE_TAGS)
+    monkeypatch.setattr(ExamChatModel, "analyze_exercises", lambda _, *args: analyze(*args))
+    client, sid, _, _, provider, scope, router = image_client
+    provider.return_value = OXYZ_LATEX
+    scope.return_value = [{"image": 1, "kind": "topic", "text": "Cho vectơ A B"}]
+    router.return_value = ChatAction(action="chapter", chapters=["12C2"])
+    return client, sid, analyze, router
+
+
+async def test_exercise_image_becomes_matrix_of_chapter_level_and_type(seen_exercises):
+    client, sid, analyze, router = seen_exercises
+    response = await send(client, sid, PNG, purpose="topic")
+    assert response.status_code == 200 and "Ma trận đề rút ra từ ảnh (2 câu)" in response.text
+    images, ocr, _ = analyze.call_args.args
+    assert images == {1: (PNG, "image/png")} and "vectơ A B" in ocr[1] and "\\" not in ocr[1]
+    assert router.call_args.args[0]["image_analysis"][0] == {
+        "label": "Câu 3", "chapter_code": "12C22", "difficulty": "VD", "type": "TRUE_FALSE"}
+    structure = (await client.get(f"{BASE}/sessions/{sid}")).json()["preview"]["structure"]
+    assert {(r["chapter"], r["difficulty"], r["type"], r["count"]) for r in structure["rows"]} == {
+        ("12C22", "VD", "TRUE_FALSE", 1), ("12C21", "TH", "TRUE_FALSE", 1)}
+    assert {c["code"]: c["count"] for c in structure["chapters"]} == {"12C22": 1, "12C21": 1}
+    assert structure["type_counts"] == {"TRUE_FALSE": 2}
+    assert (await client.get(CREDITS)).json()["balance"] == 500
+
+
+async def test_student_typed_total_scales_the_picture_matrix(seen_exercises):
+    client, sid, _, router = seen_exercises
+    router.return_value = ChatAction(action="chapter", chapters=["12C2"], total=6)
+    response = await send(client, sid, PNG, text="Ra cho em 6 câu giống thế này")
+    assert response.status_code == 200 and "(6 câu)" in response.text
+    structure = (await client.get(f"{BASE}/sessions/{sid}")).json()["preview"]["structure"]
+    assert sum(c["count"] for c in structure["chapters"]) == 6 and structure["type_counts"] == {"TRUE_FALSE": 6}
+
+
+async def test_model_invented_total_is_ignored_when_student_gave_no_number(seen_exercises):
+    client, sid, _, router = seen_exercises
+    router.return_value = ChatAction(action="chapter", chapters=["12C2"], total=10)
+    response = await send(client, sid, PNG, text="Cho em ôn các bài trong ảnh")
+    assert response.status_code == 200 and "(2 câu)" in response.text
+
+
+async def test_picture_analysis_failure_falls_back_to_chapter_hints(seen_exercises):
+    client, sid, analyze, router = seen_exercises
+    analyze.side_effect = ExamChatModelError("vision down")
+    response = await send(client, sid, PNG, purpose="topic")
+    assert response.status_code == 200 and "VECTƠ VÀ HỆ TRỤC TOẠ ĐỘ TRONG KHÔNG GIAN" in response.text
+    assert "image_analysis" not in router.call_args.args[0]
