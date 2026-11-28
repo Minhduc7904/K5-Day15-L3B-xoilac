@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.api.cookies import clear_session_cookie, set_session_cookie
+from app.api.cookies import cookie_name_for, clear_session_cookie, request_scope, session_cookie_name, set_session_cookie
 from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep, StudentAuthDep, get_session_token
 from app.api.errors import to_api_error
 from app.service.socket_tickets import TICKET_TTL_SECONDS
@@ -68,7 +68,7 @@ async def verify_otp(body: OtpIn, request: Request, response: Response, student:
         )
     except AuthError as error:
         raise to_api_error(error) from None
-    set_session_cookie(response, token, settings)
+    set_session_cookie(response, token, settings, user.role)
     _no_store(response)
     if body.purpose == REGISTRATION:
         response.status_code = status.HTTP_201_CREATED
@@ -88,13 +88,14 @@ async def login(body: LoginIn, request: Request, response: Response, usecase: Au
         user, token = await usecase.login(body.email, body.password, request.headers.get("user-agent"))
     except AuthError as e:
         raise to_api_error(e) from None
-    set_session_cookie(response, token, settings)
+    set_session_cookie(response, token, settings, user.role)
     _no_store(response)
     return user
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
     usecase: AuthUseCaseDep,
     settings: SettingsDep,
     token: Annotated[str | None, Depends(get_session_token)],
@@ -103,7 +104,10 @@ async def logout(
     không hợp lệ. Thu hồi phiên ngay nếu nó còn."""
     await usecase.logout(token)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    clear_session_cookie(response, settings)
+    # Chỉ xoá cookie của phạm vi đang đăng xuất, giữ nguyên phiên còn lại (admin / học sinh song song).
+    scope = request_scope(request)
+    name = cookie_name_for(scope, settings) if scope else session_cookie_name(request, settings)
+    clear_session_cookie(response, settings, name)
     return response
 
 

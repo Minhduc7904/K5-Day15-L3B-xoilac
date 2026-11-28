@@ -4,26 +4,30 @@ import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
 import { useHydrated } from '@/lib/use-hydrated';
+import type { AuthScope } from '@/lib/auth-scope';
 import { useAppSelector } from '@/store';
+import { authOf } from '../auth-slice';
+import { ADMIN_LOGIN_PATH } from '../route-guard';
 import { useLogout } from '../use-logout';
 
 /** Tên người dùng và nút đăng xuất trên thanh điều hướng. Khách thấy nút Đăng nhập / Đăng ký. */
-export function UserMenu() {
-  const user = useAppSelector((s) => s.auth.user);
-  const status = useAppSelector((s) => s.auth.status);
-  const { leaving, logout } = useLogout();
+export function UserMenu({ scope = 'student' }: { scope?: AuthScope }) {
+  const { user, status } = useAppSelector((s) => authOf(s, scope));
+  const { leaving, logout } = useLogout(scope);
   const hydrated = useHydrated();
 
   if (!hydrated || status === 'unknown') return <Skeleton className="h-9 w-48 rounded-xl" />;
   if (!user) {
     return (
       <>
-        <Button variant="ghost" size="sm" href="/login">
+        <Button variant="ghost" size="sm" href={scope === 'admin' ? ADMIN_LOGIN_PATH : '/login'}>
           Đăng nhập
         </Button>
-        <Button size="sm" href="/register">
-          Đăng ký
-        </Button>
+        {scope === 'student' && (
+          <Button size="sm" href="/register">
+            Đăng ký
+          </Button>
+        )}
       </>
     );
   }

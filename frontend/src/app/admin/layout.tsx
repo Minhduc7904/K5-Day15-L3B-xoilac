@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Container } from '@/components/layout/container';
 import { Logo } from '@/components/layout/logo';
+import { AdminShell } from '@/features/admin/admin-shell';
 import { UserMenu } from '@/features/auth/components/user-menu';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -10,11 +11,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <Container size="full" className="flex h-16 items-center gap-2">
           <Logo href="/admin" priority />
           <div className="ml-auto flex items-center gap-2">
-            <UserMenu />
+            <UserMenu scope="admin" />
           </div>
         </Container>
       </header>
-      {children}
+      <AdminShell>{children}</AdminShell>
     </>
   );
 }

@@ -7,7 +7,7 @@ import pytest
 from app.main import app
 from app.service.presence import PresenceRegistry, SocketConnection
 from tests.conftest import new_password
-from tests.test_auth import API, COOKIE, make_admin, register
+from tests.test_auth import ADMIN_COOKIE, API, COOKIE, make_admin, register
 
 STATS = f"{API}/admin/stats/online-students"
 
@@ -29,7 +29,7 @@ def presence(client, monkeypatch):
 async def _bearer(client, email, password) -> dict:
     r = await client.post(f"{API}/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200
-    token = client.cookies[COOKIE]
+    token = client.cookies.get(ADMIN_COOKIE) or client.cookies[COOKIE]
     client.cookies.clear()
     return {"Authorization": f"Bearer {token}"}
 

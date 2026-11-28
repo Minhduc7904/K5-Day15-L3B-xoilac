@@ -22,7 +22,7 @@ Backend auth có từ PR #26. Issue #25 bổ sung xác minh đăng ký và Googl
 | `features/auth/use-auth-form.ts` | Hook form: giá trị, lỗi, trạng thái gửi, gộp lỗi từ server, focus trường sai đầu tiên |
 | `features/auth/route-guard.tsx` | `AuthGuard` bọc mọi trang trong `AppProvider`, chặn route theo phiên và vai trò (xem mục bên dưới) |
 | `lib/api-client.ts` | `onSessionLost`: API nào trả `SESSION_*` hoặc `ACCOUNT_DISABLED` (trừ `/auth/me`, `/auth/login`, `/auth/logout`) thì provider dispatch `signedOut('session-expired')` |
-| `features/auth/auth-slice.ts` | Reducer `auth`: `{ user, status: 'unknown' \| 'authenticated' \| 'guest' }`. `reason` (`session-expired` hoặc `logged-out`) cho trang đăng nhập hiện thông báo. Chỉ lưu `UserOut`, không lưu token |
+| `features/auth/auth-slice.ts` | Hai reducer cùng hình dạng, `auth` (học sinh) và `adminAuth` (admin), mỗi slice chỉ nhận người dùng đúng vai trò: `{ user, status: 'unknown' \| 'authenticated' \| 'guest' }`. `reason` (`session-expired` hoặc `logged-out`) cho trang đăng nhập hiện thông báo. Chỉ lưu `UserOut`, không lưu token |
 | `features/auth/reset-flow.ts` | Lưu email và `reset_token` của luồng quên mật khẩu trong `sessionStorage` key `examind:reset-flow`, để email không nằm trên URL |
 | `features/auth/forms/` | Năm form: đăng nhập, đăng ký, quên mật khẩu, nhập OTP, đặt mật khẩu mới |
 | `features/auth/components/` | `AuthAside`, `AuthHeader`, `PasswordStrength`, `UserMenu` (tên người dùng và nút đăng xuất, dùng ở navbar học sinh và header admin) |
@@ -33,15 +33,21 @@ Splash khởi động gọi `authApi.me()` rồi dispatch `signedIn` hoặc `sig
 
 ### Chặn route theo vai trò
 
-Web có hai vai trò tài khoản là học sinh và admin. Khách vào được landing và các trang xác thực.
+Web có hai vai trò tài khoản là học sinh và admin, **hai phiên đăng nhập độc lập** (cookie riêng `examind_session` và `examind_admin_session`, slice Redux riêng `auth` và `adminAuth`). Một trình duyệt đăng nhập cả hai cùng lúc được, và `/admin` cùng các trang học sinh mở song song, không chuyển hướng qua lại.
 
-| Người dùng | Được vào | Mở trang khác thì chuyển tới |
+| Trang | Cần phiên | Chưa có phiên thì chuyển tới |
 | --- | --- | --- |
-| Chưa đăng nhập | `/`, `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`, `/login/google` | `/login` (kèm `?reason=` nếu vừa đăng xuất hoặc hết phiên) |
-| Học sinh | `/`, khu vực học sinh và `/design-system` | `/dashboard`, có thể chuyển tiếp tới `/profile/setup` |
-| Admin | `/admin/*`, `/design-system` | `/admin` |
+| `/admin/*` | admin | `/login/admin` (kèm `?reason=` nếu vừa đăng xuất hoặc hết phiên) |
+| `/`, `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`, `/login/google`, `/login/admin` | không cần | không chuyển |
+| Khu học sinh (`/dashboard`, `/exams`, `/results`, `/profile`) | học sinh | `/login` (kèm `?reason=`) |
+| `/design-system` | học sinh hoặc admin | `/login` |
 
-Đã đăng nhập mà mở trang auth thì về trang chủ theo vai trò. Đăng xuất dispatch `signedOut('logged-out')`, guard đưa về `/login?reason=logged-out`. Guard chỉ là lớp giao diện, quyền thật do backend kiểm ở từng API.
+- Có phiên học sinh mà mở `/login` hoặc trang auth khác thì về `/dashboard`. Có phiên admin mà mở `/login/admin` thì về `/admin`. Phiên này không ép người dùng khỏi trang của phiên kia.
+- `/login/admin` là trang đăng nhập quản trị (không có Google, đăng ký, quên mật khẩu). Đăng nhập ở `/login` bằng tài khoản admin vẫn được: backend đặt cookie theo vai trò, frontend ghi vào slice `adminAuth` (`signedInAs`) rồi đưa tới `/admin`.
+- Phạm vi theo đường dẫn (`lib/auth-scope.ts`): `/admin/*` là `admin`, còn lại là `student`. `lib/api-client.ts` gắn header `X-Auth-Scope` vào mọi request để backend đọc đúng cookie. Splash kiểm cả hai phiên song song (`authApi.me('student')`, `authApi.me('admin')`), socket realtime kết nối bằng phiên của phạm vi trang đang mở.
+- Đăng xuất chỉ kết thúc phiên của phạm vi hiện tại (`useLogout(scope)`), dispatch `signedOut('logged-out')` của slice đó, guard đưa về trang đăng nhập tương ứng.
+
+Guard chỉ là lớp giao diện, quyền thật do backend kiểm ở từng API.
 
 ## Luồng dữ liệu và tích hợp
 

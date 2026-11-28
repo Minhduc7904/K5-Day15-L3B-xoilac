@@ -15,6 +15,7 @@ from tests.conftest import TEST_OTP, new_password
 
 API = "/api/v1"
 COOKIE = "examind_session"
+ADMIN_COOKIE = "examind_admin_session"
 # Sinh lúc chạy, không viết cứng (tests/conftest.py).
 PW = new_password()
 

@@ -18,6 +18,8 @@
 | Nhãn | Thật (dữ liệu của trung tâm), không phải `synthetic` |
 | Giới hạn | Chương và độ khó do trung tâm gắn, nhóm chưa kiểm với giáo viên *(chưa kiểm)*. `dap_an` suy từ lựa chọn khi ô gốc trống, chưa kiểm tay. Hình minh hoạ chỉ có tham chiếu `media:ID`, ảnh không nằm trong repo nên câu có hình bị loại khỏi phần "dùng được". 3.818 câu chưa gắn chương và 2.596 câu chưa có độ khó. Có chương chỉ có rất ít câu dùng được (vd `10C53`: 1 câu). Mẫu giữ tỉ lệ theo bản đầy đủ nên lệch về lớp 12 và chương `12C1`, `12C4`, và có ít câu `VDC` (ví dụ `12C1`: 13 câu). Không có chương Số phức (chương trình mới). Số đo trên mẫu không đại diện cho bản đầy đủ. Không đại diện cho đề thi chính thức |
 
+**Trạng thái trong CSDL (#11).** Mẫu CSV chỉ gồm câu đã đăng. Trong PostgreSQL, admin có thể ngừng sử dụng một câu (`questions.archived_at`, migration `0021`); câu đó không còn được chọn cho đề mới nhưng vẫn đọc được trong đề và lịch sử cũ. Xem [API quản lý ngân hàng câu hỏi](../docs/api/admin-data-api.md).
+
 **Dữ liệu khác của trung tâm.** Nhóm còn có dữ liệu vận hành khác của trung tâm; không đưa vào repo và không dùng cho bộ câu thử.
 
 ## Dataset 2 · Kết quả làm bài của học sinh mẫu (`data/student_results.csv`)

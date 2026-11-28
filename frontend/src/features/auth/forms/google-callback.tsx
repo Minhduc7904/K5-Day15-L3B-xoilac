@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/feedback';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
-import { signedIn } from '../auth-slice';
+import { signedInAs } from '../auth-slice';
 import { homeFor } from '../route-guard';
 import { AuthHeader } from '../components/auth-shell';
 import { googleResultProblem, readGoogleResult, type GoogleResultProblem } from '../google-flow';
@@ -52,7 +52,7 @@ export function GoogleCallback() {
         if ('challenge' in result) {
           setPending(result);
         } else {
-          dispatch(signedIn(result));
+          dispatch(signedInAs(result));
           router.replace(homeFor(result));
         }
       } catch (failure) {

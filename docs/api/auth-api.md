@@ -6,9 +6,13 @@ Tài liệu này mô tả các endpoint đăng ký, đăng nhập, đăng xuất
 
 - Base URL local: `http://localhost:8000/api/v1`. Qua frontend thì dùng đường dẫn tương đối `/api/v1/...`, Next.js rewrites chuyển tiếp sang backend. Tài liệu tự sinh ở `/docs`.
 - Body gửi và nhận dạng JSON (`content-type: application/json`).
-- **Phiên** nằm trong cookie `examind_session` với các thuộc tính `HttpOnly; SameSite=Lax; Path=/`, thêm `Secure` khi `COOKIE_SECURE=true`. Hạn của cookie là `SESSION_TTL_HOURS` giờ, mặc định 168.
+- **Phiên** nằm trong cookie với các thuộc tính `HttpOnly; SameSite=Lax; Path=/`, thêm `Secure` khi `COOKIE_SECURE=true`. Hạn của cookie là `SESSION_TTL_HOURS` giờ, mặc định 168.
   - Trình duyệt: cookie đi kèm tự động khi gọi cùng origin. Với Axios trong cùng origin không cần cấu hình thêm. Chỉ khi dev gọi thẳng backend khác origin mới cần `withCredentials: true` và đặt `CORS_ORIGINS` ở backend.
   - curl hoặc Swagger: gửi `Authorization: Bearer <token>`. Token lấy từ header `set-cookie` khi đăng nhập. Nếu request có cả hai thì cookie được dùng.
+- **Hai cookie theo vai trò**: học sinh dùng `examind_session` (`COOKIE_NAME`), admin dùng `examind_admin_session` (`ADMIN_COOKIE_NAME`). Đăng nhập, xác minh OTP và Google exchange đặt cookie theo `role` của tài khoản, nên admin và học sinh đăng nhập song song trong cùng trình duyệt mà không đè phiên của nhau.
+  - Khi đọc phiên, frontend gửi header `X-Auth-Scope: admin | student` (trang `/admin/*` gửi `admin`, còn lại gửi `student`). Header chọn cookie nào được đọc, và phiên phải đúng vai trò của phạm vi (cookie học sinh chứa phiên admin bị từ chối `401 SESSION_MISSING` ở phạm vi học sinh, và ngược lại).
+  - Không có header (curl, Swagger, test): ưu tiên cookie học sinh, không có thì dùng cookie admin.
+  - `POST /auth/logout` và lệnh xoá cookie khi phiên hỏng chỉ xoá cookie của phạm vi đang dùng, giữ phiên còn lại.
 - Token không bao giờ nằm trong body. JavaScript không đọc được cookie, nên frontend biết trạng thái đăng nhập bằng cách gọi `GET /auth/me`.
 
 ## Endpoint và hợp đồng

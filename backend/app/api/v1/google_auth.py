@@ -65,5 +65,5 @@ async def exchange(
         response.status_code = 202
         return OtpChallengeOut.model_validate(result)
     user, token = result
-    set_session_cookie(response, token, settings)
+    set_session_cookie(response, token, settings, user.role)
     return user

@@ -9,7 +9,7 @@ import { OtpInput } from '@/components/ui/otp-input';
 import { useToast } from '@/components/ui/toast';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
-import { signedIn } from '../auth-slice';
+import { signedInAs } from '../auth-slice';
 import { homeFor } from '../route-guard';
 import { AuthHeader } from '../components/auth-shell';
 import { toAuthError, type OtpPurpose, type PendingOtp } from '../types';
@@ -48,7 +48,7 @@ export function EmailOtpForm({
     setError(undefined);
     try {
       const user = await authApi.completeOtp(purpose, pending.challenge, code);
-      dispatch(signedIn(user));
+      dispatch(signedInAs(user));
       toast({ tone: 'success', title: 'Đã xác minh email' });
       router.replace(homeFor(user));
     } catch (failure) {

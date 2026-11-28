@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Chặn route theo phiên và vai trò. Web chỉ có hai loại người dùng: học sinh và admin.
- * - Chưa đăng nhập: vào được trang chủ `/` (landing) và các trang auth, mọi trang khác chuyển tới /login.
- * - Học sinh: không vào /admin. Admin: chỉ ở /admin.
- * - Đã đăng nhập mà mở trang auth: chuyển về trang chủ theo vai trò.
+ * Chặn route theo phiên. Admin và học sinh là hai phiên độc lập (cookie riêng) nên dùng song song được:
+ * - `/admin/*` chỉ cần phiên admin. Chưa có thì chuyển tới `/login/admin`.
+ * - Mọi trang khác (trừ trang chủ `/` và trang auth) cần phiên học sinh. Chưa có thì chuyển tới `/login`.
+ * - Có phiên admin không ép người dùng khỏi trang học sinh và ngược lại.
+ * - Đã đăng nhập mà mở trang auth: về trang chủ của phiên tương ứng (`/login/admin` xét phiên admin, còn lại xét phiên học sinh).
  * Đây chỉ là lớp UX. Quyền thật do backend kiểm ở từng API.
  */
 import { usePathname, useRouter } from 'next/navigation';
@@ -14,6 +15,7 @@ import { useAppSelector } from '@/store';
 import type { AuthState } from './auth-slice';
 import type { User } from './types';
 
+export const ADMIN_LOGIN_PATH = '/login/admin';
 const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/verify-otp', '/reset-password'];
 /** Trang mọi người đã đăng nhập đều xem được, bất kể vai trò. */
 const SHARED_PATHS = ['/design-system'];
@@ -29,25 +31,44 @@ const isAuthPage = (path: string) => AUTH_PATHS.some((base) => under(path, base)
  */
 const isPublicPage = (path: string) => isAuthPage(path) || path === '/';
 
+/** Hai phiên đăng nhập độc lập: học sinh (`auth`) và admin (`adminAuth`). */
+export interface AuthSessions {
+  student: AuthState;
+  admin: AuthState;
+}
+
+const loginFor = (path: string, auth: AuthState) => {
+  const base = under(path, '/admin') ? ADMIN_LOGIN_PATH : '/login';
+  return auth.reason ? `${base}?reason=${auth.reason}` : base;
+};
+
 /** Trả đường dẫn cần chuyển tới, hoặc `null` nếu được ở lại. `undefined` khi chưa biết phiên. */
-export function guardRedirect(path: string, auth: AuthState): string | null | undefined {
-  const authPage = isAuthPage(path);
-  if (auth.status === 'unknown') return isPublicPage(path) ? null : undefined;
-  const { user } = auth;
-  if (!user) return isPublicPage(path) ? null : auth.reason ? `/login?reason=${auth.reason}` : '/login';
-  if (authPage) return homeFor(user);
-  if (SHARED_PATHS.some((base) => under(path, base))) return null;
-  const inAdmin = under(path, '/admin');
-  if (user.role === 'admin' && !inAdmin) return '/admin';
-  if (user.role === 'student' && inAdmin) return homeFor(user);
+export function guardRedirect(path: string, sessions: AuthSessions): string | null | undefined {
+  const { student, admin } = sessions;
+
+  if (under(path, '/admin')) {
+    if (admin.status === 'unknown') return undefined;
+    return admin.user ? null : loginFor(path, admin);
+  }
+  if (path === ADMIN_LOGIN_PATH) return admin.user ? homeFor(admin.user) : null;
+
+  if (student.status === 'unknown') return isPublicPage(path) ? null : undefined;
+  if (!student.user) {
+    if (isPublicPage(path)) return null;
+    // Trang dùng chung cho cả hai vai trò: người đang đăng nhập admin cũng được xem.
+    if (SHARED_PATHS.some((base) => under(path, base)) && admin.user) return null;
+    return loginFor(path, student);
+  }
+  if (isAuthPage(path)) return homeFor(student.user);
   return null;
 }
 
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const auth = useAppSelector((s) => s.auth);
+  const student = useAppSelector((s) => s.auth);
+  const admin = useAppSelector((s) => s.adminAuth);
   const path = usePathname();
   const router = useRouter();
-  const target = guardRedirect(path, auth);
+  const target = guardRedirect(path, { student, admin });
   const firstPath = useRef(true);
 
   // Sang trang khác (vd đăng nhập xong về `/dashboard`) thì luôn bắt đầu từ đầu trang, không giữ vị trí cuộn của
