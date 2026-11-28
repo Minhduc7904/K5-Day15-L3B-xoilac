@@ -73,6 +73,12 @@ $env:EXAMIND_CP3_LIVE = $null
 - `POST /exam-chat/sessions/{id}/messages/with-images` nhận multipart với trường lặp `images`, văn bản
   `text` có thể để trống và `version` là bản xem trước đang thấy (0 nếu chưa có). Tối đa 4 ảnh PNG, JPEG
   hoặc WebP, tổng 4 MB. Phản hồi dùng cùng SSE với tin nhắn văn bản.
+- Trường tùy chọn `image_purpose` (`matrix` hoặc `topic`, giá trị khác trả `422`) cho biết ảnh dùng làm gì. Bỏ trống
+  thì agent tự nhận diện. `matrix`: ảnh ma trận/cấu trúc đề (bảng chương, số câu, mức độ, dạng câu, thời gian), agent
+  đọc số liệu ghi trong ảnh để lập bản xem trước theo chương, không tự thêm số. `topic`: ảnh bài hoặc dạng bài học sinh
+  muốn ôn, agent chỉ nhận diện chương để gợi ý chương cần ôn và lập đề luyện. Cả hai đều không giải bài, không đưa đáp án
+  hay lời giải; yêu cầu giải bài ("giải giúp", "lời giải"…) bị từ chối trước khi gọi model. Câu trả lời nêu tên các
+  chương nhận diện được từ ảnh. Tên chương trong ảnh không khớp danh mục thì agent hỏi lại.
 - Backend lưu ảnh vào bucket MinIO riêng của ứng dụng và lưu metadata theo tin nhắn. `messages[].attachments`
   trả ID, vị trí và MIME. `GET /exam-chat/sessions/{id}/attachments/{attachment_id}` chỉ trả ảnh cho chủ phiên.
 - Dùng `MISTRAL_API_KEY` và `OCR_MODEL` của service nhập đề PDF. Nếu chưa có khóa hoặc OCR chưa dùng được,

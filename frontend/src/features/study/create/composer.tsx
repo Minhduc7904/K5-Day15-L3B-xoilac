@@ -1,10 +1,17 @@
 'use client';
 
-import { ArrowUp, ImagePlus, X } from 'lucide-react';
+import { ArrowUp, BookMarked, ImagePlus, Table2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import type { ImagePurpose } from '../exam-chat-api';
+
+/** Hai cách dùng ảnh: ma trận đề để soạn đề, hoặc bài/dạng muốn ôn để agent gợi ý chương. Agent không giải bài trong ảnh. */
+export const IMAGE_PURPOSES: Array<{ value: ImagePurpose; label: string; hint: string; icon: typeof Table2; defaultText: string }> = [
+  { value: 'matrix', label: 'Ma trận đề', hint: 'Ảnh bảng cấu trúc đề: chương, số câu, mức độ', icon: Table2, defaultText: 'Soạn đề theo ma trận trong ảnh mình gửi' },
+  { value: 'topic', label: 'Bài muốn ôn', hint: 'Ảnh bài/dạng bài: agent gợi ý chương cần ôn, không giải bài', icon: BookMarked, defaultText: 'Gợi ý chương mình cần ôn từ ảnh này' },
+];
 
 export interface Attachment {
   id: string;
@@ -25,13 +32,16 @@ interface Props {
   placeholder?: string;
   imageLimits?: ImageLimits;
   maxLength?: number;
+  /** Mục đích ảnh đang chọn (null = để agent tự nhận diện). Có `onPurposeChange` thì hiện nút chọn khi có ảnh. */
+  purpose?: ImagePurpose | null;
+  onPurposeChange?: (purpose: ImagePurpose | null) => void;
 }
 
 /**
  * Ô soạn tin: tự cao theo nội dung, Enter gửi, Shift+Enter xuống dòng.
  * Ảnh: bấm nút, dán (Ctrl+V) hoặc kéo thả vào khung chat. Tối đa 4 ảnh, mỗi ảnh ≤ 5 MB.
  */
-export function Composer({ disabled, onSend, attachments, setAttachments, placeholder, imageLimits, maxLength }: Props) {
+export function Composer({ disabled, onSend, attachments, setAttachments, placeholder, imageLimits, maxLength, purpose, onPurposeChange }: Props) {
   const [text, setText] = useState('');
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -105,6 +115,41 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
         )}
       </AnimatePresence>
 
+      <AnimatePresence initial={false}>
+        {attachments.length > 0 && onPurposeChange && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div role="group" aria-label="Ảnh này dùng để làm gì" className="flex flex-wrap items-center gap-1.5 px-1 pb-2">
+              <span className="text-caption text-muted-foreground">Ảnh này là:</span>
+              {IMAGE_PURPOSES.map((p) => {
+                const on = purpose === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => onPurposeChange(on ? null : p.value)}
+                    aria-pressed={on}
+                    title={p.hint}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full border px-3 py-1 text-caption font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                      on ? 'border-primary bg-primary-subtle text-primary' : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                    )}
+                  >
+                    <p.icon className="size-3.5" aria-hidden="true" />
+                    {p.label}
+                  </button>
+                );
+              })}
+              {!purpose && <span className="text-[0.6875rem] text-muted-foreground">Không chọn thì Examind tự nhận diện.</span>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-end gap-1.5">
         <input
           ref={fileRef}
@@ -159,7 +204,7 @@ export function Composer({ disabled, onSend, attachments, setAttachments, placeh
         </motion.button>
       </div>
       <p id="chat-hint" className="hidden px-3 pt-1 pb-0.5 text-[0.6875rem] text-muted-foreground sm:block">
-        Enter để gửi · Shift + Enter xuống dòng · Dán hoặc kéo thả ảnh{imageLimits && ' · PNG, JPG, WebP · tổng tối đa 4 MB'}
+        Enter để gửi · Shift + Enter xuống dòng · Dán hoặc kéo thả ảnh ma trận đề / bài muốn ôn (Examind không giải bài){imageLimits && ' · PNG, JPG, WebP · tổng tối đa 4 MB'}
       </p>
     </form>
   );

@@ -58,6 +58,8 @@ export interface StudentPlan {
   type_counts: Record<string, number>;
   difficulty_counts: Record<string, number>;
 }
+/** Ảnh gửi kèm dùng làm gì: ma trận/cấu trúc đề để soạn đề, hay bài/dạng muốn ôn để gợi ý chương. Bỏ trống thì agent tự nhận diện. */
+export type ImagePurpose = 'matrix' | 'topic';
 export interface ServerPreview {
   version: number;
   status: 'PROPOSED' | 'EDITED' | 'CONFIRMED' | 'BUILT' | 'CANCELLED';
@@ -152,7 +154,7 @@ export const examChatApi = {
       sessionPath(id) + '/preview/confirm', { version, accepted_count: acceptedCount }, { timeout: 30000 },
     )).data;
   },
-  async *send(id: number, text: string, version: number, images: File[] = [], plan?: StudentPlan): AsyncGenerator<ExamChatEvent> {
+  async *send(id: number, text: string, version: number, images: File[] = [], plan?: StudentPlan, purpose?: ImagePurpose): AsyncGenerator<ExamChatEvent> {
     const path = apiBaseUrl + sessionPath(id) + '/messages';
     const headers = new Headers({ Accept: 'text/event-stream' });
     let body: FormData | string;
@@ -160,6 +162,7 @@ export const examChatApi = {
       body = new FormData();
       body.append('text', text);
       body.append('version', String(version));
+      if (purpose) body.append('image_purpose', purpose);
       for (const image of images) body.append('images', image);
     } else {
       headers.set('Content-Type', 'application/json');

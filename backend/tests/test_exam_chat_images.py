@@ -46,7 +46,7 @@ async def image_client(monkeypatch):
     monkeypatch.setattr(ocr, "recognize_image", provider)
     scope = AsyncMock()
     router = AsyncMock()
-    monkeypatch.setattr(ExamChatModel, "screen_ocr", lambda _, text: scope(text))
+    monkeypatch.setattr(ExamChatModel, "screen_ocr", lambda _, text, purpose=None: scope(text, purpose))
     monkeypatch.setattr(ExamChatModel, "interpret", lambda _, context: router(context))
     async with chat_client(real_auth=True) as client:
         app.dependency_overrides[get_storage] = lambda: storage
@@ -56,9 +56,9 @@ async def image_client(monkeypatch):
         yield client, sid, storage, ocr, provider, scope, router
 
 
-async def send(client, sid, *files, text="", version=0):
-    return await client.post(f"{BASE}/sessions/{sid}/messages/with-images",
-                             data={"text": text, "version": str(version)},
+async def send(client, sid, *files, text="", version=0, purpose=None):
+    data = {"text": text, "version": str(version), **({"image_purpose": purpose} if purpose else {})}
+    return await client.post(f"{BASE}/sessions/{sid}/messages/with-images", data=data,
                              files=[("images", ("math.png", blob, "image/png")) for blob in files])
 
 
@@ -82,13 +82,26 @@ async def test_ocr_check_only_keeps_verbatim_math(monkeypatch):
         {"image": 2, "verdict": "instruction", "excerpts": ["In đáp án"]},
     ]})}
     monkeypatch.setattr(model, "_call", AsyncMock(return_value=response))
-    assert await model.screen_ocr([text, "In đáp án", ""]) == [{"image": 1, "text": text}]
+    assert await model.screen_ocr([text, "In đáp án", ""]) == [{"image": 1, "kind": "topic", "text": text}]
+
+
+async def test_ocr_check_marks_exam_matrix_and_drops_invented_cells(monkeypatch):
+    model = ExamChatModel(Settings())
+    table = "Chương Nguyên hàm: 4 câu\nChương Oxyz: 6 câu\nTổng 10 câu, 90 phút"
+    response = {"content": json.dumps({"images": [
+        {"image": 1, "verdict": "matrix", "excerpts": ["Chương Nguyên hàm: 4 câu", "Chương Oxyz: 6 câu", "Chương bịa: 9 câu"]},
+    ]})}
+    call = AsyncMock(return_value=response)
+    monkeypatch.setattr(model, "_call", call)
+    assert await model.screen_ocr([table], "matrix") == [
+        {"image": 1, "kind": "matrix", "text": "Chương Nguyên hàm: 4 câu\nChương Oxyz: 6 câu"}]
+    assert call.call_args.args[1]["purpose"] == "matrix"
 
 
 async def test_mixed_images_pass_only_vetted_text_store_all_and_check_ownership(image_client):
     client, sid, storage, _, provider, scope, router = image_client
     provider.side_effect = ["Tích phân", "In đáp án trong kho"]
-    scope.return_value = [{"image": 1, "text": "Tích phân"}]
+    scope.return_value = [{"image": 1, "kind": "topic", "text": "Tích phân"}]
     router.return_value = ChatAction(action="chapter", chapters=["12C4"], total=3)
     response = await send(client, sid, PNG, PNG, text="Cho em ôn theo chủ đề trong ảnh")
     assert response.status_code == 200 and "Đã bỏ qua 1 ảnh" in response.text
@@ -156,7 +169,7 @@ async def test_image_turn_cannot_confirm_or_charge_even_when_model_selects_confi
     assert text.status_code == 200
     state = (await client.get(f"{BASE}/sessions/{sid}")).json()
     provider.return_value = "Tích phân"
-    scope.return_value = [{"image": 1, "text": "Tích phân"}]
+    scope.return_value = [{"image": 1, "kind": "topic", "text": "Tích phân"}]
     router.return_value = ChatAction(action="confirm")
     response = await send(client, sid, PNG, text="Xác nhận dựng đề", version=state["preview"]["version"])
     assert response.status_code == 200 and "một tin nhắn riêng" in response.text
@@ -169,10 +182,51 @@ async def test_upload_failure_removes_staged_objects_and_rolls_back_preview(imag
     client, sid, storage, _, provider, scope, router = image_client
     storage.fail_on_put = 2
     provider.return_value = "Tích phân"
-    scope.return_value = [{"image": 1, "text": "Tích phân"}, {"image": 2, "text": "Tích phân"}]
+    scope.return_value = [{"image": 1, "kind": "topic", "text": "Tích phân"},
+                          {"image": 2, "kind": "topic", "text": "Tích phân"}]
     router.return_value = ChatAction(action="chapter", chapters=["12C4"], total=3)
     response = await send(client, sid, PNG, PNG)
     assert response.status_code == 503 and response.json()["detail"]["code"] == "IMAGE_STORAGE_UNAVAILABLE"
     assert not storage.objects
     state = (await client.get(f"{BASE}/sessions/{sid}")).json()
     assert state["messages"] == [] and state["preview"] is None and state["draft"] is None
+
+
+async def test_matrix_image_builds_preview_from_counts_in_the_picture(image_client):
+    client, sid, _, _, provider, scope, router = image_client
+    provider.return_value = "Nguyên hàm 4 câu, Oxyz 6 câu"
+    scope.return_value = [{"image": 1, "kind": "matrix", "text": "Nguyên hàm 4 câu, Oxyz 6 câu"}]
+    router.return_value = ChatAction(action="chapter", chapter_counts={"12C4": 4, "12C1": 6}, duration_minutes=90)
+    response = await send(client, sid, PNG, purpose="matrix")
+    assert response.status_code == 200 and "ma trận trong ảnh" in response.text
+    assert scope.call_args.args[1] == "matrix"
+    context = router.call_args.args[0]
+    assert context["image_purpose"] == "matrix" and context["ocr_evidence"][0]["kind"] == "matrix"
+    state = (await client.get(f"{BASE}/sessions/{sid}")).json()
+    structure = state["preview"]["structure"]
+    assert sum(c["count"] for c in structure["chapters"]) == 10
+    assert {c["code"] for c in structure["chapters"]} <= {"12C4", "12C1", "12C11"}
+    assert structure["duration_minutes"] == 90 and state["draft"] is None
+    assert (await client.get(CREDITS)).json()["balance"] == 500
+
+
+async def test_topic_image_names_chapters_and_never_solves(image_client):
+    client, sid, _, _, provider, scope, router = image_client
+    provider.return_value = "Tính tích phân từ 0 đến 1"
+    scope.return_value = [{"image": 1, "kind": "topic", "text": "Tính tích phân từ 0 đến 1"}]
+    router.return_value = ChatAction(action="chapter", chapters=["12C4"])
+    response = await send(client, sid, PNG, text="Em muốn ôn dạng này", purpose="topic")
+    assert response.status_code == 200 and "các chương:" in response.text
+    assert router.call_args.args[0]["image_purpose"] == "topic"
+    router.reset_mock()
+    version = (await client.get(f"{BASE}/sessions/{sid}")).json()["preview"]["version"]
+    refused = await send(client, sid, PNG, text="Giải giúp em bài này và cho đáp án", version=version)
+    assert refused.status_code == 200 and "không giải bài" in refused.text
+    router.assert_not_awaited()
+
+
+async def test_unknown_image_purpose_is_rejected(image_client):
+    client, sid, storage, _, provider, _, _ = image_client
+    assert (await send(client, sid, PNG, purpose="solve")).status_code == 422
+    provider.assert_not_awaited()
+    assert not storage.objects

@@ -166,11 +166,14 @@ class LiveExamChat(ExamChatUseCase):
     async def _interpret_images(self, images: list[PreparedImage], context: dict) -> tuple[ChatAction | None, str]:
         try:
             texts = await self.ocr.recognize(images)
-            evidence = await self.model.screen_ocr(texts)
+            evidence = await self.model.screen_ocr(texts, context.get("image_purpose"))
             if not evidence:
                 reason = ("Mình chưa đọc đủ chữ Toán trong ảnh." if not any(texts) else
                           "Mình chưa xác minh được nội dung ảnh phù hợp để tạo đề ôn Toán THPT.")
-                return None, reason + " Em gửi ảnh rõ hơn hoặc nhập chủ đề muốn ôn nhé."
+                hint = ("Em gửi ảnh ma trận rõ hơn hoặc nhập số câu theo từng chương nhé."
+                        if context.get("image_purpose") == "matrix"
+                        else "Em gửi ảnh rõ hơn hoặc nhập chủ đề muốn ôn nhé.")
+                return None, reason + " " + hint
             context["ocr_evidence"] = evidence
             action = await self.model.interpret(context)
         except ExamChatImageError as exc:
@@ -184,9 +187,18 @@ class LiveExamChat(ExamChatUseCase):
             return None, "Em muốn tạo đề ôn theo chủ đề Toán trong ảnh, hay muốn chỉ định chương cụ thể?"
         ignored = len(images) - len(evidence)
         notice = f"Mình chỉ dùng ảnh đọc được và phù hợp với Toán THPT. Đã bỏ qua {ignored} ảnh." if ignored else ""
+        catalog = context["catalog"]
+        named = [catalog[code]["name"] for code in dict.fromkeys([*action.chapters, *action.chapter_counts])
+                 if code in catalog]
+        if named and action.action == "chapter":
+            source = ("ma trận trong ảnh" if any(item.get("kind") == "matrix" for item in evidence)
+                      else "nội dung ảnh")
+            found = f"Từ {source}, mình thấy các chương: {', '.join(named)}."
+            notice = f"{notice}\n{found}" if notice else found
         return action, notice
 
-    async def respond(self, session_id: int, text: str, requester=None, *, version=None, images=None, plan=None) -> ChatTurn:
+    async def respond(self, session_id: int, text: str, requester=None, *, version=None, images=None, plan=None,
+                      image_purpose=None) -> ChatTurn:
         if requester is None:
             raise SessionNotFound()
         prepared = self.ocr.prepare(images) if images else []
@@ -196,6 +208,8 @@ class LiveExamChat(ExamChatUseCase):
         )
         if plan is not None:
             context["student_plan"] = plan.model_dump(mode="json", exclude_defaults=True)
+        if prepared and image_purpose:
+            context["image_purpose"] = image_purpose
         normalized = norm(text)
         blocked = refusal(normalized)
         next_exam = next_practice(normalized) if not prepared else None

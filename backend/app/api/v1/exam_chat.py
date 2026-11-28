@@ -7,7 +7,7 @@ như không tồn tại. student_ref lấy từ tài khoản, giá trị client 
 import json
 import logging
 from collections.abc import Iterator
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
@@ -139,8 +139,9 @@ async def send_images(
     images: Annotated[list[UploadFile], File(min_length=1, max_length=MAX_CHAT_IMAGES)],
     text: Annotated[str, Form(max_length=2000)] = "",
     version: Annotated[int | None, Form(ge=0)] = None,
+    image_purpose: Annotated[Literal["matrix", "topic"] | None, Form()] = None,
 ):
-    """Gửi ảnh hoặc ảnh kèm tin nhắn. Phản hồi dùng cùng SSE với tin nhắn văn bản."""
+    """Gửi ảnh ma trận đề hoặc ảnh bài/dạng cần ôn, kèm tin nhắn. Phản hồi dùng cùng SSE với tin nhắn văn bản."""
     if not isinstance(usecase, LiveExamChat):
         raise HTTPException(503, {"code": "EXAM_CHAT_UNAVAILABLE", "message": "Chat có ảnh chưa được bật."})
     await _check_owner(usecase, requester, session_id)
@@ -152,7 +153,8 @@ async def send_images(
         if remaining < 0:
             raise HTTPException(413, {"code": "IMAGES_TOO_LARGE", "message": "Tổng dung lượng ảnh tối đa 4 MB."})
         blobs.append(data)
-    return await _send_message(session_id, text.strip(), version, usecase, writer, requester, blobs)
+    return await _send_message(session_id, text.strip(), version, usecase, writer, requester, blobs,
+                               image_purpose=image_purpose)
 
 
 async def _check_owner(usecase, requester, session_id):
@@ -162,10 +164,12 @@ async def _check_owner(usecase, requester, session_id):
         raise _not_found() from None
 
 
-async def _send_message(session_id, text, version, usecase, writer, requester, images=None, plan=None):
+async def _send_message(session_id, text, version, usecase, writer, requester, images=None, plan=None,
+                        image_purpose=None):
     try:
         if isinstance(usecase, LiveExamChat):
-            turn = await usecase.respond(session_id, text, requester, version=version, images=images, plan=plan)
+            turn = await usecase.respond(session_id, text, requester, version=version, images=images, plan=plan,
+                                         image_purpose=image_purpose)
         else:
             turn = await usecase.respond(session_id, text, requester)
     except SessionNotFound:  # kiểm quyền trước khi mở luồng: phiên của người khác trả 404 thường

@@ -19,6 +19,8 @@ DUMP = re.compile(r"(in|hien|liet ke|xuat|gui|cho).{0,25}(toan bo|tat ca).{0,25}
 TAMPER = re.compile(r"\b(sua|chinh|nang|tang|thay doi|doi)\b.{0,15}\bdiem\b")
 CHEAT = re.compile(r"dap an.{0,40}(de kiem tra|bai kiem tra|de thi|de cua lop|de lop)|\bchep\b.{0,20}(dap an|bai)"
                    r"|dap an.{0,30}\bchep\b")
+SOLVE = re.compile(r"\b(giai|giai thich)\s+(giup|ho|bai|cau|chi tiet)\b|\bloi giai\b|\b(lam|tinh)\s+(giup|ho)\b"
+                   r"|\bdap an\s+(cua\s+)?(bai|cau)\b")
 OFF_TOPIC = re.compile(r"\b(ngu van|bai van|nghi luan|van hoc|tieng anh|vat ly|hoa hoc|sinh hoc|lich su|dia ly)\b")
 EXAM = re.compile(r"(ky thi|thi tot nghiep|thi thpt|thi hoc ky|thi giua ky|thi cuoi ky|cau truc de|ma tran"
                   r"|de thi 20\d\d|theo cau truc|giua ky|cuoi ky|giua hoc ky|cuoi hoc ky|\bhsa\b|\btsa\b"
@@ -51,6 +53,9 @@ def refusal(t: str) -> str | None:
         return "Mình không thể sửa điểm hay dữ liệu làm bài, điểm không do mình quyết định. " + OFFER
     if CHEAT.search(t):
         return "Mình không đưa đáp án đề kiểm tra để chép. Nếu em muốn luyện, " + OFFER[0].lower() + OFFER[1:]
+    if SOLVE.search(t):
+        return ("Mình không giải bài hay đưa đáp án. Em gửi ảnh hoặc nói dạng bài muốn ôn, mình gợi ý chương cần ôn "
+                "và ra đề luyện cho em. " + OFFER)
     if OFF_TOPIC.search(t):
         return "Mình chỉ hỗ trợ ôn môn Toán THPT nên không làm được việc này. " + OFFER
     return None

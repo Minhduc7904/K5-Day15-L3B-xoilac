@@ -1,6 +1,6 @@
 'use client';
 
-import { BookMarked, CircleAlert, ClipboardList, Download, FileCheck2, ImageIcon, ImageUp, ListTree, Maximize2, Minimize2, PanelLeftOpen, Play, Target, Wand2, X } from 'lucide-react';
+import { BookMarked, CircleAlert, ClipboardList, Download, FileCheck2, ImageIcon, ImageUp, Lightbulb, ListTree, Maximize2, Minimize2, PanelLeftOpen, Play, Table2, Target, Wand2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -9,25 +9,36 @@ import { MascotAnimation } from '@/components/mascot/mascot-animation';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
-import { examChatApi, examChatError, type ServerPreview, type StudentPlan } from '../exam-chat-api';
+import { examChatApi, examChatError, type ImagePurpose, type ServerPreview, type StudentPlan } from '../exam-chat-api';
 import { QuestionContent } from '../components/question-content';
 import { ExamPaperDialog } from '../exams/exam-paper';
 import { examDuration } from '../format';
 import { difficultyLabels } from '../labels';
 import { useStudentAccount } from '../profile/student-account-provider';
 import type { Exam, StructureProposal } from '../types';
-import { addImages, Composer, type Attachment } from './composer';
+import { addImages, Composer, IMAGE_PURPOSES, type Attachment } from './composer';
 import { MatrixDialog } from './matrix-dialog';
 import { allocate, DIFFS, distribute, parentOf, planFromRows, planTotal, TYPES, type ExamPlan } from './plan';
 import { SessionSidebar } from './session-sidebar';
 import { builtCard, shortageText, toProposal, uid, useChatSessions, type ChatMessage } from './sessions';
 import { StructurePreview } from './structure-preview';
 
-const STARTERS = [
+interface Starter {
+  icon: typeof Target;
+  title: string;
+  text: string;
+  hint: string;
+  /** Mở hộp chọn ảnh với mục đích này thay vì gửi ngay. */
+  attach?: ImagePurpose;
+}
+
+const STARTERS: Starter[] = [
   { icon: Target, title: 'Ôn chương mình hay sai', text: 'Tạo đề ôn tiếp', hint: 'Agent xem lịch sử làm bài để chọn chương' },
   { icon: BookMarked, title: 'Theo một chương cụ thể', text: 'Ra đề 20 phút về nguyên hàm và tích phân', hint: 'Vd: tích phân, mũ – lôgarit, Oxyz…' },
   { icon: ClipboardList, title: 'Luyện thoải mái, không tính giờ', text: 'Cho mình đề không giới hạn thời gian về hàm số mũ và lôgarit', hint: 'Làm chậm, hiểu kỹ từng câu' },
-  { icon: ImageUp, title: 'Gửi ảnh bài hay sai', text: '', hint: 'Đính kèm ảnh, agent gợi ý chương cần ôn', attach: true },
+  { icon: Lightbulb, title: 'Dạng em muốn ôn', text: 'Em muốn ôn dạng tìm cực trị của hàm số', hint: 'Nói dạng bài, agent chọn chương và ra đề luyện' },
+  { icon: Table2, title: 'Gửi ảnh ma trận đề', text: '', hint: 'Ảnh bảng cấu trúc đề, agent soạn đề theo đó', attach: 'matrix' },
+  { icon: ImageUp, title: 'Gửi ảnh bài muốn ôn', text: '', hint: 'Agent gợi ý chương cần ôn, không giải bài', attach: 'topic' },
 ];
 
 type PanelState = 'open' | 'min';
@@ -50,6 +61,7 @@ export function CreateExamPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const [attachments, setAttachmentsState] = useState<Attachment[]>([]);
+  const [imagePurpose, setImagePurpose] = useState<ImagePurpose | null>(null);
   const [dragging, setDragging] = useState(false);
   const [panel, setPanel] = useState<PanelState>('open');
   const [matrixOpen, setMatrixOpen] = useState(false);
@@ -89,9 +101,10 @@ export function CreateExamPage() {
   }, [messages, thinking, activeId]);
 
   const send = useCallback(
-    async (sessionId: string, text: string, files: Attachment[] = [], plan: ExamPlan | null = null) => {
+    async (sessionId: string, text: string, files: Attachment[] = [], plan: ExamPlan | null = null, purpose: ImagePurpose | null = null) => {
       const images = files.map((f) => ({ url: f.url, name: f.file.name }));
       setAttachmentsState([]);
+      setImagePurpose(null);
       setBusyId(sessionId);
       setThinking(true);
       let sid = sessionId;
@@ -123,7 +136,7 @@ export function CreateExamPage() {
           messages: [...s.messages, { id: uid(), role: 'student', text, images }],
         }));
         const version = current && current.status !== 'CANCELLED' ? current.version : 0;
-        for await (const ev of examChatApi.send(Number(sid), text, version, files.map((f) => f.file), plan ? studentPlan(plan) : undefined)) {
+        for await (const ev of examChatApi.send(Number(sid), text, version, files.map((f) => f.file), plan ? studentPlan(plan) : undefined, files.length ? (purpose ?? undefined) : undefined)) {
           if (ev.event === 'error') throw new Error(ev.data.message);
           if (ev.event === 'message') {
             ensureReply();
@@ -181,6 +194,7 @@ export function CreateExamPage() {
   const switchTo = (id: string) => {
     attachments.forEach((a) => URL.revokeObjectURL(a.url));
     setAttachmentsState([]);
+    setImagePurpose(null);
     setMatrixOpen(false);
     setPanel('open');
     select(id);
@@ -302,8 +316,10 @@ export function CreateExamPage() {
               {messages.length === 0 ? (
                 <Welcome
                   onPick={(s) => {
-                    if (s.attach) document.querySelector<HTMLButtonElement>('button[aria-label^="Đính kèm ảnh"]')?.click();
-                    else void send(activeId, s.text);
+                    if (s.attach) {
+                      setImagePurpose(s.attach);
+                      document.querySelector<HTMLButtonElement>('button[aria-label^="Đính kèm ảnh"]')?.click();
+                    } else void send(activeId, s.text);
                   }}
                 />
               ) : (
@@ -362,10 +378,18 @@ export function CreateExamPage() {
           <div className="mx-auto max-w-3xl">
             <Composer
               disabled={busy}
-              onSend={(t, a) => void send(activeId, t || 'Mình gửi ảnh bài mình hay sai', a)}
+              onSend={(t, a) => void send(activeId, t || (IMAGE_PURPOSES.find((p) => p.value === imagePurpose)?.defaultText ?? 'Mình gửi ảnh, bạn xem giúp mình nên ôn chương nào'), a, null, imagePurpose)}
               attachments={attachments}
               setAttachments={setAttachments}
-              placeholder={proposal && !built ? 'Chỉnh bằng lời: "thêm 2 câu", "khó hơn", "45 phút"… hoặc gõ "xác nhận"' : undefined}
+              purpose={imagePurpose}
+              onPurposeChange={setImagePurpose}
+              placeholder={
+                attachments.length
+                  ? imagePurpose === 'matrix' ? 'Thêm lời nhắn nếu muốn (vd: "45 phút", "chỉ lấy chương 12C4")…'
+                    : imagePurpose === 'topic' ? 'Em muốn ôn dạng nào trong ảnh? (Examind không giải bài)'
+                    : 'Ảnh ma trận đề hoặc bài muốn ôn? Chọn ở trên hoặc nhắn thêm…'
+                  : proposal && !built ? 'Chỉnh bằng lời: "thêm 2 câu", "khó hơn", "45 phút"… hoặc gõ "xác nhận"' : undefined
+              }
             />
           </div>
         </div>
@@ -380,8 +404,8 @@ export function CreateExamPage() {
             >
               <div className="grid justify-items-center gap-2 text-primary">
                 <ImageUp className="size-10" aria-hidden="true" />
-                <p className="text-h3">Thả ảnh vào đây</p>
-                <p className="text-caption">Tối đa 4 ảnh, mỗi ảnh 5 MB</p>
+                <p className="text-h3">Thả ảnh ma trận đề hoặc bài muốn ôn</p>
+                <p className="text-caption">Tối đa 4 ảnh, tổng 4 MB · PNG, JPG, WebP</p>
               </div>
             </motion.div>
           )}
@@ -469,7 +493,7 @@ function FloatingPanel({ title, built, readOnly, onTitle, onMinimize, children }
   );
 }
 
-function Welcome({ onPick }: { onPick: (s: (typeof STARTERS)[number]) => void }) {
+function Welcome({ onPick }: { onPick: (s: Starter) => void }) {
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="grid justify-items-center gap-5 py-4 text-center">
       <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
@@ -478,7 +502,7 @@ function Welcome({ onPick }: { onPick: (s: (typeof STARTERS)[number]) => void })
       <div className="grid gap-1.5">
         <h2 className="text-h2 text-balance text-foreground">Hôm nay bạn muốn ôn gì?</h2>
         <p className="mx-auto max-w-lg text-body text-muted-foreground">
-          Mình chọn câu đã duyệt trong ngân hàng để ghép đề. Bạn xem trước, chỉnh số câu, dạng câu và độ khó rồi mới tạo đề.
+          Mình chọn câu đã duyệt trong ngân hàng để ghép đề. Bạn nói dạng muốn ôn hoặc gửi ảnh ma trận đề, ảnh bài muốn ôn (mình gợi ý chương, không giải bài). Xem trước, chỉnh rồi mới tạo đề.
         </p>
       </div>
       <ul data-tour="chat-starters" className="grid w-full gap-2.5 text-left sm:grid-cols-2">
