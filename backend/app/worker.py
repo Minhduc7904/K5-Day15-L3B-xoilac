@@ -6,11 +6,14 @@ from collections.abc import Awaitable, Callable
 
 from app.core.config import get_settings
 from app.core.database import get_engine, get_sessionmaker
+from app.repositories.exam_attempts import ExamAttemptRepository
+from app.repositories.question_bank_repository import QuestionBankRepository
 from app.service.email_service import GmailEmailService
+from app.usecase.exam_attempts import ExamAttempts
 from app.usecase.student_jobs import DailyCreditJob, StudyReminderJob
 
 log = logging.getLogger(__name__)
-JOB_NAMES = ("daily-credit", "study-reminders")
+JOB_NAMES = ("daily-credit", "study-reminders", "exam-expiry")
 POLL_SECONDS = 30
 
 
@@ -26,13 +29,28 @@ async def run_job(name: str, job: Callable[[], Awaitable[dict[str, int]]], once:
                 raise
         if once:
             return
-        await asyncio.sleep(POLL_SECONDS)
+        await asyncio.sleep(2 if name == "exam-expiry" else POLL_SECONDS)
+
+
+async def expire_exams(sessions):
+    async with sessions() as session:
+        repo = ExamAttemptRepository(session)
+        ids = await repo.due_ids(await repo.clock())
+    graded = 0
+    for attempt_id in ids:
+        try:
+            async with sessions() as session:
+                usecase = ExamAttempts(ExamAttemptRepository(session), QuestionBankRepository(session))
+                graded += await usecase.expire_due(attempt_id)
+        except Exception:
+            log.exception("Could not grade expired attempt %d", attempt_id)
+    return {"graded": graded}
 
 
 async def main(once: bool, selected: str | None) -> None:
     settings = get_settings()
     sessions = get_sessionmaker()
-    jobs = {"daily-credit": DailyCreditJob(sessions).run}
+    jobs = {"daily-credit": DailyCreditJob(sessions).run, "exam-expiry": lambda: expire_exams(sessions)}
     if settings.email_provider == "gmail":
         jobs["study-reminders"] = StudyReminderJob(
             sessions, GmailEmailService(settings), settings.frontend_url

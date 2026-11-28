@@ -30,6 +30,7 @@ export interface Question {
   /** Đáp án của câu trả lời ngắn (vd `0,58`). */
   answer?: string;
   solution?: string;
+  remoteAttemptId?: number;
 }
 
 /** Câu hỏi khi đang làm bài: không có đáp án, không có lời giải. */
@@ -38,6 +39,7 @@ export type PublicQuestion = Omit<Question, 'answer' | 'solution' | 'statements'
   remoteDraftId?: number;
   order?: number;
   difficultyKnown?: boolean;
+  maxPoints?: number;
 };
 
 export interface ExamSection {
@@ -71,6 +73,7 @@ export interface Attempt {
   examId: string;
   startedAt: string;
   submittedAt: string;
+  reason?: 'manual' | 'timeout';
   durationSeconds: number;
   answers: Record<string, Answer>;
   /**
@@ -85,6 +88,7 @@ export interface Attempt {
 
 export interface ExamSummary extends Exam {
   questionCount: number;
+  hasActiveAttempt?: boolean;
   attempts: number;
   bestScore: number | null;
   lastAttemptAt: string | null;

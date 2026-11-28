@@ -109,6 +109,7 @@ class DraftItem(BaseModel):
     section_order: int | None = None      # chỉ có ở đề theo mẫu kỳ thi
     section_title: str | None = None
     points: float | None = None
+    max_points: float | None = None
 
 
 class Shortage(BaseModel):
@@ -134,6 +135,7 @@ class DraftOut(BaseModel):
     items: list[DraftItem]
     shortages: list[Shortage]
     created_at: datetime
+    max_score: int = 10
 
 
 class ConfirmOut(BaseModel):

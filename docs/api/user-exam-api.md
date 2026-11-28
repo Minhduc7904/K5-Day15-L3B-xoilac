@@ -220,7 +220,7 @@ Một câu trong `items`:
  "section_order": null, "section_title": null, "points": null}
 ```
 
-Đề theo mẫu kỳ thi có thêm `section_order`, `section_title`, `points` cho từng câu. Câu của mỗi phần đúng `question_type` của phần đó, trong phạm vi chương của phần, đúng phân bố độ khó của mẫu. `chapter` là chương gốc của câu.
+Đề theo mẫu kỳ thi có thêm `section_order` và `section_title`. `items[].points` giữ điểm gốc do mẫu khai báo. Với câu chưa có điểm sẵn, trường này chứa điểm được phân bổ. `items[].max_points` là điểm dùng khi chấm. Tổng điểm tối đa của đề là `max_score = 10`. Với đề theo chương, `type_point_weights` mặc định là 30/40/30 cho trắc nghiệm, Đúng/Sai và TLN. Trường này có thể sửa trong bản xem trước. Câu của mỗi phần đúng `question_type` của phần đó, trong phạm vi chương của phần, đúng phân bố độ khó của mẫu. `chapter` là chương gốc của câu.
 
 Một mục trong `shortages`:
 

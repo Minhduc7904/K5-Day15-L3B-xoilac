@@ -5,6 +5,7 @@ from app.api.v1 import (
     admin_accounts,
     admin_import,
     auth,
+    exam_attempts,
     exam_chat,
     exam_templates,
     google_auth,
@@ -26,3 +27,4 @@ api_router.include_router(sample_files.router)
 api_router.include_router(admin_import.router)
 api_router.include_router(exam_templates.router)
 api_router.include_router(exam_chat.router)
+api_router.include_router(exam_attempts.router)

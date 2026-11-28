@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { io } from 'socket.io-client';
+import { useEffect, useSyncExternalStore } from 'react';
+import { io, type Socket } from 'socket.io-client';
 import { signedOut } from '@/features/auth/auth-slice';
 import { apiClient } from '@/lib/api-client';
 import { mockMode } from '@/lib/config';
@@ -9,6 +9,23 @@ import { useAppDispatch, useAppSelector } from '@/store';
 
 const socketOrigin = process.env.NEXT_PUBLIC_SOCKET_URL
   || (process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : undefined);
+
+let currentSocket: Socket | null = null;
+const subscribers = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  subscribers.add(listener);
+  return () => { subscribers.delete(listener); };
+}
+
+function publishSocket(socket: Socket | null) {
+  currentSocket = socket;
+  subscribers.forEach((listener) => listener());
+}
+
+export function useRealtimeSocket() {
+  return useSyncExternalStore(subscribe, () => currentSocket, () => null);
+}
 
 async function requestTicket(signal: AbortSignal) {
   const { data } = await apiClient.post<{ ticket: string }>('/auth/socket-ticket', undefined, { signal });
@@ -60,6 +77,7 @@ export function RealtimeConnection() {
     socket.on('connect_error', scheduleReconnect);
     socket.on('disconnect', scheduleReconnect);
     socket.on('session:revoked', () => dispatch(signedOut('session-expired')));
+    publishSocket(socket);
     void connect();
 
     return () => {
@@ -67,6 +85,7 @@ export function RealtimeConnection() {
       window.clearTimeout(retry);
       socket.removeAllListeners();
       socket.disconnect();
+      if (currentSocket === socket) publishSocket(null);
     };
   }, [dispatch, userId]);
 

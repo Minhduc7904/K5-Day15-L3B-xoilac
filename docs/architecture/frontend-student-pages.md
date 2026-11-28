@@ -21,10 +21,10 @@ Câu hỏi mock do nhóm tự viết. Repo không chép câu nào từ ngân hà
 | `app/(student)/(app)/dashboard`, `exams`, `exams/new`, `exams/[id]`, `results/[attemptId]`, `profile` | Mỗi route chỉ render page component của feature |
 | `app/(student)/(focus)/exams/[id]/take/page.tsx` | Trang làm bài toàn màn hình với thanh công cụ làm bài riêng |
 | `features/study/types.ts` | Kiểu dữ liệu `Question`, `Exam`, `Attempt`, `StructureProposal` và các kiểu khác. Bám theo schema production (xem mục bên dưới) |
-| `features/study/api.ts` | Điểm nối dữ liệu hoạt động: `studyApi` và `agentApi` dùng nguồn mẫu |
+| `features/study/api.ts` | Điểm nối dữ liệu cho chế độ mock và API đề, lượt làm và kết quả thật |
 | `features/study/mock.ts` | Kho mock trong `localStorage` key `examind:mock-study`, thống kê theo chương, chuỗi ngày học, agent giả lập `runAgent` |
 | `features/study/fixtures/` | 19 câu hỏi tự viết, danh sách chương lấy từ `data/chapters.csv`, đề và lượt làm mẫu |
-| `features/study/grading.ts` | Chấm điểm theo thang THPT 2025, quy về thang 10 |
+| `features/study/grading.ts` | Chấm và dựng kết quả cho dữ liệu mock. Kết quả thật lấy từ server |
 | `features/study/use-resource.ts` | Hook tải dữ liệu, trả về `loading`, `ready` hoặc `error` cùng hàm `reload` |
 | `features/study/format.ts` | Định dạng ngày, thời lượng, điểm và màu theo mức điểm |
 | `features/study/components/` | `AppShell`, `StudentHeader`, `Flame`, `QuestionContent`, `PageHeader`, `EmptyState`, `ErrorState` |
@@ -77,6 +77,8 @@ Lời giải dùng cùng định dạng với nội dung câu hỏi. Lời giả
 
 ### Chấm điểm
 
+Đề do agent dựng có tổng tối đa 10. Backend tính điểm theo mẫu hoặc trọng số điểm theo dạng câu. Học sinh có thể chỉnh trọng số trong ma trận đề theo chương. Mỗi câu Đúng/Sai được nhân với hệ số 0%, 10%, 25%, 50% hoặc 100% theo số mệnh đề đúng. Bảng dưới mô tả cách chấm ở chế độ demo.
+
 | Dạng câu | Điểm tối đa | Cách tính |
 | --- | --- | --- |
 | Trắc nghiệm một đáp án | 0,25 | Đúng được cả điểm |
@@ -98,7 +100,9 @@ Trên màn hình nhỏ, bảng xem trước mở dưới dạng bottom sheet.
 
 ### Luồng làm bài
 
-Bài đang làm được lưu nháp vào `localStorage` key `examind:attempt-draft:<examId>` sau mỗi thay đổi. Mở lại đề sẽ có nút "Làm tiếp". Hết giờ thì bài tự nộp. Nộp bài xong chuyển tới `/results/<attemptId>`.
+Luồng thật lưu đáp án trên server, dùng room Socket.IO theo lượt và đồng bộ lại khi mất kết nối. Nút **Làm tiếp** mở đúng lượt của tài khoản. Đồng hồ có thời lượng tiếp tục chạy khi người dùng thoát. Khi tới hạn, worker chấm và trang kết quả hiển thị thông báo hết giờ. Đề vô hạn chỉ ghi thời gian hoạt động từng câu và nộp khi học sinh chọn. Xem [API làm bài online](../api/online-exam-attempts-api.md).
+
+Chế độ demo lưu nháp cục bộ trong `localStorage` key `examind:attempt-draft:<examId>`.
 
 ### Tour hướng dẫn
 

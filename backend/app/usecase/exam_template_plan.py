@@ -109,6 +109,8 @@ def apply_template_edit(structure: TemplatePreviewStructure, edit: PreviewEdit) 
         errors.append("Mẫu kỳ thi cố định phân bố độ khó, không đổi được độ khó.")
     if "chapter_counts" in fields:
         errors.append("Mẫu kỳ thi cố định số câu từng phần, không chia lại số câu theo chương được.")
+    if "type_point_weights" in fields:
+        errors.append("Mẫu kỳ thi giữ nguyên quy tắc phân bổ điểm.")
 
     s = structure.model_copy(deep=True)
     if edit.chapter_codes:

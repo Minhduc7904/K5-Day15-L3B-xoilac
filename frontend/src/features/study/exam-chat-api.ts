@@ -33,6 +33,9 @@ interface TemplateSection {
   allowed_chapters: string[] | null;
   chapters: string[] | null;
 }
+export const defaultPointWeights = { SINGLE_CHOICE: 30, TRUE_FALSE: 40, SHORT_ANSWER: 30 };
+export type PointWeights = typeof defaultPointWeights;
+
 type Structure = {
   duration_minutes: number | null;
 } & ({
@@ -40,6 +43,7 @@ type Structure = {
   chapters: Array<{ code: string; count: number }>;
   rows: StructureRow[] | null;
   difficulty_weights: Partial<Record<Difficulty, number>>;
+  type_point_weights?: PointWeights;
 } | {
   kind: 'EXAM_TEMPLATE';
   template_name: string;
@@ -68,6 +72,8 @@ export interface ServerDraft {
     type: QuestionType;
     section_order: number | null;
     section_title: string | null;
+    points?: number | null;
+    max_points?: number | null;
     content: string;
     statements: Array<{ order: number | null; content: string }>;
   }>;
@@ -123,7 +129,7 @@ export const examChatApi = {
   async chapters(signal?: AbortSignal) {
     return (await apiClient.get<Record<string, { name: string; parent_code: string | null }>>(root + '/chapters', { signal })).data;
   },
-  async edit(id: number, version: number, edit: { rows?: StructureRow[]; chapter_codes?: string[]; duration_minutes?: number }) {
+  async edit(id: number, version: number, edit: { rows?: StructureRow[]; chapter_codes?: string[]; duration_minutes?: number; type_point_weights?: PointWeights }) {
     return (await apiClient.patch<ServerPreview>(sessionPath(id) + '/preview', { version, edit })).data;
   },
   async confirm(id: number, version: number, acceptedCount?: number) {
@@ -211,6 +217,7 @@ export function adaptDraft(draft: ServerDraft): { exam: Exam; questions: PublicQ
     questions: draft.items.map((item) => ({
       id: item.code, type: item.type, chapter: item.chapter ?? '', order: item.order,
       difficulty: item.difficulty ?? 'NB', difficultyKnown: item.difficulty !== null,
+      maxPoints: item.max_points ?? item.points ?? undefined,
       content: item.content, remoteDraftId: draft.draft_id,
       statements: item.statements.map((option, index) => ({
         label: String.fromCharCode((item.type === 'TRUE_FALSE' ? 97 : 65) + index), content: option.content,

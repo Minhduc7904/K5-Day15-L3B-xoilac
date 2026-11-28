@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import {
-  chatAttachmentUrl, draftLink, examChatApi, examChatError, type ServerDraft, type ServerMessage,
+  chatAttachmentUrl, defaultPointWeights, draftLink, examChatApi, examChatError, type PointWeights, type ServerDraft, type ServerMessage,
   type ServerPreview, type ServerSession,
 } from '../exam-chat-api';
 import { difficultyLabels, typeLabels } from '../fixtures/chapters';
@@ -16,7 +16,7 @@ import { addImages, Composer, EXAM_CHAT_IMAGES, type Attachment } from './compos
 const field = 'min-w-0 rounded-lg border border-border bg-background px-2 py-2 text-label text-foreground';
 const starter = ['Ôn theo mẫu kỳ thi trong hồ sơ của mình', 'Ra 20 câu nguyên hàm và tích phân'];
 const DIFFICULTIES = Object.keys(difficultyLabels) as StructureRow['difficulty'][];
-const TYPES = Object.keys(typeLabels) as StructureRow['type'][];
+const TYPES = Object.keys(defaultPointWeights) as Array<keyof PointWeights>;
 
 export function LiveCreateExamPage() {
   const params = useSearchParams();
@@ -302,10 +302,14 @@ export function LiveCreateExamPage() {
               </div>
             : editing
               ? <MatrixEditor key={preview.version} preview={preview} catalog={catalog} busy={busy}
-                  onCancel={() => setEditing(false)} onSave={(rows, minutes) => void apply({ rows, duration_minutes: minutes })} />
+                  onCancel={() => setEditing(false)} onSave={(rows, minutes, weights) => void apply({ rows, duration_minutes: minutes, type_point_weights: weights })} />
               : <>
                   <p className="text-label">{preview.structure.chapters.reduce((n, chapter) => n + chapter.count, 0)} câu
                     {preview.structure.duration_minutes ? ' · ' + preview.structure.duration_minutes + ' phút' : ''}</p>
+                  <p className="text-caption text-muted-foreground">
+                    Trọng số điểm: {TYPES.map((type) => `${typeLabels[type]} ${(preview.structure.kind === 'CHAPTER'
+                      ? preview.structure.type_point_weights ?? defaultPointWeights : defaultPointWeights)[type]}`).join(' · ')}
+                  </p>
                   <ul className="grid max-h-56 gap-1 overflow-auto text-caption">
                     {(preview.structure.rows ?? []).map((row) => <li key={[row.chapter, row.type, row.difficulty].join('-')}>
                       {catalog[row.chapter] ?? row.chapter} · {typeLabels[row.type]} · {difficultyLabels[row.difficulty]} · {row.count} câu
@@ -331,7 +335,8 @@ export function LiveCreateExamPage() {
         </div>}
         {draft && <div className="mt-3 grid gap-2 rounded-2xl border border-border p-4">
           <p className="font-semibold">{draft.title} · {draft.items.length} câu</p>
-          <Button href={draftLink(draft)}>Xem đề</Button>
+          <Button href={draftLink(draft) + '/take'}>Làm bài online</Button>
+          <Button href={draftLink(draft)} variant="secondary">Xem đề</Button>
           <Button href="/exams" variant="secondary">Đề của tôi</Button>
         </div>}
       </aside>
@@ -359,17 +364,18 @@ function Message({ role, content, images = [] }: {
 
 function MatrixEditor({ preview, catalog, busy, onSave, onCancel }: {
   preview: ServerPreview; catalog: Record<string, string>; busy: boolean;
-  onSave: (rows: StructureRow[], minutes: number) => void; onCancel: () => void;
+  onSave: (rows: StructureRow[], minutes: number, weights: PointWeights) => void; onCancel: () => void;
 }) {
   const structure = preview.structure.kind === 'CHAPTER' ? preview.structure : null;
   const [rows, setRows] = useState(() => (structure?.rows ?? []).map((row, index) => ({ id: index, ...row })));
   const [minutes, setMinutes] = useState(structure?.duration_minutes ?? 0);
+  const [weights, setWeights] = useState(structure?.type_point_weights ?? defaultPointWeights);
   const counter = useRef(rows.length);
   const total = rows.reduce((n, row) => n + row.count, 0);
   const change = (id: number, patch: Partial<StructureRow>) => setRows((list) => list.map((row) => row.id === id ? { ...row, ...patch } : row));
   return <form className="grid gap-2" onSubmit={(event) => {
     event.preventDefault();
-    onSave(rows.map(({ chapter, type, difficulty, count }) => ({ chapter, type, difficulty, count })), minutes);
+    onSave(rows.map(({ chapter, type, difficulty, count }) => ({ chapter, type, difficulty, count })), minutes, weights);
   }}>
     {rows.map((row) => <fieldset key={row.id} className="grid grid-cols-2 gap-1 rounded-xl border border-border p-2">
       <select aria-label="Chương" className={field + ' col-span-2'} value={row.chapter} onChange={(e) => change(row.id, { chapter: e.target.value })}>
@@ -384,6 +390,14 @@ function MatrixEditor({ preview, catalog, busy, onSave, onCancel }: {
       <input aria-label="Số câu" type="number" required min={1} max={50} className={field} value={row.count} onChange={(e) => change(row.id, { count: Number(e.target.value) })} />
       <Button size="sm" type="button" variant="secondary" onClick={() => setRows((list) => list.filter((item) => item.id !== row.id))}>Bỏ hàng</Button>
     </fieldset>)}
+    <fieldset className="grid gap-2 rounded-xl border border-border p-2">
+      <legend className="px-1 text-caption">Trọng số điểm theo dạng câu</legend>
+      {TYPES.map((type) => <label key={type} className="grid grid-cols-[1fr_5rem] items-center gap-2 text-caption">
+        {typeLabels[type]}
+        <input className={field} type="number" min={1} max={100} required value={weights[type]}
+          onChange={(event) => setWeights((current) => ({ ...current, [type]: Number(event.target.value) }))} />
+      </label>)}
+    </fieldset>
     <p className="text-caption">{total}/50 câu</p>
     <label className="grid gap-1 text-caption">Thời lượng phút (0 là không giới hạn)
       <input type="number" className={field} min={0} max={300} required value={minutes} onChange={(event) => setMinutes(Number(event.target.value))} />
