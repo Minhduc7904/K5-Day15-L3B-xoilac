@@ -11,6 +11,7 @@ import { mockMode } from '@/lib/config';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
+import { homeFor } from '../route-guard';
 import { AuthHeader, MockNote } from '../components/auth-shell';
 import { MOCK_OTP } from '../mock';
 import { toAuthError, type OtpPurpose, type PendingOtp } from '../types';
@@ -51,7 +52,7 @@ export function EmailOtpForm({
       const user = await authApi.completeOtp(purpose, pending.challenge, code);
       dispatch(signedIn(user));
       toast({ tone: 'success', title: 'Đã xác minh email' });
-      router.replace('/');
+      router.replace(homeFor(user));
     } catch (failure) {
       setError(toAuthError(failure));
       setCode('');

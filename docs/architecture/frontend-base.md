@@ -14,6 +14,7 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo |
 | `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password` (đang chạy mock). Xem [Trang xác thực frontend](frontend-auth.md) |
 | `features/auth/` | Lớp API auth (mock hoặc Axios), reducer `auth`, form và validation |
+| `app/(student)/(app)/`, `app/(student)/(focus)/`, `features/study/` | Trang học sinh (dashboard, tạo đề với AI, đề, làm bài, kết quả, hồ sơ) đang chạy mock. Xem [Trang học sinh frontend](frontend-student-pages.md) |
 | `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở dev hoặc chế độ mock |
 | `app/layout.tsx` | Layout gốc: font, favicon, metadata và `AppProvider` |
 | `components/ui/`, `components/layout/`, `components/motion/` | Component dùng chung, xem [Design system frontend](frontend-design-system.md) |

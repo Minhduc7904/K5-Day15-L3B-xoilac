@@ -39,7 +39,7 @@ Ngày 27/11/2026 instance được gắn **Elastic IP** `54.79.136.46` (thay cho
 
    ```text
    API:    https://examind.duckdns.org/api/v1
-   Socket: wss://examind.duckdns.org   (đường dẫn /api/socket.io, issue #20)
+   Socket: wss://examind.duckdns.org   (đường dẫn /api/socket.io, issue #36)
    ```
 
    Chứng chỉ Let's Encrypt do `deploy/remote-deploy.sh` xin ở lần deploy đầu và container `certbot` tự gia hạn. Cần cả cổng **80** (xác minh tên miền) và **443** mở trong Security Group. Cổng 80 vẫn phục vụ API qua HTTP để kiểm sức khoẻ. Frontend gọi từ origin khác thì cho phép origin đó trong `CORS_ORIGINS` của `/opt/examind/prod.env` trên VPS (nhiều origin phân tách bằng dấu phẩy).
@@ -53,7 +53,8 @@ Ngày 27/11/2026 instance được gắn **Elastic IP** `54.79.136.46` (thay cho
 | PostgreSQL | `POSTGRES_PASSWORD` bắt buộc. Compose ghép `DATABASE_URL` từ mật khẩu, `POSTGRES_USER` và `POSTGRES_DB`. Giữ giá trị của cơ sở dữ liệu đang chạy. |
 | MinIO | `S3_ACCESS_KEY` và `S3_SECRET_KEY` bắt buộc. Giữ `S3_BUCKET` hiện dùng. Compose đặt endpoint nội bộ `http://minio:9000`. |
 | CORS và xác thực | Giữ `CORS_ORIGINS` cho các origin frontend cần truy cập trực tiếp, `COOKIE_SECURE=true` trên HTTPS và cấu hình phiên hiện tại. Giữ `ADMIN_*` nếu dùng bootstrap cùng các biến OTP, Gmail và Google OAuth đã bật. Xem [cấu hình xác thực](deploy-backend-ci-cd.md#cấu-hình-otp-và-google). |
-| Nhập đề PDF | `MISTRAL_API_KEY` và `OPENAI_API_KEY` bật OCR, tách câu hỏi và embedding. Thiếu một trong hai khóa thì API tải PDF trả `503`. Tên model dùng mặc định của backend. |
+| Nhập đề PDF | `MISTRAL_API_KEY` và `OPENAI_API_KEY` bật OCR, tách câu hỏi và embedding. Thiếu một trong hai khóa thì API tải PDF trả `503`. `OCR_MODEL` mặc định là `mistral-ocr-4-1`. |
+| Chat tạo đề | Khi `EXAM_CHAT_LIVE=true`, chat dùng chung `OPENAI_API_KEY`, còn `MISTRAL_API_KEY` bật OCR cho ảnh học sinh gửi. Kiểm tra cờ này trước khi thêm khóa để thống nhất phạm vi dùng API. |
 
 1. Thống nhất thời điểm thay đổi với người vận hành và kiểm tra đang dùng đúng thư mục, tệp env và tài khoản triển khai. Chạy trên EC2 với tài khoản đó để lưu bản sao và tạo tệp chuẩn bị trong cùng thư mục.
 
@@ -67,13 +68,14 @@ Ngày 27/11/2026 instance được gắn **Elastic IP** `54.79.136.46` (thay cho
    install -m 600 /opt/examind/prod.env "$candidate"
    ```
 
-2. Chuyển riêng các khóa AI cần bổ sung qua stdin của SSH đã xác minh host key. Cập nhật các dòng tương ứng trong `$candidate`, giữ các giá trị hiện có và các dòng khác. Chạy với shell tracing tắt. Chỉ ghi tên biến và kết quả kiểm vào log. Sau khi xác nhận cấu hình hợp lệ, cài tệp bằng thao tác đổi tên trong cùng thư mục.
+2. Chuyển riêng các khóa AI còn thiếu qua stdin của SSH đã xác minh host key. Cập nhật các dòng tương ứng trong `$candidate`, giữ các khóa đang dùng và các dòng khác. Chạy với shell tracing tắt. Chỉ ghi tên biến và kết quả kiểm vào log. Trong cửa sổ vận hành, kiểm tra tệp đang dùng vẫn khớp bản sao và Compose đọc được tệp chuẩn bị, rồi cài tệp bằng thao tác đổi tên trong cùng thư mục.
 
    ```bash
-   if docker compose --env-file "$candidate" -f docker-compose.yml -f docker-compose.prod.yml config --quiet >/dev/null 2>&1; then
+   if cmp -s -- "$backup" /opt/examind/prod.env \
+     && docker compose --env-file "$candidate" -f docker-compose.yml -f docker-compose.prod.yml config --quiet >/dev/null 2>&1; then
      mv -T -- "$candidate" /opt/examind/prod.env
    else
-     echo 'Cấu hình Compose chưa hợp lệ. Kiểm tra lại tệp chuẩn bị trên EC2.' >&2
+     echo 'Tệp đang dùng đã đổi hoặc tệp chuẩn bị chưa hợp lệ. Kiểm tra lại trên EC2.' >&2
    fi
    ```
 

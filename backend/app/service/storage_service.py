@@ -25,6 +25,9 @@ class StorageService:
             self._client.put_object, Bucket=self._bucket, Key=key, Body=data, ContentType=content_type
         )
 
+    async def delete(self, key: str) -> None:
+        await run_in_threadpool(self._client.delete_object, Bucket=self._bucket, Key=key)
+
     async def get(self, key: str) -> tuple[bytes, str] | None:
         def _get() -> tuple[bytes, str] | None:
             try:

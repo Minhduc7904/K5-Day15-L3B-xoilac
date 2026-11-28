@@ -95,6 +95,7 @@ async def chat_client(
     seed_fn: Callable | None = seed,
     real_auth: bool = False,
     real_templates: bool = False,
+    database_url: str | None = None,
 ) -> AsyncIterator[AsyncClient]:
     """Client HTTP với DB riêng. Ba chế độ người gọi:
 
@@ -103,7 +104,8 @@ async def chat_client(
     - real_auth=True: dùng đăng nhập thật của #8 (cookie phiên), tạo tài khoản bằng login_as().
     real_templates=True: tra mẫu qua ExamTemplateUseCase thật của #5 thay vì nguồn giả.
     """
-    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
+    engine = (create_async_engine(database_url) if database_url else
+              create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool))
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(content_metadata.create_all)

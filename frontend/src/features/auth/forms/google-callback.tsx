@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/feedback';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
+import { homeFor } from '../route-guard';
 import { AuthHeader } from '../components/auth-shell';
 import { googleResultProblem, readGoogleResult, type GoogleResultProblem } from '../google-flow';
 import { toAuthError, type PendingOtp } from '../types';
@@ -52,7 +53,7 @@ export function GoogleCallback() {
           setPending(result);
         } else {
           dispatch(signedIn(result));
-          router.replace('/');
+          router.replace(homeFor(result));
         }
       } catch (failure) {
         setError({ title: toAuthError(failure).message });

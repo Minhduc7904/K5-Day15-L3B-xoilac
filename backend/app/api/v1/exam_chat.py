@@ -7,11 +7,16 @@ như không tồn tại. student_ref lấy từ tài khoản, giá trị client 
 import json
 import logging
 from collections.abc import Iterator
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response, StreamingResponse
 
-from app.api.deps import ExamChatUseCaseDep, ReplyWriterDep, RequesterDep
+from app.api.deps import ExamChatUseCaseDep, ReplyWriterDep, RequesterDep, StorageDep
+from app.repositories.credits import InsufficientCredits
+from app.service.exam_chat_model import ExamChatModelError
+from app.service.exam_chat_ocr import ExamChatImageError, MAX_CHAT_IMAGE_BYTES, MAX_CHAT_IMAGES
+from app.usecase.live_exam_chat import LiveExamChat
 from app.schemas.exam_chat import (
     ConfirmIn,
     ConfirmOut,
@@ -22,6 +27,7 @@ from app.schemas.exam_chat import (
     PreviewUpdate,
     SessionCreate,
     SessionOut,
+    SessionListItem,
     SessionStateOut,
 )
 from app.usecase.exam_chat import (
@@ -68,6 +74,24 @@ async def create_session(body: SessionCreate, usecase: ExamChatUseCaseDep, reque
         raise HTTPException(422, {"message": "Thiếu student_ref (chưa đăng nhập)"}) from None
 
 
+@router.get("/sessions", response_model=list[SessionListItem])
+async def list_sessions(usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    rows = await usecase.list_sessions(_student(requester))
+    return [{**SessionOut.model_validate(session).model_dump(), "title": (title or ("Ảnh đã gửi" if title is not None else "Đoạn chat mới"))[:80]}
+            for session, title in rows]
+
+
+@router.get("/sessions/{session_id}/transcript", response_model=list[MessageOut])
+async def transcript(
+    session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep,
+    before: int | None = Query(None, ge=1), limit: int = Query(80, ge=1, le=200),
+):
+    try:
+        return await usecase.message_page(session_id, _student(requester), before, limit)
+    except SessionNotFound:
+        raise _not_found() from None
+
+
 @router.get("/sessions/{session_id}", response_model=SessionStateOut)
 async def get_session(session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     try:
@@ -77,7 +101,7 @@ async def get_session(session_id: int, usecase: ExamChatUseCaseDep, requester: R
     return {
         "session": session,
         "messages": [MessageOut.model_validate(m) for m in messages],
-        "preview": PreviewOut.model_validate(preview) if preview else None,
+        "preview": PreviewOut.model_validate(preview) if preview and preview.status != "CANCELLED" else None,
         "draft": DraftOut.model_validate(draft) if draft else None,
     }
 
@@ -86,11 +110,56 @@ async def get_session(session_id: int, usecase: ExamChatUseCaseDep, requester: R
 async def send_message(
     session_id: int, body: MessageIn, usecase: ExamChatUseCaseDep, writer: ReplyWriterDep, requester: RequesterDep
 ):
-    """Gửi một tin nhắn, nhận phản hồi qua SSE: message* → preview? → draft? → done (hoặc error)."""
+    """Gửi một tin nhắn văn bản, nhận phản hồi qua SSE."""
+    return await _send_message(session_id, body.text, body.version, usecase, writer, requester)
+
+
+@router.post("/sessions/{session_id}/messages/with-images")
+async def send_images(
+    session_id: int, usecase: ExamChatUseCaseDep, writer: ReplyWriterDep, requester: RequesterDep,
+    images: Annotated[list[UploadFile], File(min_length=1, max_length=MAX_CHAT_IMAGES)],
+    text: Annotated[str, Form(max_length=2000)] = "",
+    version: Annotated[int | None, Form(ge=0)] = None,
+):
+    """Gửi ảnh hoặc ảnh kèm tin nhắn. Phản hồi dùng cùng SSE với tin nhắn văn bản."""
+    if not isinstance(usecase, LiveExamChat):
+        raise HTTPException(503, {"code": "EXAM_CHAT_UNAVAILABLE", "message": "Chat có ảnh chưa được bật."})
+    await _check_owner(usecase, requester, session_id)
+    remaining = MAX_CHAT_IMAGE_BYTES
+    blobs = []
+    for upload in images:
+        data = await upload.read(remaining + 1)
+        remaining -= len(data)
+        if remaining < 0:
+            raise HTTPException(413, {"code": "IMAGES_TOO_LARGE", "message": "Tổng dung lượng ảnh tối đa 4 MB."})
+        blobs.append(data)
+    return await _send_message(session_id, text.strip(), version, usecase, writer, requester, blobs)
+
+
+async def _check_owner(usecase, requester, session_id):
     try:
-        turn = await usecase.respond(session_id, body.text, requester)
+        await usecase.check_owner(session_id, _student(requester))
+    except SessionNotFound:
+        raise _not_found() from None
+
+
+async def _send_message(session_id, text, version, usecase, writer, requester, images=None):
+    try:
+        if isinstance(usecase, LiveExamChat):
+            turn = await usecase.respond(session_id, text, requester, version=version, images=images)
+        else:
+            turn = await usecase.respond(session_id, text, requester)
     except SessionNotFound:  # kiểm quyền trước khi mở luồng: phiên của người khác trả 404 thường
         raise _not_found() from None
+    except VersionConflict as e:
+        raise _conflict(e) from e
+    except InsufficientCredits as e:
+        raise HTTPException(402, {"code": "INSUFFICIENT_CREDITS", "message": "Cần 100 credit để tạo đề đầu tiên."}) from e
+    except ExamChatImageError as e:
+        raise HTTPException(e.status, {"code": e.code, "message": str(e)}) from e
+    except ExamChatModelError as e:
+        log.warning("exam-chat model unavailable: %s", e)
+        raise HTTPException(503, {"code": "EXAM_CHAT_UNAVAILABLE", "message": "Agent đang bận. Em thử lại nhé."}) from e
     except Exception:  # lỗi không lường trước: báo qua SSE thay vì cắt kết nối
         log.exception("exam-chat respond failed")
 
@@ -102,8 +171,8 @@ async def send_message(
     def events() -> Iterator[str]:
         for chunk in writer.stream(turn.reply):
             yield _sse("message", {"delta": chunk})
-        if turn.preview_changed and turn.preview is not None:
-            yield _sse("preview", PreviewOut.model_validate(turn.preview).model_dump(mode="json"))
+        if turn.preview_changed:
+            yield _sse("preview", PreviewOut.model_validate(turn.preview).model_dump(mode="json") if turn.preview else None)
         if turn.draft is not None:
             yield _sse("draft", DraftOut.model_validate(turn.draft).model_dump(mode="json"))
         yield _sse("done", {"preview_version": turn.preview.version if turn.preview else None})
@@ -113,10 +182,24 @@ async def send_message(
     )
 
 
+@router.get("/sessions/{session_id}/attachments/{attachment_id}")
+async def get_chat_attachment(
+    session_id: int, attachment_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep, storage: StorageDep,
+):
+    try:
+        data, mime = await usecase.chat_attachment(session_id, _student(requester), attachment_id, storage)
+    except SessionNotFound:
+        raise _not_found("Không tìm thấy ảnh") from None
+    return Response(data, media_type=mime, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
 @router.get("/sessions/{session_id}/preview", response_model=PreviewOut)
 async def get_preview(session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     try:
-        return await usecase.get_preview(session_id, requester)
+        preview = await usecase.get_preview(session_id, requester)
+        if preview.status == "CANCELLED":
+            raise PreviewNotFound()
+        return preview
     except SessionNotFound:
         raise _not_found() from None
     except PreviewNotFound:
@@ -141,13 +224,18 @@ async def update_preview(session_id: int, body: PreviewUpdate, usecase: ExamChat
 async def confirm_preview(session_id: int, body: ConfirmIn, usecase: ExamChatUseCaseDep, requester: RequesterDep):
     """Xác nhận bản xem trước rồi dựng đề nháp từ câu đã duyệt."""
     try:
-        preview, draft, message = await usecase.confirm(session_id, body.version, requester)
+        if isinstance(usecase, LiveExamChat):
+            preview, draft, message = await usecase.confirm(session_id, body.version, requester, accepted_count=body.accepted_count)
+        else:
+            preview, draft, message = await usecase.confirm(session_id, body.version, requester)
     except SessionNotFound:
         raise _not_found() from None
     except PreviewNotFound:
         raise _not_found(NO_PREVIEW) from None
     except VersionConflict as e:
         raise _conflict(e) from e
+    except InsufficientCredits as e:
+        raise HTTPException(402, {"code": "INSUFFICIENT_CREDITS", "message": "Cần 100 credit để tạo đề đầu tiên."}) from e
     except InvalidState as e:
         raise HTTPException(status.HTTP_409_CONFLICT, {"message": str(e)}) from e
     except PreviewRuleError as e:
@@ -164,3 +252,39 @@ async def get_draft(session_id: int, usecase: ExamChatUseCaseDep, requester: Req
     if draft is None:
         raise _not_found("Phiên chưa có đề nháp")
     return draft
+
+
+def _student(requester):
+    if requester is None:
+        raise HTTPException(401)
+    return requester
+
+
+@router.get("/drafts", response_model=list[DraftOut])
+async def list_drafts(usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    return await usecase.list_drafts(_student(requester))
+
+
+@router.get("/drafts/{draft_id}", response_model=DraftOut)
+async def get_draft_by_id(draft_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    try:
+        return await usecase.draft_by_id(_student(requester), draft_id)
+    except SessionNotFound:
+        raise _not_found("Không tìm thấy đề nháp") from None
+
+
+@router.get("/drafts/{draft_id}/media/{media_id}")
+async def get_draft_media(
+    draft_id: int, media_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep, storage: StorageDep,
+):
+    try:
+        data, mime = await usecase.draft_media(_student(requester), draft_id, media_id, storage)
+    except SessionNotFound:
+        raise _not_found("Không tìm thấy ảnh") from None
+    return Response(data, media_type=mime, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/chapters")
+async def get_chapters(usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    _student(requester)
+    return await usecase.chapter_catalog()

@@ -36,8 +36,10 @@ from app.usecase.exam_preview_rules import (
     check_structure,
     describe,
     difficulty_plan,
+    matrix_plan,
     new_structure,
 )
+from app.usecase.exam_scoring import allocate_points
 from app.usecase.exam_template_plan import (
     EXAM_NAME,
     TYPE_NAME,
@@ -136,6 +138,51 @@ class ExamChatUseCase:
         if item is None or (requester is not None and item.user_id != requester.user_id):
             raise SessionNotFound()
         return item
+
+    async def list_sessions(self, requester: Requester):
+        return await self._repo.list_sessions(requester.user_id)
+
+    async def check_owner(self, session_id: int, requester: Requester) -> None:
+        await self._session(session_id, requester)
+
+    async def message_page(self, session_id: int, requester: Requester, before: int | None, limit: int):
+        await self._session(session_id, requester)
+        return await self._repo.message_page(session_id, before, limit)
+
+    async def list_drafts(self, requester: Requester):
+        return await self._repo.list_drafts(requester.user_id)
+
+    async def draft_by_id(self, requester: Requester, draft_id: int) -> ExamDraft:
+        draft = await self._repo.draft_by_id(requester.user_id, draft_id)
+        if draft is None:
+            raise SessionNotFound()
+        return draft
+
+    async def draft_media(self, requester: Requester, draft_id: int, media_id: int, storage):
+        draft = await self.draft_by_id(requester, draft_id)
+        marker = f"](media:{media_id})"
+        if not any(marker in item["content"] or any(marker in row["content"] for row in item["statements"])
+                   for item in draft.items):
+            raise SessionNotFound()
+        key = await self._repo.media_key(media_id)
+        result = await storage.get(key) if key else None
+        if not result or result[1] not in {"image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"}:
+            raise SessionNotFound()
+        return result
+
+    async def chat_attachment(self, session_id: int, requester: Requester, attachment_id: int, storage):
+        await self._session(session_id, requester)
+        image = await self._repo.chat_attachment(session_id, attachment_id)
+        if image is None:
+            raise SessionNotFound()
+        key, mime = image
+        stored = await storage.get(key)
+        if stored is None:
+            raise SessionNotFound()
+        return stored[0], mime
+
+    async def chapter_catalog(self):
+        return await self._bank.chapter_catalog()
 
     async def get_state(self, session_id: int, requester: Requester | None = None):
         session = await self._session(session_id, requester)
@@ -426,6 +473,7 @@ class ExamChatUseCase:
             preview = await self._repo.save_preview(sid, {"status": "EDITED"})
             return preview, None, ("Ngân hàng chưa có câu nào phù hợp cấu trúc này, nên mình không tạo đề và không bịa "
                                    "câu. Em thử đổi chương hoặc độ khó nhé.")
+        items = allocate_points(items, structure.model_dump(mode="json"))
         draft = await self._repo.add_draft({
             "session_id": sid,
             "preview_version": confirmed.version,
@@ -441,6 +489,18 @@ class ExamChatUseCase:
         chosen: list[int] = []
         meta: dict[int, dict] = {}
         shortages: list[dict] = []
+        if structure.rows or structure.type_counts:
+            for cell in matrix_plan(structure):
+                result = await self._bank.pick_for_section(
+                    question_type=cell.type, n=cell.count, chapter_codes=[cell.chapter],
+                    difficulty=cell.difficulty, exclude=chosen,
+                )
+                chosen.extend(result.question_ids)
+                meta.update({qid: {"chapter": cell.chapter} for qid in result.question_ids})
+                if len(result.question_ids) < cell.count:
+                    shortages.append({"chapter": cell.chapter, "difficulty": cell.difficulty, "requested": cell.count,
+                                      "available": len(result.question_ids), "question_type": cell.type})
+            return chosen, meta, shortages
         for code, mix in difficulty_plan(structure).items():
             for diff, k in mix.items():
                 res = await self._bank.pick(code, diff, k, exclude=chosen)
@@ -451,7 +511,7 @@ class ExamChatUseCase:
                                       "available": len(res.question_ids)})
         return chosen, meta, shortages
 
-    async def _pick_template(self, structure: TemplatePreviewStructure):
+    async def _pick_template(self, structure: TemplatePreviewStructure, *, prefer_subchapters: bool = False):
         chosen: list[int] = []
         meta: dict[int, dict] = {}
         shortages: list[dict] = []
@@ -459,7 +519,8 @@ class ExamChatUseCase:
             chapters = sec.effective_chapters()
             for diff, k in sec.difficulty_plan().items():
                 res = await self._bank.pick_for_section(question_type=sec.question_type, n=k, chapter_codes=chapters,
-                                                        difficulty=diff, grade=structure.grade, exclude=chosen)
+                                                        difficulty=diff, grade=structure.grade, exclude=chosen,
+                                                        prefer_subchapters=prefer_subchapters)
                 chosen += res.question_ids
                 meta.update({q: {"section_order": sec.order, "section_title": sec.title,
                                  "points": sec.points_per_question} for q in res.question_ids})

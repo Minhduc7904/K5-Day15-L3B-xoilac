@@ -13,6 +13,7 @@ import { mockMode } from '@/lib/config';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
+import { homeFor } from '../route-guard';
 import { AuthHeader, AuthSwitch, MockLoginHint, TextLink } from '../components/auth-shell';
 import { GoogleSignIn } from '../components/google-sign-in';
 import { toAuthError, type AuthErrorCode } from '../types';
@@ -70,7 +71,7 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
       const user = await authApi.login({ email: normalizeEmail(email), password });
       dispatch(signedIn(user));
       toast({ tone: 'success', title: `Chào ${user.display_name ?? 'bạn'}!`, description: 'Đăng nhập thành công.' });
-      router.push(user.role === 'admin' ? '/admin' : '/');
+      router.replace(homeFor(user));
     } catch (error) {
       const authError = toAuthError(error);
       if (authError.code === 'VALIDATION' && authError.fieldErrors) {

@@ -16,7 +16,7 @@ Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần me
 | Thư mục trên VPS | `/opt/examind/app` (mã nguồn), `/opt/examind/seed` (gói dữ liệu nền), `/opt/examind/prod.env` (mật khẩu, chmod 600, không nằm trong Git) |
 | Dịch vụ | `nginx` (cổng 80 và 443) → `backend` (FastAPI, nội bộ) → `postgres`, `minio`; `certbot` gia hạn chứng chỉ |
 | Địa chỉ API | `https://examind.duckdns.org/api/v1/health` (và `http://` ở cổng 80). DuckDNS trỏ về Elastic IP `54.79.136.46`, IP không đổi khi dừng/khởi động instance, xem [deploy-ec2.md](deploy-ec2.md) |
-| Địa chỉ socket | `wss://examind.duckdns.org/api/socket.io/` (nginx đã sẵn đường nâng cấp WebSocket, backend sẽ có ở issue #20) |
+| Địa chỉ socket | `wss://examind.duckdns.org/api/socket.io/` (nginx chuyển tiếp đến Socket.IO của issue #36) |
 | Chứng chỉ HTTPS | Let's Encrypt, lưu ở `/opt/examind/letsencrypt`; thư mục thử thách ACME `/opt/examind/certbot-www`. Không nằm trong Git |
 | Kiểm tra sống | `http://examind.duckdns.org/api/v1/health/live` trả `{"status":"ok","version":"0.1.0"}`, không chạm DB và MinIO |
 | Workflow | [.github/workflows/ci.yml](../../.github/workflows/ci.yml), [.github/workflows/deploy.yml](../../.github/workflows/deploy.yml) |
@@ -56,6 +56,8 @@ Cấu hình local nằm trong [`backend/.env.example`](../../backend/.env.exampl
 
 Đăng ký đúng callback trong **Authorized redirect URIs**. Client đăng nhập dùng `openid email profile`. Client Gmail chỉ gửi thư. Để chạy trọn luồng Google local, cấu hình callback localhost và origin frontend local trong cả app lẫn Google Auth Platform.
 
+Để bật chat tạo đề trên môi trường thử, đặt `EXAM_CHAT_LIVE=true`, `OPENAI_API_KEY` và tùy chọn `EXAM_CHAT_MODEL` trong `prod.env`. Thêm `MISTRAL_API_KEY` khi sẵn sàng bật đọc ảnh và dùng `OCR_MODEL` nếu cần chỉ định model OCR. Chat vẫn lưu ảnh khi chưa có khóa OCR. Kiểm tra migration `0014_exam_chat_images`, MinIO, SSE, số dư và danh sách đề trước khi bật `NEXT_PUBLIC_EXAM_CHAT_LIVE=true` trên Vercel. Khi cần tạm dừng rollout, tắt cờ trên frontend trước và giữ migration để bảo toàn các khoản đã ghi.
+
 Sau khi cập nhật `prod.env`, chạy lệnh sau từ `/opt/examind/app` để kiểm cú pháp mà không in cấu hình. Lần deploy backend tiếp theo sẽ nạp biến vào container.
 
 ```bash
@@ -85,7 +87,7 @@ Script cài Docker và Compose, thêm swap 2 GB (VPS chỉ có ~1,9 GB RAM), t�
 | Biến | Container | Mặc định nếu thiếu | Ghi chú |
 | --- | --- | --- | --- |
 | `POSTGRES_PASSWORD`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | tất cả | bắt buộc (`:?`) | Sinh ngẫu nhiên khi bootstrap |
-| `CORS_ORIGINS` | backend | `http://localhost:3000` | Chỉ cần khi frontend gọi thẳng backend khác origin |
+| `CORS_ORIGINS` | backend | `http://localhost:3000` | Danh sách origin frontend được phép mở socket, phân cách bằng dấu phẩy |
 | `COOKIE_SECURE` | backend, db-init | `true` | nginx có TLS. Cookie phiên chỉ gửi qua HTTPS; ở db-init bật luật mật khẩu admin ≥ 12 ký tự |
 | `COOKIE_NAME` | backend | `examind_session` | |
 | `SESSION_TTL_HOURS` | backend | `168` | Hạn phiên (giờ) |
@@ -110,6 +112,19 @@ ssh -i ./backend-key.pem ubuntu@<host> 'ADMIN_EMAIL=<email-admin> bash -s' < dep
    Mong đợi `Đã tạo admin mặc định ...` (lần đầu) hoặc `Admin mặc định đã có, không thay đổi`. Xem mật khẩu trên VPS: `grep '^ADMIN_PASSWORD=' /opt/examind/prod.env`. Không chép mật khẩu ra ngoài VPS ngoài nơi lưu trữ an toàn của nhóm.
 
 Nếu `ADMIN_PASSWORD` dưới 12 ký tự hoặc sai định dạng, `db-init` thoát mã 2, backend không khởi động và deploy quay về commit trước. Email đã thuộc một tài khoản student thì chỉ cảnh báo trong log, không làm deploy fail. Cách thêm admin khác và cứu hộ: [backend-auth.md](../architecture/backend-auth.md#cấp-tài-khoản-admin).
+
+## Worker học sinh
+
+Compose khởi động `student-worker` sau khi `db-init` chạy xong migration. Worker giữ một luồng kiểm credit và một luồng nhắc email độc lập. `daily-credit` cộng tối đa 100 khi sang ngày Việt Nam, trần 500. `study-reminders` dùng cùng cấu hình Gmail với backend và chỉ gửi đến email đã xác minh có lịch nhắc.
+
+Từ thư mục deploy trên VPS, kiểm tra trạng thái và log bằng cùng tham số Compose với quy trình deploy.
+
+```bash
+docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml ps student-worker
+docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml logs --tail=60 student-worker
+```
+
+Để kiểm job, dùng cơ sở dữ liệu và hộp thư kiểm thử. Trạng thái `uncertain` nghĩa là chưa xác định được Gmail có nhận yêu cầu. Kiểm tra hộp thư gửi trước khi xử lý bằng tay. Xem [API realtime](../api/realtime-api.md) để kiểm tra WSS và origin.
 
 ## Kiểm tra kết quả
 

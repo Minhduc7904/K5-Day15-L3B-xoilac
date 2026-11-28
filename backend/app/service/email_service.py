@@ -20,6 +20,14 @@ class EmailDeliveryError(RuntimeError):
     """Google did not confirm email delivery submission."""
 
 
+class RetryableEmailError(EmailDeliveryError):
+    """A temporary failure occurred before Gmail accepted the message."""
+
+
+class RejectedEmailError(EmailDeliveryError):
+    """Gmail explicitly rejected the request."""
+
+
 class GmailEmailService:
     def __init__(
         self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
@@ -102,9 +110,17 @@ async def _post_for_field(
     try:
         response = await client.post(url, **kwargs)
     except httpx.RequestError:
-        raise EmailDeliveryError(f"{operation} failed during the HTTP request.") from None
+        error = RetryableEmailError if operation == "OAuth refresh" else EmailDeliveryError
+        raise error(f"{operation} failed during the HTTP request.") from None
     if not response.is_success:
-        raise EmailDeliveryError(f"{operation} failed with HTTP {response.status_code}.")
+        code = response.status_code
+        if code == 429 or (operation == "OAuth refresh" and code >= 500):
+            error = RetryableEmailError
+        elif 400 <= code < 500 or operation == "OAuth refresh":
+            error = RejectedEmailError
+        else:
+            error = EmailDeliveryError
+        raise error(f"{operation} failed with HTTP {code}.")
 
     try:
         body = response.json()

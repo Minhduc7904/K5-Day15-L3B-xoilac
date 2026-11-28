@@ -5,7 +5,7 @@ cùng một quy tắc kiểm tra. Hành vi bám theo codebase/agent.py (lát c�
 phương pháp phần dư lớn nhất, mặc định 10 câu, trộn 20% NB · 40% TH · 40% VD, không lấy VDC.
 """
 import re
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,12 +17,25 @@ DIFF_NAME = {"NB": "nhận biết", "TH": "thông hiểu", "VD": "vận dụng",
 DEFAULT_WEIGHTS: dict[str, float] = {"NB": 0.2, "TH": 0.4, "VD": 0.4}
 DEFAULT_TOTAL = 10
 MAX_TOTAL = 50
-MAX_CHAPTERS = 5
+MAX_CHAPTERS = MAX_TOTAL
 CHAPTER_CODE = re.compile(r"^1[0-2]C\d+$")
 
 
 class ChapterCount(BaseModel):
     code: str = Field(pattern=r"^1[0-2]C\d+$")
+    count: int = Field(ge=1, le=MAX_TOTAL)
+
+
+QUESTION_TYPES = ("SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "MULTIPLE_CHOICE", "ESSAY")
+ScoredType = Literal["SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"]
+PointWeights = dict[ScoredType, Annotated[int, Field(ge=1, le=100)]]
+DEFAULT_POINT_WEIGHTS: PointWeights = {"SINGLE_CHOICE": 30, "TRUE_FALSE": 40, "SHORT_ANSWER": 30}
+
+
+class MatrixCell(BaseModel):
+    chapter: str
+    difficulty: Difficulty
+    type: Literal["SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "MULTIPLE_CHOICE", "ESSAY"]
     count: int = Field(ge=1, le=MAX_TOTAL)
 
 
@@ -33,6 +46,10 @@ class PreviewStructure(BaseModel):
     chapters: list[ChapterCount] = Field(min_length=1, max_length=MAX_CHAPTERS)
     difficulty_weights: dict[Difficulty, float] = Field(default_factory=lambda: dict(DEFAULT_WEIGHTS))
     excluded_difficulties: list[Difficulty] = Field(default_factory=list)
+    duration_minutes: int | None = Field(None, ge=0, le=300)
+    type_counts: dict[str, int] | None = None
+    type_point_weights: PointWeights = Field(default_factory=lambda: dict(DEFAULT_POINT_WEIGHTS))
+    rows: list[MatrixCell] | None = None
 
     @property
     def total(self) -> int:
@@ -47,10 +64,14 @@ class PreviewEdit(BaseModel):
 
     total: int | None = Field(default=None, ge=1, le=MAX_TOTAL)
     chapter_codes: list[str] | None = Field(default=None, min_length=1, max_length=MAX_CHAPTERS)
-    chapter_counts: dict[str, int] | None = None
+    chapter_counts: dict[str, Annotated[int, Field(ge=1, le=MAX_TOTAL)]] | None = None
     only_difficulty: Difficulty | None = None
     exclude_difficulties: list[Difficulty] | None = None
     difficulty_counts: dict[Difficulty, int] | None = None
+    duration_minutes: int | None = Field(None, ge=0, le=300)
+    type_counts: dict[str, int] | None = None
+    type_point_weights: PointWeights | None = None
+    rows: list[MatrixCell] | None = Field(None, min_length=1, max_length=50)
 
     def is_empty(self) -> bool:
         return all(v is None for v in self.model_dump().values())
@@ -80,6 +101,19 @@ def difficulty_plan(structure: PreviewStructure) -> dict[str, dict[str, int]]:
     return {c.code: allocate(c.count, weights) for c in structure.chapters}
 
 
+def matrix_plan(structure: PreviewStructure) -> list[MatrixCell]:
+    if structure.rows:
+        return structure.rows
+    remaining = dict(structure.type_counts or {"SINGLE_CHOICE": structure.total})
+    cells = []
+    for chapter, mixes in difficulty_plan(structure).items():
+        for difficulty, count in mixes.items():
+            for kind, amount in allocate(count, remaining).items():
+                cells.append(MatrixCell(chapter=chapter, difficulty=difficulty, type=kind, count=amount))
+                remaining[kind] -= amount
+    return cells
+
+
 def check_structure(structure: PreviewStructure, known_chapters: set[str] | None = None) -> list[str]:
     """Trả danh sách lỗi (rỗng là hợp lệ). known_chapters: mã chương có trong danh mục, None là bỏ qua bước này."""
     errors: list[str] = []
@@ -92,6 +126,13 @@ def check_structure(structure: PreviewStructure, known_chapters: set[str] | None
         errors.append("Trọng số độ khó không được âm.")
     if not structure.effective_weights():
         errors.append("Không còn mức độ khó nào để chọn câu (đã loại hết).")
+    if set(structure.type_point_weights) != set(DEFAULT_POINT_WEIGHTS):
+        errors.append("Cần trọng số điểm cho cả ba loại câu chấm tự động.")
+    if structure.type_counts is not None and (
+        any(k not in QUESTION_TYPES or v < 1 for k, v in structure.type_counts.items())
+        or sum(structure.type_counts.values()) != structure.total
+    ):
+        errors.append("Số câu theo dạng phải bằng tổng số câu của đề.")
     if known_chapters is not None:
         unknown = [c for c in codes if c not in known_chapters]
         if unknown:
@@ -134,6 +175,37 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
     if edit.exclude_difficulties:
         s.excluded_difficulties = sorted(set(s.excluded_difficulties) | set(edit.exclude_difficulties),
                                          key=DIFFICULTIES.index)
+    if edit.duration_minutes is not None:
+        s.duration_minutes = edit.duration_minutes
+    if edit.type_point_weights is not None:
+        s.type_point_weights = edit.type_point_weights
+    if edit.rows is not None:
+        cells = [(row.chapter, row.difficulty, row.type) for row in edit.rows]
+        if len(set(cells)) != len(cells):
+            raise PreviewRuleError(["Ma trận có ô bị lặp."])
+        chapters = {}
+        types = {}
+        diffs = {}
+        for row in edit.rows:
+            chapters[row.chapter] = chapters.get(row.chapter, 0) + row.count
+            types[row.type] = types.get(row.type, 0) + row.count
+            diffs[row.difficulty] = diffs.get(row.difficulty, 0) + row.count
+        if len(chapters) > MAX_CHAPTERS or sum(chapters.values()) > MAX_TOTAL:
+            raise PreviewRuleError(["Ma trận tối đa 50 câu."])
+        try:
+            s.chapters = [ChapterCount(code=c, count=n) for c, n in chapters.items()]
+        except ValueError as exc:
+            raise PreviewRuleError(["Mã chương trong ma trận không hợp lệ."]) from exc
+        s.type_counts = types
+        s.difficulty_weights = diffs
+        s.excluded_difficulties = []
+        s.rows = edit.rows
+    elif any(v is not None for k, v in edit.model_dump().items() if k not in {"duration_minutes", "type_point_weights"}):
+        s.rows = None
+        if edit.type_counts is not None:
+            s.type_counts = edit.type_counts
+        elif s.type_counts:
+            s.type_counts = allocate(s.total, s.type_counts)
     return s
 
 

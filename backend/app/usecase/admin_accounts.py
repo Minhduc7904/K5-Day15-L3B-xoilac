@@ -164,6 +164,8 @@ class AdminAccountsUseCase:
         except BaseException:
             await self._users.rollback()  # nhả khoá dòng
             raise
+        if status == STATUS_DISABLED:
+            await self._auth.revoke_user_sockets(target.user_id)
         return target
 
     async def _reauth(self, actor: CurrentUser, current_password: str) -> None:

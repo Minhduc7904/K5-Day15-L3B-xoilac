@@ -42,6 +42,18 @@ class ExtractionTooLong(ValueError):
     pass
 
 
+def image_mime(data: bytes | None) -> str:
+    if not data or len(data) > MAX_IMAGE_BYTES:
+        raise ValueError("Kích thước ảnh không hợp lệ.")
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    raise ValueError("Định dạng ảnh không được hỗ trợ.")
+
+
 class PdfImportModels:
     """Provider adapters for PDF OCR and structured extraction."""
 
@@ -71,6 +83,24 @@ class PdfImportModels:
         if not key:
             raise ValueError("Chưa cấu hình OCR.")
         return await self._recognize_mistral(pdf, key)
+
+    async def recognize_image(self, image: bytes, mime: str) -> str:
+        """Read image text via the same Mistral OCR endpoint and configuration as PDF import."""
+        key = self.ocr_key
+        if not key:
+            raise ValueError("Chưa cấu hình OCR.")
+        encoded = base64.b64encode(image).decode("ascii")
+        data = await self._post(
+            "https://api.mistral.ai/v1/ocr",
+            key,
+            {
+                "model": self.settings.ocr_model,
+                "document": {"type": "image_url", "image_url": f"data:{mime};base64,{encoded}"},
+                "include_image_base64": False,
+            },
+            timeout=20,
+        )
+        return "\n".join(page["markdown"] for page in sorted(data["pages"], key=lambda page: page["index"]))
 
     async def _recognize_mistral(self, pdf: bytes, key: str) -> tuple[str, list[OcrPage]]:
         data = await self._post(

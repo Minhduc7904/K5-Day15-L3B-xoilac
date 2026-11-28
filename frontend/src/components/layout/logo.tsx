@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 
 interface LogoProps {
@@ -8,9 +9,10 @@ interface LogoProps {
   href?: string;
   className?: string;
   priority?: boolean;
+  onClick?: ComponentProps<typeof Link>['onClick'];
 }
 
-export function Logo({ variant = 'full', href = '/', className, priority }: LogoProps) {
+export function Logo({ variant = 'full', href = '/', className, priority, onClick }: LogoProps) {
   const image =
     variant === 'full' ? (
       <Image
@@ -37,6 +39,7 @@ export function Logo({ variant = 'full', href = '/', className, priority }: Logo
   return (
     <Link
       href={href}
+      onClick={onClick}
       className="inline-flex shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
     >
       {image}

@@ -14,15 +14,17 @@ services:
     image: examind-backend:latest
     restart: unless-stopped
     environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      OCR_MODEL: ${OCR_MODEL:-mistral-ocr-4-1}
+      EXAM_CHAT_LIVE: ${EXAM_CHAT_LIVE:-false}
+      EXAM_CHAT_MODEL: ${EXAM_CHAT_MODEL:-gpt-5.4-mini}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-examind}:${POSTGRES_PASSWORD:?thiếu POSTGRES_PASSWORD trong prod.env}@postgres:5432/${POSTGRES_DB:-examind}
       S3_ENDPOINT_URL: http://minio:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?thiếu S3_ACCESS_KEY trong prod.env}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?thiếu S3_SECRET_KEY trong prod.env}
       S3_BUCKET: ${S3_BUCKET:-examind}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      # Nhập đề PDF (#3). Thiếu khóa thì chỉ tính năng nhập đề không khả dụng.
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Phiên đăng nhập (#8). nginx có TLS (cổng 443) nên cookie đặt Secure mặc định.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_NAME: ${COOKIE_NAME:-examind_session}
@@ -55,6 +57,30 @@ services:
       timeout: 5s
       retries: 6
       start_period: 15s
+    logging: *logging
+
+  student-worker:
+    build: ./backend
+    image: examind-backend:latest
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-examind}
+      PGDATABASE: ${POSTGRES_DB:-examind}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL:-https://examind-frontend.vercel.app}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Examind}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:-}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
     logging: *logging
 
   nginx:

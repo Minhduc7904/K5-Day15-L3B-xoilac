@@ -1,20 +1,17 @@
 'use client';
 
 import { LogOut } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
 import { useHydrated } from '@/lib/use-hydrated';
-import { useAppDispatch, useAppSelector } from '@/store';
-import { authApi } from '../api';
-import { signedOut } from '../auth-slice';
+import { useAppSelector } from '@/store';
+import { useLogout } from '../use-logout';
 
 /** Tên người dùng và nút đăng xuất trên thanh điều hướng. Khách thấy nút Đăng nhập / Đăng ký. */
 export function UserMenu() {
   const user = useAppSelector((s) => s.auth.user);
   const status = useAppSelector((s) => s.auth.status);
-  const dispatch = useAppDispatch();
-  const [leaving, setLeaving] = useState(false);
+  const { leaving, logout } = useLogout();
   const hydrated = useHydrated();
 
   if (!hydrated || status === 'unknown') return <Skeleton className="h-9 w-48 rounded-xl" />;
@@ -32,16 +29,6 @@ export function UserMenu() {
   }
 
   const name = user.display_name ?? user.email;
-  const logout = async () => {
-    setLeaving(true);
-    try {
-      await authApi.logout();
-    } catch {
-      // Backend luôn trả 204; lỗi mạng thì vẫn xoá trạng thái phía client.
-    }
-    dispatch(signedOut('logged-out'));
-  };
-
   return (
     <>
       <span className="flex min-w-0 items-center gap-2 rounded-xl bg-surface px-3 py-1.5 text-label text-foreground">

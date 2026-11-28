@@ -20,4 +20,9 @@ if [ -z "$baseline" ]; then
   baseline=$(git merge-base HEAD FETCH_HEAD) || exit 1
 fi
 
-git diff --quiet "$baseline" HEAD -- ':(top)frontend/'
+git cat-file -e "$baseline^{commit}" 2>/dev/null || exit 1
+
+if git diff --quiet "$baseline" HEAD -- ':(top)frontend/'; then
+  exit 0
+fi
+exit 1
