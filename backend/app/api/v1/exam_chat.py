@@ -28,6 +28,7 @@ from app.schemas.exam_chat import (
     SessionCreate,
     SessionOut,
     SessionListItem,
+    SessionRename,
     SessionStateOut,
 )
 from app.usecase.exam_chat import (
@@ -77,8 +78,26 @@ async def create_session(body: SessionCreate, usecase: ExamChatUseCaseDep, reque
 @router.get("/sessions", response_model=list[SessionListItem])
 async def list_sessions(usecase: ExamChatUseCaseDep, requester: RequesterDep):
     rows = await usecase.list_sessions(_student(requester))
-    return [{**SessionOut.model_validate(session).model_dump(), "title": (title or ("Ảnh đã gửi" if title is not None else "Đoạn chat mới"))[:80]}
+    return [{**SessionOut.model_validate(session).model_dump(), "title": (session.title or title or ("Ảnh đã gửi" if title is not None else "Đoạn chat mới"))[:80]}
             for session, title in rows]
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionListItem)
+async def rename_session(session_id: int, body: SessionRename, usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    try:
+        item = await usecase.rename_session(session_id, _student(requester), body.title)
+    except SessionNotFound:
+        raise _not_found() from None
+    return {**SessionOut.model_validate(item).model_dump(), "title": item.title}
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: int, usecase: ExamChatUseCaseDep, requester: RequesterDep):
+    """Ẩn đoạn chat khỏi danh sách. Đề nháp đã dựng vẫn còn trong "Đề của tôi"."""
+    try:
+        await usecase.delete_session(session_id, _student(requester))
+    except SessionNotFound:
+        raise _not_found() from None
 
 
 @router.get("/sessions/{session_id}/transcript", response_model=list[MessageOut])
@@ -111,7 +130,7 @@ async def send_message(
     session_id: int, body: MessageIn, usecase: ExamChatUseCaseDep, writer: ReplyWriterDep, requester: RequesterDep
 ):
     """Gửi một tin nhắn văn bản, nhận phản hồi qua SSE."""
-    return await _send_message(session_id, body.text, body.version, usecase, writer, requester)
+    return await _send_message(session_id, body.text, body.version, usecase, writer, requester, plan=body.plan)
 
 
 @router.post("/sessions/{session_id}/messages/with-images")
@@ -143,10 +162,10 @@ async def _check_owner(usecase, requester, session_id):
         raise _not_found() from None
 
 
-async def _send_message(session_id, text, version, usecase, writer, requester, images=None):
+async def _send_message(session_id, text, version, usecase, writer, requester, images=None, plan=None):
     try:
         if isinstance(usecase, LiveExamChat):
-            turn = await usecase.respond(session_id, text, requester, version=version, images=images)
+            turn = await usecase.respond(session_id, text, requester, version=version, images=images, plan=plan)
         else:
             turn = await usecase.respond(session_id, text, requester)
     except SessionNotFound:  # kiểm quyền trước khi mở luồng: phiên của người khác trả 404 thường

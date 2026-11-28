@@ -135,12 +135,20 @@ class ExamChatUseCase:
 
     async def _session(self, session_id: int, requester: Requester | None) -> ExamChatSession:
         item = await self._repo.get_session(session_id)
-        if item is None or (requester is not None and item.user_id != requester.user_id):
+        if item is None or item.deleted_at is not None or (requester is not None and item.user_id != requester.user_id):
             raise SessionNotFound()
         return item
 
     async def list_sessions(self, requester: Requester):
         return await self._repo.list_sessions(requester.user_id)
+
+    async def rename_session(self, session_id: int, requester: Requester, title: str) -> ExamChatSession:
+        item = await self._session(session_id, requester)
+        await self._repo.rename_session(item, title.strip())
+        return item
+
+    async def delete_session(self, session_id: int, requester: Requester) -> None:
+        await self._repo.hide_session(await self._session(session_id, requester))
 
     async def check_owner(self, session_id: int, requester: Requester) -> None:
         await self._session(session_id, requester)
@@ -477,7 +485,7 @@ class ExamChatUseCase:
         draft = await self._repo.add_draft({
             "session_id": sid,
             "preview_version": confirmed.version,
-            "title": draft_title(),
+            "title": getattr(structure, "title", None) or draft_title(),
             "structure": structure.model_dump(mode="json"),
             "items": items,
             "shortages": shortages,

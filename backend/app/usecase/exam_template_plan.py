@@ -51,6 +51,7 @@ class TemplatePreviewStructure(BaseModel):
     """Cấu trúc đề theo một mẫu đã duyệt. Lưu bản chụp của mẫu để đề dựng ra khớp đúng mẫu lúc học sinh xác nhận."""
 
     kind: Literal["EXAM_TEMPLATE"] = "EXAM_TEMPLATE"
+    title: str | None = Field(None, max_length=120)
     template_id: int
     template_name: str
     exam_type: str
