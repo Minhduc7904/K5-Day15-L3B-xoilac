@@ -21,6 +21,11 @@ from app.usecase.exam_chat import (
     ChatTurn, ExamChatUseCase, InvalidState, Requester, SessionNotFound,
     VersionConflict, draft_title, load_structure,
 )
+from app.usecase.exam_chat_intent import norm, read, refusal
+from app.usecase.exam_personalization import (
+    PracticeRequest, practice_chapters, recommendation_context, review_text,
+    validate_recommendation, weak_priority,
+)
 from app.usecase.exam_preview_rules import (
     DEFAULT_TOTAL, MAX_TOTAL, PreviewEdit, PreviewRuleError, PreviewStructure, allocate,
     apply_edit, ensure_valid, matrix_plan, new_structure,
@@ -189,8 +194,24 @@ class LiveExamChat(ExamChatUseCase):
         context, latest, previous_version, summary, cutoff = await self._context(
             session_id, requester, text, version, image_turn=bool(prepared),
         )
-        action, notice = (await self._interpret_images(prepared, context) if prepared
-                          else (await self.model.interpret(context), ""))
+        blocked = refusal(norm(text)) if text else None
+        if blocked:
+            action, notice = None, blocked
+        elif prepared:
+            action, notice = await self._interpret_images(prepared, context)
+        else:
+            try:
+                action, notice = await self.model.interpret(context), ""
+            except ExamChatModelError:
+                if read(text).kind != "weak":
+                    raise
+                action, notice = None, "AI đang bận. Em thử lại hoặc chọn một chương để ôn nhé."
+        proposal = None
+        if action and action.action == "history":
+            try:
+                proposal = await self._recommend(requester, action, context)
+            except PreviewRuleError as exc:
+                proposal = (None, " ".join(exc.errors))
         log.info("exam_chat action=%s image_count=%d model_latency_ms=%d",
                  action.action if action else "image_notice", len(prepared), (perf_counter() - started) * 1000)
         session = await self._lock(session_id, requester)
@@ -199,7 +220,14 @@ class LiveExamChat(ExamChatUseCase):
         if current_version != previous_version or await self._repo.transcript(session_id, latest):
             raise VersionConflict(current_version)
         try:
-            turn = await self._dispatch(session_id, requester, current, action, context) if action else ChatTurn(notice)
+            if proposal:
+                structure, reply = proposal
+                turn = (await self._stage(session_id, structure, current, reason="Theo lịch sử làm bài đã chấm.")
+                        if structure else ChatTurn(reply))
+                if structure:
+                    turn.reply = reply + "\n" + turn.reply
+            else:
+                turn = await self._dispatch(session_id, requester, current, action, context) if action else ChatTurn(notice)
         except PreviewRuleError as exc:
             turn = ChatTurn(" ".join(exc.errors))
         if action and notice:
@@ -208,6 +236,49 @@ class LiveExamChat(ExamChatUseCase):
         session.summarized_through = cutoff or None
         await self._commit_turn(session_id, session, text, turn, prepared)
         return turn
+
+    async def _recommend(self, requester: Requester, action: ChatAction, context):
+        catalog = context["catalog"]
+        if not (action.grade or action.chapters or action.chapter_counts):
+            action = action.model_copy(update={"grade": context["student"].get("grade")})
+        request = PracticeRequest.from_action(action, catalog)
+        history = await self._history.get(requester.student_ref, grade=action.grade, chapter_codes=request.scope)
+        if not (action.grade or request.scope) and history:
+            return None, "Em chọn khối lớp hoặc chương muốn ôn để mình đọc đúng phạm vi bài đã làm nhé."
+        review = review_text(history, catalog)
+        if history is None or history.conflicting or not any(row.total for row in history.chapters):
+            return None, review + "\nEm muốn chọn chương nào hoặc làm một bài ngắn để có thêm dữ liệu?"
+        options, available = await self._bank.practice_capacity(
+            practice_chapters(history, request, catalog), request.difficulties, request.types,
+        )
+        if available < request.total:
+            return None, (review + f"\nKho có {available}/{request.total} câu phù hợp phạm vi và mức đã chọn. "
+                          f"Còn thiếu {request.total - available} câu. Em giảm số câu hoặc đổi chương, mức độ nhé.")
+        priority = weak_priority(history, options, catalog)
+        unavailable = [catalog[row.code]["name"] for row in history.chapters if row.classification == "weak"
+                       and not any((catalog[cell["chapter_code"]]["parent_code"] or cell["chapter_code"]) == row.code
+                                   for cell in options)]
+        if unavailable:
+            review += "\nKho chưa có câu phù hợp để củng cố " + ", ".join(unavailable) + "."
+        await self.db.rollback()
+        try:
+            recommendation = await self.model.recommend(
+                recommendation_context(history, request, catalog, options, priority),
+            )
+            structure, reasons = validate_recommendation(recommendation, history, request, catalog, options, priority)
+        except ExamChatModelError:
+            log.info("exam_chat recommendation unavailable")
+            return None, review + "\nAI đang bận. Em thử lại hoặc chọn một chương để ôn nhé."
+        except PreviewRuleError as exc:
+            log.info("exam_chat recommendation rejected")
+            return None, review + "\n" + " ".join(exc.errors) + " Em có thể đổi số câu hoặc mức độ rồi thử lại."
+        chosen, _, shortages = await self._pick_chapters(structure)
+        if shortages or len(chosen) != structure.total:
+            details = "\n".join(self._shortage_text(shortage) for shortage in shortages)
+            return None, (review + f"\nMa trận chỉ ghép được {len(chosen)}/{structure.total} câu phân biệt. "
+                          "Em giảm số câu hoặc đổi mức độ nhé.\n" + details).rstrip()
+        log.info("exam_chat recommendation accepted groups=%d question_count=%d", len(reasons), structure.total)
+        return structure, "\n".join([review, *reasons])
 
     async def _commit_turn(self, sid, session, text, turn, images):
         attachments = []
@@ -247,8 +318,6 @@ class LiveExamChat(ExamChatUseCase):
         kind = action.action
         if kind == "unsupported":
             return ChatTurn("Mình chỉ hỗ trợ tạo và chỉnh đề ôn Toán từ ngân hàng đã duyệt.")
-        if kind == "history":
-            return ChatTurn("Mình chưa có lịch sử làm bài để biết chương em hay sai. Em muốn ôn chương hoặc chủ đề nào?")
         if kind == "clarify":
             return ChatTurn(action.question or "Em muốn ôn chương nào hoặc theo mẫu kỳ thi nào?")
         if kind == "template":

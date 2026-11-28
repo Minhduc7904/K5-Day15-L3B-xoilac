@@ -134,6 +134,8 @@ def read(text: str) -> Intent:
     exam = exam_request(t)
     if exam is not None:
         return Intent("exam", exam=exam, edit=edit, asked_total=asked)
+    if re.search(r"\b(tao de|ra de|on)\b.{0,35}\b(on tiep|theo lich su|hay sai|vua lam)\b", t):
+        return Intent("weak", edit=edit, asked_total=asked)
     if CONFIRM.search(t):
         return Intent("confirm", edit=edit, asked_total=asked)
     if edit.chapter_codes or edit.chapter_counts:

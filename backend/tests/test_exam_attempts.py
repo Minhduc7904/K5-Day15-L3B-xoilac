@@ -43,7 +43,7 @@ async def seed_attempt_bank(conn):
     ])
 
 
-async def add_draft(client, user_id, minutes=None):
+async def add_draft(client, user_id, minutes=None, *, chapter="12C1"):
     async with client.db() as session:
         chat = ExamChatSession(student_ref=f"U{user_id}", user_id=user_id)
         session.add(chat)
@@ -52,9 +52,9 @@ async def add_draft(client, user_id, minutes=None):
         items = await bank.load_items([qid for qid, _ in ROWS])
         draft = ExamDraft(
             session_id=chat.session_id, title="Đề luyện tập mẫu", preview_version=1,
-            structure={"kind": "CHAPTER", "chapters": [{"code": "12C1", "count": 3}],
+            structure={"kind": "CHAPTER", "chapters": [{"code": chapter, "count": 3}],
                        "duration_minutes": minutes},
-            items=[{"order": i, "chapter": "12C1", **item} for i, item in enumerate(items.values(), 1)],
+            items=[{"order": i, "chapter": chapter, **item} for i, item in enumerate(items.values(), 1)],
             shortages=[],
         )
         session.add(draft)
