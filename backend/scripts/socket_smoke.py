@@ -4,7 +4,8 @@
     SMOKE_ADMIN_EMAIL=admin@example.com SMOKE_ADMIN_PASSWORD='...' python scripts/socket_smoke.py [--base http://localhost:8000]
 
 Cần backend chạy với một admin (vd admin gốc do ensure_admin tạo) và thư viện aiohttp (requirements-dev.txt).
-Script tự đăng ký hai học sinh mới (email ngẫu nhiên, mật khẩu ngẫu nhiên), rồi đi kịch bản:
+Admin tạo hai học sinh mới qua POST /admin/users (email, mật khẩu ngẫu nhiên; không cần dịch vụ email
+như đăng ký công khai), học sinh đăng nhập, rồi đi kịch bản:
   A mở 2 kết nối, B mở 1 → thống kê 2 học sinh / 3 kết nối
   đóng 2 kết nối của A → 1 / 1
   dùng lại một ticket → bị từ chối
@@ -64,11 +65,9 @@ class Api:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self.http = http
 
-    async def register(self, email: str, password: str) -> str:
-        r = await self.http.post("/api/v1/auth/register", json={"email": email, "password": password})
+    async def create_student(self, admin: str, email: str, password: str) -> None:
+        r = await self.http.post("/api/v1/admin/users", json={"email": email, "password": password}, headers=self.h(admin))
         r.raise_for_status()
-        self.http.cookies.clear()
-        return r.cookies["examind_session"]
 
     async def login(self, email: str, password: str) -> str:
         r = await self.http.post("/api/v1/auth/login", json={"email": email, "password": password})
@@ -100,9 +99,12 @@ async def main(base: str, admin_email: str, admin_password: str) -> int:
     email_a, email_b = f"smoke-a-{tag}@example.com", f"smoke-b-{tag}@example.com"
     async with httpx.AsyncClient(base_url=base, timeout=10) as http:
         api = Api(http)
-        token_a = await api.register(email_a, "T-" + secrets.token_urlsafe(16))
-        token_b = await api.register(email_b, "T-" + secrets.token_urlsafe(16))
         admin = await api.login(admin_email, admin_password)
+        pw_a, pw_b = "T-" + secrets.token_urlsafe(16), "T-" + secrets.token_urlsafe(16)
+        await api.create_student(admin, email_a, pw_a)
+        await api.create_student(admin, email_b, pw_b)
+        token_a = await api.login(email_a, pw_a)
+        token_b = await api.login(email_b, pw_b)
         print(f"Học sinh A={email_a}, B={email_b}; admin={admin_email} (mật khẩu, token: ***)")
         before = await api.stats(admin)
         print(f"Thống kê trước kịch bản: {before[0]} học sinh, {before[1]} kết nối")
