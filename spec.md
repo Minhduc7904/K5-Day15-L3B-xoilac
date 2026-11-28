@@ -15,19 +15,20 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): chưa ghi 
 - Việc họ cố làm xong: chọn và làm một đề Toán tiếp theo phù hợp với phần mình còn yếu sau khi chữa đề.
 - Cách hiện tại *(giả thuyết)*: xem điểm và đáp án, tự nhóm lỗi hoặc hỏi người hỗ trợ, rồi tìm bài tương tự. Điểm tổng có thể khó chuyển thành nội dung cần ôn, trong khi đề có sẵn dễ tiếp cận. Cần hỏi học sinh đã làm gì ở lần gần nhất.
 - Pain *(giả thuyết)*: học sinh đang tự ôn Toán khó xác định chương cần ưu tiên sau khi làm đề và mất thời gian tìm bài luyện tiếp. Giả thuyết phụ là học sinh khó tự đối chiếu đề ôn với kỳ thi/năm mình nhắm tới.
-- Bằng chứng khảo sát sơ bộ: **19/23 (82,6%)** phản hồi báo từng chữa đề mà chưa biết ôn gì tiếp trong 30 ngày qua. **8/23** biết câu sai hoặc biết một phần nhưng chưa xác định được chương, dạng bài hoặc thứ tự ưu tiên. **7/23** gặp khó khi tìm đề đúng nội dung hoặc dạng câu. Kết quả ủng hộ hướng đề ôn theo chương yếu trong mẫu khảo sát. Việc xác nhận các phiếu hợp lệ và số phút mất mỗi lần còn thiếu. Xem [tổng hợp và trích dẫn ẩn danh](evidence/summary.md).
+- Bằng chứng khảo sát sơ bộ: **19/23 (82,6%)** phản hồi báo từng chữa đề mà chưa biết ôn gì tiếp trong 30 ngày qua. **8/23** biết câu sai hoặc biết một phần nhưng chưa xác định được chương, dạng bài hoặc thứ tự ưu tiên. **7/23** gặp khó khi tìm đề đúng nội dung hoặc dạng câu. Kết quả ủng hộ hướng đề ôn theo chương yếu trong mẫu khảo sát. Cả 23 phiếu đã được đội trưởng xác nhận; số phút mất mỗi lần chưa đo (§2 dùng số phút *(tự ước tính)*). Xem [tổng hợp và trích dẫn ẩn danh](evidence/summary.md).
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-| Đề ôn theo chương yếu | 19/23 phiếu báo gặp (sơ bộ) | 8 phiếu: 1 lần, 6 phiếu: 2–3 lần, 5 phiếu: có gặp nhưng không nhớ số lần trong 30 ngày | Thời gian tìm phần cần ôn và bài tập, chưa đo số phút | Chưa đủ số để tính | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
-| Đề theo ma trận từng kỳ thi/năm | __ | __ | __ phút tìm và kiểm tra cấu trúc | __ | Cần kho đủ dạng câu và nguồn đã xác thực theo kỳ thi/năm | Định hướng sản phẩm |
-| Báo cáo phần hay sai sau khi chữa đề | __ | __ | __ phút tự rà và nhóm lỗi | __ | Có thể thử với lịch sử làm bài giả lập đã gắn nhãn | Chưa chọn làm hướng riêng |
+| Đề ôn theo chương yếu | 19/23 (82,6%) phiếu báo gặp (khảo sát câu 8) | ≥ 1,43 lần/người: 14 phiếu có nêu số lần (8 phiếu 1 lần, 6 phiếu 2–3 lần, tính cận dưới); 5 phiếu "không nhớ số lần" không tính | 20 phút tìm phần cần ôn và bài luyện *(tự ước tính, chưa đo; khoảng 10–30)* | ≈ 39 giờ / 100 học sinh (khoảng 20–59 giờ) | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
+| Đề theo ma trận từng kỳ thi/năm | 9/23 (39,1%) tìm được ít đề hoặc ít đề đúng nội dung/dạng (câu 5: 7 + 2); chỉ 1 phiếu (S14) nhắc cấu trúc đề thi ở trường | 1 lần, ôn trước mỗi kỳ thi *(tự ước tính, chưa đo)* | 15 phút tìm và kiểm tra cấu trúc *(tự ước tính)* | ≈ 10 giờ / 100 học sinh | Cần kho đủ dạng câu và nguồn đã xác thực theo kỳ thi/năm | Định hướng sản phẩm |
+| Báo cáo phần hay sai sau khi chữa đề | 13/23 (56,5%) chưa xác định rõ chỗ yếu (câu 6: 5 biết câu sai nhưng chưa rõ chương, 5 không xác định được, 3 biết một phần) | ≥ 1,43 lần/người *(dùng số lần của câu 8, chưa đo riêng)* | 10 phút tự rà và nhóm lỗi *(tự ước tính)* | ≈ 13,5 giờ / 100 học sinh | Có thể thử với lịch sử làm bài giả lập đã gắn nhãn | Chưa chọn làm hướng riêng |
 
-- **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
+- **Impact / tháng** của hướng chọn = 82,6 người (mỗi 100 học sinh) × 1,43 lần × 20 phút ≈ 2.360 phút ≈ 39 giờ — nguồn từng thừa số: 82,6% = 19/23 phiếu (khảo sát câu 8) · 1,43 lần = (8×1 + 6×2)/14 phiếu có nêu số lần, cận dưới (khảo sát câu 8) · 20 phút *(tự ước tính)*. Hai hướng còn lại tính cùng cách: ma trận kỳ thi ≈ 39,1 × 1 × 15 ≈ 587 phút; báo cáo phần hay sai ≈ 56,5 × 1,43 × 10 ≈ 808 phút. Số học sinh thật của trung tâm chưa có nên tính trên 100 học sinh; mẫu từ một trung tâm nên không suy rộng ra học sinh cả nước.
 - Lý do chọn sơ bộ: đề ôn theo chương yếu giúp học sinh có bài để làm tiếp ngay sau khi chữa đề. Báo cáo phần hay sai vẫn là đầu vào hữu ích, còn đề theo nhiều ma trận cần thêm nguồn và ngân hàng đủ dạng câu. Sẽ đối chiếu lựa chọn với bằng chứng và bảng impact.
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8): ôn rải rác __ · ôn đều __ · ôn dồn trước kỳ thi __. Nguồn: __.
+- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8): ôn rải rác 1 lần (8/14 phiếu có nêu số lần) · ôn đều 2–3 lần (6/14 phiếu) · ôn dồn trước kỳ thi 4 lần *(tự ước tính, khảo sát không hỏi riêng)*. Nguồn: khảo sát câu 8, `evidence/survey/results.csv`.
+- Lý do chọn: đề ôn theo chương yếu có impact lớn nhất trong ba hướng (≈ 39 giờ so với ≈ 10 và ≈ 13,5 giờ trên 100 học sinh) và là hướng duy nhất có số lần có nguồn trực tiếp. Giờ phụ thuộc số phút tự ước tính, nên kết luận chỉ có nghĩa về thứ tự các hướng. Hướng bị loại giữ lại ở bảng.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
 - [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
@@ -189,6 +190,7 @@ flowchart LR
 | 28/11/2026 | Nối lịch sử đã chấm và đề xuất AI với luồng xem trước của web (#41) | Kiểm hai tài khoản cùng khối, ca thiếu căn cứ, kho thiếu, cập nhật sau lượt mới và luồng xác nhận. Giữ bộ câu thử và tiêu chí CP2 tại §7. |
 | 28/11/2026 | Thêm 14 câu thử B14–B27 (chỉ thêm, không sửa B01–B13): 27 câu, từ người dùng / data thật 10/27 | Đủ 20–30 câu cho CP3 và ≥1/3 câu từ khảo sát / data thật; bổ sung độ phủ chưa nêu chương, ngân hàng thiếu câu theo mức, ngoài phạm vi (`eval/README.md` mục 2). |
 | 28/11/2026 | Ghi cách quy đổi ngưỡng "đạt" sang 27 câu: ≥ 22/27 · tu_choi 7/7 · thuong ≥ 6/8 · kho ≥ 10/12 | Chuẩn §7 và `metric_spec.yaml` giữ nguyên chữ, chỉ giữ tỷ lệ % đã chốt ở CP2 (80%, 100%, 75%, 80%) và làm tròn lên cho bộ câu lớn hơn; chi tiết `eval/README.md` mục 3. |
+| 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 
