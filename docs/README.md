@@ -27,6 +27,7 @@
 | Kết nối EC2 và kiểm tra khả năng truy cập API | [Runbook EC2](operations/deploy-ec2.md) |
 | Deploy backend bằng GitHub Actions, sửa nginx | [Deploy backend CI/CD](operations/deploy-backend-ci-cd.md) |
 | Dựng và nạp dữ liệu nền (câu hỏi, đề, ảnh) | [Nạp dữ liệu nền](operations/seed-base-data.md) |
+| Mẫu cấu trúc đề Toán nạp sẵn (THPT, GK/CK khối 10–12) | [Mẫu cấu trúc đề nạp sẵn](operations/seed-exam-template-matrix.md) |
 | Cấu hình nhà cung cấp model cho bản thử | [Kết nối model](connect-model.md) |
 | Ghi nhận cách nhóm dùng AI | [Nhật ký sử dụng AI](ai-usage.md) |
 | Hiểu dữ liệu và đánh giá | [Data card](../data/DATA_CARD.md) · [Hướng dẫn eval](../eval/README.md) |
