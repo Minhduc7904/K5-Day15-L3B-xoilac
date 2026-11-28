@@ -12,4 +12,6 @@
   - Vấn đề chính là thiếu thời gian hoặc động lực, không phải thiếu thông tin.
   - Học sinh có đề ôn đủ nhưng chép dạng bài, không hiểu chương nên làm lại vẫn sai.
 - **Mình đúng nếu thấy:** ≥2/3 học sinh trong mẫu khảo sát báo ít nhất một lần trong 30 ngày qua chữa đề Toán xong mà chưa biết ôn phần nào tiếp. Đây là mốc kiểm giả thuyết trong mẫu khảo sát.
-- **Nguồn sẽ dùng** (≥1 nguồn đạt ngưỡng, guide 1.2): [ ] đào data · [ ] phỏng vấn ≥3 · [x] khảo sát ≥20 — nguồn chính dự kiến: Google Form gửi tới học sinh lớp 10–12 ngoài nhóm, đã từng tự ôn bằng đề Toán, tại trung tâm dạy thêm nơi Nguyễn Minh Đức đang làm quản lý. Số phản hồi hợp lệ: __.
+- **Nguồn sẽ dùng** (≥1 nguồn đạt ngưỡng, guide 1.2): [ ] đào data · [ ] phỏng vấn ≥3 · [x] khảo sát ≥20 — nguồn chính dự kiến: Google Form gửi tới học sinh lớp 10–12 ngoài nhóm, đã từng tự ôn bằng đề Toán, tại trung tâm dạy thêm nơi Nguyễn Minh Đức đang làm quản lý.
+
+**Cập nhật sau khảo sát (28/11/2026).** Đội trưởng xác nhận 23 phản hồi hợp lệ. Có 19/23 phản hồi báo từng gặp khó khăn nêu trong giả thuyết. [Tổng hợp khảo sát](summary.md)

@@ -6,12 +6,8 @@ README của nhóm có mục "Dùng AI vào việc gì" (2–3 dòng, bắt bu�
 
 | Việc | Công cụ AI | AI làm gì | Người kiểm/sửa gì | Ai phụ trách |
 |---|---|---|---|---|
-| Code bản chạy thử | Claude Code | Viết phần gọi model thật trong `codebase/ai.py` (OpenAI, Claude, Gemini, Ollama), đọc token từ `usage`. | Thử bằng máy chủ giả, rồi `python run.py eval --try` với gpt-5.4-mini: token vào/ra lớn hơn 0. | |
-| Prompt / thiết kế lời gọi mô hình | | | | |
-| Đào data (viết script đếm, gợi ý nhãn) | | | Kiểm tay __ dòng, khớp __ | |
-| Rà câu hỏi phỏng vấn / khảo sát | | Chỉ rà câu dẫn dắt | | |
+| Code bản chạy thử | Claude Code | Viết phần gọi model thật trong `codebase/ai.py` (OpenAI, Claude, Gemini, Ollama), đọc token từ `usage`. | Thử bằng máy chủ giả, rồi `python run.py eval --try` với gpt-5.4-mini: token vào/ra lớn hơn 0. | Nguyễn Minh Đức |
 | Viết câu thử (benchmark) | Claude Code | Soạn B24–B27 (`tu_viet`) và dựng B19–B23 từ số liệu ngân hàng thật; B14–B18 chép nguyên văn từ khảo sát câu 9. | Mỗi câu thử có `source`; câu thử AI viết được ghi rõ là `tu_viet`; `run.py check` pass. | Nguyễn Minh Đức |
-| Sinh data `synthetic` (nếu có) | | | Seed __ · kiểm tay __ dòng | |
 | Chấm cột `pass` bằng LLM (nếu có) | Không dùng | Cột `pass` do người chấm, không có LLM chấm. | Đức chấm lượt 1 và 2; Hằng chấm độc lập 5 câu của lượt 2, khớp 3/5 (`eval/second-grader-sheet.md`). | Nguyễn Minh Đức |
 | Slide, văn bản | Claude Code | Soạn bản đầu `eval/report.md`, `cost/cost-estimate.md`, `spec.md` §0, §2, §3, §8, `slides/demo-slides.html` (xuất `demo-slides.pdf`), `evidence/summary.md`. | Đức đọc, đối chiếu số với file nguồn và duyệt trước khi commit; số không có nguồn ghi *(tự ước tính)*. | Nguyễn Minh Đức |
 | Cấu hình production (#13) | Codex | Rà cấu hình backend, thêm ánh xạ khóa AI trong Compose, cập nhật runbook EC2 và kiểm thử local. | Huy duyệt kế hoạch và phối hợp xác minh trên EC2. | Vũ Quang Huy |

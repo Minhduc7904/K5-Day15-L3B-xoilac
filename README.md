@@ -25,7 +25,7 @@
 - Backend chạy trên EC2, frontend trên Vercel; cách dựng và vận hành ở [runbook EC2](docs/operations/deploy-ec2.md), [CI/CD backend](docs/operations/deploy-backend-ci-cd.md) và [Vercel](docs/operations/deploy-frontend-vercel.md).
 - Nếu ứng dụng không mở hoặc API trả lỗi 502, xem video dự phòng ở trên.
 - Bản chạy thử theo đề (CLI, không cần mạng nội bộ của nhóm): làm theo mục "Chạy trong 3 phút" bên dưới; các số trong `eval/` và `cost/` đo trên bản CLI này, chưa đo trên luồng web.
-- Tài khoản dùng thử: *(chưa điền, nhóm bổ sung nếu giám khảo cần đăng nhập)*.
+- Giám khảo có thể đăng nhập bằng tài khoản học sinh demo `student-demo@example.com`. Nhận mật khẩu trực tiếp từ đội trưởng Nguyễn Minh Đức. Tài khoản đã có hồ sơ lớp 12 và credit để thử luồng tạo đề ôn. [Đăng nhập Examind](https://examind-frontend.vercel.app/login)
 
 ## Tài liệu dự án
 
@@ -122,7 +122,7 @@ Codex hỗ trợ chỉnh phạm vi CP1 và nháp câu hỏi tìm hiểu cách h�
 | `TEAMS.md` | 1.0 | CP1 · **đúng format**, BTC quét khi chấm |
 | `canvas.md` | 1.4 | CP1, cập nhật CP2 |
 | `evidence/hypothesis.md` | 1.1 | trước khi tìm bằng chứng |
-| `evidence/data-mining.md` · `evidence/interviews/TEMPLATE.md` → `P1.md`… · `evidence/survey/TEMPLATE.md` | 1.2 | bắt đầu sau Zoom, xong CP3 |
+| `evidence/survey/questions.md` · `evidence/survey/results.csv` | 1.2 | Khảo sát đã thực hiện ở CP3 |
 | `evidence/summary.md` | 1.2 | CP3 |
 | `spec.md` | §0–§2: 1.1–1.3 · §3–§5: 2.1–2.3 · §7: 2.4 · §8: 4.2 · §10: suốt | §7 chốt CP2 · §0–§7 CP3 · đủ CP4 |
 | `data/DATA_CARD.md` | 2.4 | bản đầu CP2 |

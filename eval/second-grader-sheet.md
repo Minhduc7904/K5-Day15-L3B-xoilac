@@ -67,7 +67,7 @@
 
 - **Điểm (1/0):** 0 · **Lý do:** Có từ chối rõ và không tự viết câu hỏi, nhưng tiêu chí đòi gợi ý ra đề từ ngân hàng cụ thể là 11C9 Đạo hàm; output chỉ gợi ý chung chung, không nhắc 11C9 hay đạo hàm.
 
-## Đối chiếu (Đức điền sau khi nhận phiếu)
+## Đối chiếu kết quả chấm
 
 | Câu | Người thứ hai | Cột `pass` của lượt 2 | Khớp? |
 |---|---|---|---|

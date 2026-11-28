@@ -1,4 +1,4 @@
-# AI SPEC — Tạo đề ôn Toán THPT theo chương yếu · Nhóm xoilac · Phòng C401 · Zone sẽ cập nhật sau
+# AI SPEC — Tạo đề ôn Toán THPT theo chương yếu · Nhóm xoilac · Phòng C401 · Zone 6 · Vị trí 6
 
 > Mốc nộp: §7 chốt chuẩn "đạt" tại **CP2 19:30 Thứ Sáu 27/11** · §0–§7 nộp **CP3 10:00 Thứ Bảy 28/11** · đủ §0–§10 **CP4 14:30 Thứ Bảy 28/11** · §10 changelog ghi tiếp đến **23:59 Thứ Bảy 28/11**.
 > Đầu mỗi mục ghi bước guide (`02-guide.md` trong repo đề) chỉ cách điền. Mỗi mục ngắn, có số và nguồn; chi tiết để ở file được trỏ tới. Xoá dòng hướng dẫn trong ngoặc vuông khi điền xong.
@@ -218,3 +218,4 @@ flowchart LR
 |---|---|---|
 | 28/11/2026 | §10 phân công: sửa ô CP1–CP2 của Hằng từ "Nền backend và frontend" thành auth và admin mặc định (#8); Hằng xác nhận dòng CP4 và thêm chấm độc lập lượt 2 | Nền backend (#1) và frontend (#9) do Đức làm; phần của Hằng ở CP1–CP2 là #8 theo lịch sử commit. Dòng CP4 cần từng người xác nhận. |
 | 28/11/2026 | Hồ sơ học sinh trước tour, Socket.IO theo phiên, credit và job nhắc học | Hoàn tất thiết lập một lần và lưu lịch ôn theo tài khoản. Xem [issue #36](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/36). |
+| 28/11/2026 | Bổ sung Zone 6, vị trí 6, cập nhật bằng chứng khảo sát và mở tài khoản demo học sinh | Đối chiếu khảo sát trong [tổng hợp](evidence/summary.md), xác nhận hoạt động web trong [nhật ký người dùng thử](validation/log.md) và kiểm đăng nhập tài khoản demo trên production. |

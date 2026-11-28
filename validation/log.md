@@ -1,20 +1,12 @@
-# Người dùng thử *(bonus)*
+# Người dùng thử
 
-> Điền ở guide bước 4.3 — 2–3 người ngoài nhóm, ~10 phút / người, theo 5 nhịp: làm quen · bối cảnh · giao việc · quan sát · hỏi sau. Ôn lại: ngày 5, ngày 13. Chấm ở rubric Bonus.
-> Không ghi tên: ghi vai. Hành vi quan sát được nặng hơn lời nói; toàn lời khen = phiên chưa đạt, giao việc khó hơn.
-> Người dùng thử **không thay được** bằng chứng pain ở `evidence/`.
+## Hoạt động trên bản web
 
-| Người thử (vai) | Việc giao (theo kết quả, không theo nút) | Quan sát (làm gì đầu tiên, chỗ do dự, chỗ hiểu sai) | Trích nguyên văn | Mức nghiêm trọng (cao / vừa / thấp) |
-|---|---|---|---|---|
-| | | | | |
-| | | | | |
-| | | | | |
+Đối chiếu PostgreSQL production ngày 28/11/2026, trước khi tạo tài khoản dùng thử cho giám khảo.
 
-Câu hỏi sau: *"Nếu mai không được dùng nữa, bạn thấy: rất tiếc / hơi tiếc / không sao?"* → __ / __ / __
+| Hoạt động ghi nhận | Kết quả |
+|---|---:|
+| Đã gửi tin nhắn trong chat tạo đề | 6 tài khoản học sinh · 102 tin nhắn |
+| Đã có lượt làm bài được chấm | 5 tài khoản học sinh · 11 lượt |
 
-## Tổng hợp
-
-- Chủ đề lặp nhiều nhất: __
-- Sửa gì trước demo (ghi `spec.md` §10): __
-- Giữ gì và vì sao: __
-- Để dành sau: __
+Hai nhóm tài khoản có thể trùng nhau. Database xác nhận các thao tác trên sản phẩm. Vai trò ngoài nhóm, nhiệm vụ giao trong buổi thử, điểm do dự và phản hồi nguyên văn chưa được xác nhận. [Khảo sát học sinh](../evidence/summary.md) ghi nhận riêng khó khăn khi ôn Toán.

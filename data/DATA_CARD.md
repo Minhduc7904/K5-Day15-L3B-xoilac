@@ -1,7 +1,7 @@
 # Data card — dữ liệu bản chạy thử dùng
 
 > Bản CP2 (27/11/2026). Nhóm có dữ liệu thật từ một trung tâm dạy thêm do một thành viên nhóm làm quản lý. Repo chỉ chứa **một mẫu nhỏ của dữ liệu câu hỏi** (1.279 câu); bản đầy đủ để ở máy nhóm, không commit. Không có dữ liệu học sinh thật, bản chạy thử dùng hồ sơ học sinh tự dựng.
-> Các cột `__` là chỗ nhóm điền khi dựng xong. Bằng chứng pain nằm ở `evidence/`, không nằm ở file dữ liệu này.
+Xem kết quả khảo sát và trích dẫn người dùng trong [tổng hợp bằng chứng](../evidence/summary.md).
 
 ## Dataset 1 · Ngân hàng câu hỏi Toán THPT (`data/question_bank.csv` là mẫu, `data/chapters.csv`)
 
@@ -36,7 +36,7 @@
 | Nhãn | `synthetic` |
 | Giới hạn | Hồ sơ dựng theo tình huống cần thử nên sạch hơn thực tế; không phản ánh phân bố lỗi của học sinh thật; không kết luận được tần suất hay mức độ pain từ dữ liệu này |
 
-**Cách sinh và kiểm:** script `data/make_student_results.py` · seed 42 · chạy 3 lần ra cùng file (md5 trùng) · script in tỉ lệ đúng/sai từng chương và khớp bảng hồ sơ ở trên (HS01 `12C1` 8/20 = 40%, các chương khác 75–83%; HS04 `11C6` 9/20 = 45%, `12C4` 10/20 = 50%, các chương khác ≥ 80%). Chưa có người kiểm tay (`__`).
+**Cách sinh và kiểm.** Script `data/make_student_results.py` dùng seed 42. Ba lần chạy cho cùng mã MD5. Tỷ lệ đúng từng chương do script tính khớp bảng hồ sơ trên. HS01 đúng 8/20 câu ở `12C1` (40%), các chương khác đạt 75–83%. HS04 đúng 9/20 câu ở `11C6` (45%) và 10/20 câu ở `12C4` (50%), các chương khác đạt ít nhất 80%. Chưa kiểm thủ công từng dòng.
 
 ## Dataset 3 · Đề PDF do admin nhập (dự kiến, **ngoài lát cắt CP2**)
 

@@ -77,6 +77,6 @@ Khung chỉ dùng thư viện chuẩn của Python. Thêm thư viện thì ghi v
 
 ## Quy ước của nhóm
 
-- Ngôn ngữ trả lời người dùng: __
-- Phong cách code / đặt tên: __
-- Ai duyệt thay đổi do agent tạo trước khi commit: __
+- Ngôn ngữ trả lời người dùng: tiếng Việt.
+- Phong cách code / đặt tên: theo module đang sửa. Dùng `snake_case` cho hàm và biến Python, `camelCase` cho biến và hàm TypeScript, `PascalCase` cho lớp và React component.
+- Ai duyệt thay đổi do agent tạo trước khi commit: Nguyễn Minh Đức (đội trưởng, Tech Lead) hoặc thành viên được Đức phân công.

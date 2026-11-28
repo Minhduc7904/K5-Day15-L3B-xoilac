@@ -113,6 +113,21 @@ ssh -i ./backend-key.pem ubuntu@<host> 'ADMIN_EMAIL=<email-admin> bash -s' < dep
 
 Nếu `ADMIN_PASSWORD` dưới 12 ký tự hoặc sai định dạng, `db-init` thoát mã 2, backend không khởi động và deploy quay về commit trước. Email đã thuộc một tài khoản student thì chỉ cảnh báo trong log, không làm deploy fail. Cách thêm admin khác và cứu hộ: [backend-auth.md](../architecture/backend-auth.md#cấp-tài-khoản-admin).
 
+## Tài khoản học sinh demo
+
+Lệnh dưới đây nạp tài khoản học sinh, hồ sơ lớp 12 và credit khởi tạo trong cùng giao dịch. Chạy thủ công trên EC2 từ `/opt/examind/app` sau khi image backend có module `app.cli.seed_demo_student`.
+
+```bash
+read -rsp 'Mật khẩu demo: ' demo_password
+printf '\n'
+printf '%s\n' "$demo_password" | docker compose --env-file /opt/examind/prod.env \
+  -f docker-compose.yml -f docker-compose.prod.yml exec -T backend \
+  python -m app.cli.seed_demo_student student-demo@example.com
+unset demo_password
+```
+
+Dùng mật khẩu từ 12 ký tự trở lên và chia sẻ riêng với giám khảo. Chạy lại với cùng email và mật khẩu sẽ giữ tài khoản, hồ sơ và credit hiện có. Sau khi thấy thông báo tài khoản sẵn sàng, đăng nhập qua web và kiểm tra hồ sơ lớp 12 cùng số dư credit.
+
 ## Worker học sinh
 
 Compose khởi động `student-worker` sau khi `db-init` chạy xong migration. Worker giữ một luồng kiểm credit và một luồng nhắc email độc lập. `daily-credit` cộng tối đa 100 khi sang ngày Việt Nam, trần 500. `study-reminders` dùng cùng cấu hình Gmail với backend và chỉ gửi đến email đã xác minh có lịch nhắc.
