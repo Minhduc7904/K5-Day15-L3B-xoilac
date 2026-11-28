@@ -319,3 +319,65 @@ async def test_student_plan_reaches_the_model_context(live):
         bad = await client.post(f"{BASE}/sessions/{sid}/messages",
                                 json={"text": "x", "plan": {"chapter_counts": {"12C1": 99}}})
         assert bad.status_code == 422
+
+
+def _thpt(version, parts, duration=90):
+    sections = [{"order": order, "title": f"Phần {order}", "question_type": kind, "count": count,
+                 "points_per_question": None, "difficulty_distribution": None, "chapter_codes": None}
+                for order, (kind, count) in enumerate(parts, 1)]
+    return {"template_id": int(version), "name": f"Tốt nghiệp THPT {version}", "exam_type": "THPT", "grade": None,
+            "version_label": version, "duration_minutes": duration, "source": "Đề minh hoạ",
+            "total_questions": sum(count for _, count in parts), "status": "APPROVED", "sections": sections}
+
+
+class FakeTemplates:
+    def __init__(self, items):
+        self.items = items
+
+    async def find(self, exam_type, grade, version_label):
+        return [item for item in self.items if item["exam_type"] == exam_type]
+
+
+THPT_TEMPLATES = FakeTemplates([_thpt("2024", [("SINGLE_CHOICE", 3)]),
+                                _thpt("2025", [("SINGLE_CHOICE", 12), ("TRUE_FALSE", 4), ("SHORT_ANSWER", 6)]),
+                                _thpt("2023", [("SINGLE_CHOICE", 5)])])
+
+
+async def _student_preparing(client, period, email, grade=12):
+    await login_as(client, email)
+    profile = await client.put(PROFILE, json={"school_name": "THPT Mẫu", "grade": grade, "target_score": 8,
+                                              "exam_period": period, "study_days": [1, 3]})
+    assert profile.status_code == 200, profile.text
+    return await new_session(client, None)
+
+
+async def test_unstated_structure_defaults_to_newest_template_of_the_students_exam(live):
+    live.return_value = ChatAction(action="chapter", chapters=["12C4"])
+    async with chat_client(real_auth=True, templates=THPT_TEMPLATES) as client:
+        sid = await _student_preparing(client, "national_high_school", "default-thpt@example.com")
+        reply, preview, _ = await say(client, sid, "Ôn chương nguyên hàm")
+    structure = preview["structure"]
+    assert "Tốt nghiệp THPT 2025" in reply and "22 câu" in reply and "12 trắc nghiệm" in reply
+    assert sum(c["count"] for c in structure["chapters"]) == 22 and structure["duration_minutes"] == 90
+    assert structure["type_counts"] == {"SINGLE_CHOICE": 12, "TRUE_FALSE": 4, "SHORT_ANSWER": 6}
+    assert {c["code"] for c in structure["chapters"]} <= {"12C4", "12C41", "12C42"}
+
+
+@pytest.mark.parametrize("action", [ChatAction(action="chapter", chapters=["12C4"], total=5),
+                                    ChatAction(action="chapter", chapters=["12C4"], type_counts={"TRUE_FALSE": 4})])
+async def test_student_stated_structure_is_not_replaced_by_template(live, action):
+    live.return_value = action
+    async with chat_client(real_auth=True, templates=THPT_TEMPLATES) as client:
+        sid = await _student_preparing(client, "national_high_school", "stated-thpt@example.com")
+        reply, preview, _ = await say(client, sid, "Ôn nguyên hàm")
+    assert "lấy theo mẫu" not in reply
+    assert sum(c["count"] for c in preview["structure"]["chapters"]) == (5 if action.total else 4)
+
+
+async def test_without_template_for_the_exam_keeps_generic_default(live):
+    live.return_value = ChatAction(action="chapter", chapters=["12C4"])
+    async with chat_client(real_auth=True, templates=THPT_TEMPLATES) as client:
+        sid = await _student_preparing(client, "final_1", "default-ck1@example.com")
+        reply, preview, _ = await say(client, sid, "Ôn chương nguyên hàm")
+    assert "lấy theo mẫu" not in reply
+    assert sum(c["count"] for c in preview["structure"]["chapters"]) == 10

@@ -33,7 +33,9 @@ from app.usecase.exam_preview_rules import (
     apply_edit, ensure_valid, matrix_plan, new_structure,
 )
 from app.usecase.exam_scoring import allocate_points
-from app.usecase.exam_template_plan import TemplateConflict, TemplatePreviewStructure, apply_template_edit, from_template
+from app.usecase.exam_template_plan import (
+    TYPE_NAME, TemplateConflict, TemplatePreviewStructure, apply_template_edit, from_template,
+)
 
 
 log = logging.getLogger(__name__)
@@ -387,6 +389,34 @@ class LiveExamChat(ExamChatUseCase):
                                     preview_version=turn.preview.version if turn.preview else None))
         session.updated_at = datetime.now(timezone.utc)
 
+    async def _exam_defaults(self, student: dict) -> dict | None:
+        """Structure of the newest approved template for the student's exam, or None to keep the generic default."""
+        exam_type = student.get("exam_type")
+        if not exam_type:
+            return None
+        grade = student.get("grade") if exam_type in {"GK1", "GK2", "CK1", "CK2"} else None
+        found = await self._templates.find(exam_type, grade, None)
+        if not found:
+            return None
+        newest = max(found, key=lambda item: int(match.group()) if (match := re.search(r"[0-9]{4}", item.get("version_label") or "")) else 0)
+        template = from_template(newest)
+        if not 1 <= template.total <= MAX_TOTAL:
+            return None
+        types: dict[str, int] = {}
+        levels: dict[str, int] = {}
+        for section in template.sections:
+            types[section.question_type] = types.get(section.question_type, 0) + section.count
+            for level, count in (section.difficulty_distribution or {}).items():
+                levels[level] = levels.get(level, 0) + count
+        label = template.template_name + (f" ({template.version_label})" if template.version_label and template.version_label not in template.template_name else "")
+        note = (f"Em chưa nêu cấu trúc đề nên mình lấy theo mẫu {label}: {template.total} câu ("
+                + ", ".join(f"{count} {TYPE_NAME.get(kind, kind)}" for kind, count in types.items()) + ")"
+                + (f", {template.duration_minutes} phút" if template.duration_minutes else "") + ". Em muốn đổi thì nói số câu mình chỉnh.")
+        return {"total": template.total, "type_counts": types,
+                "difficulty_counts": levels if sum(levels.values()) == template.total else None,
+                "duration_minutes": template.duration_minutes, "reason": f"Theo cấu trúc mẫu đã duyệt {label}.",
+                "note": note}
+
     async def _dispatch(self, sid, requester, current, action: ChatAction, context):
         kind = action.action
         if kind == "unsupported":
@@ -413,16 +443,31 @@ class LiveExamChat(ExamChatUseCase):
         if kind == "chapter" or (kind == "edit" and context["preview"] is None and action.chapters):
             if not action.chapters and not action.chapter_counts:
                 return ChatTurn("Em muốn ôn chương hoặc chủ đề nào?")
-            total = (action.total or sum(action.chapter_counts.values()) or sum(action.type_counts.values())
-                     or sum(action.difficulty_counts.values()) or DEFAULT_TOTAL)
+            # No structure stated: the student's own exam (from the profile) supplies the newest approved structure.
+            stated = (action.total or action.chapter_counts or action.type_counts or action.difficulty_counts
+                      or action.rows)
+            defaults = None if stated else await self._exam_defaults(context["student"])
+            total = defaults["total"] if defaults else (
+                action.total or sum(action.chapter_counts.values()) or sum(action.type_counts.values())
+                or sum(action.difficulty_counts.values()) or DEFAULT_TOTAL)
             if not 1 <= total <= MAX_TOTAL:
                 raise PreviewRuleError(["Mỗi đề cần từ 1 đến 50 câu."])
             codes = action.chapters or list(action.chapter_counts)
             if set(codes) - context["catalog"].keys():
                 raise PreviewRuleError(["Em chọn chương có trong danh mục nhé."])
             structure = new_structure(allocate(total, dict.fromkeys(codes, 1)))
-            structure = await self._edited(structure, self._action_edit(action, include_chapters=False))
-            return await self._stage(sid, structure, current, reason="Theo yêu cầu ôn tập của em.")
+            edit = self._action_edit(action, include_chapters=False)
+            if defaults:
+                edit = edit.model_copy(update={
+                    "type_counts": defaults["type_counts"], "difficulty_counts": defaults["difficulty_counts"],
+                    "duration_minutes": edit.duration_minutes if edit.duration_minutes is not None
+                    else defaults["duration_minutes"]})
+            structure = await self._edited(structure, edit)
+            turn = await self._stage(sid, structure, current, reason=defaults["reason"] if defaults
+                                     else "Theo yêu cầu ôn tập của em.")
+            if defaults:
+                turn.reply = defaults["note"] + "\n" + turn.reply
+            return turn
         if not current or current.status == "CANCELLED":
             return ChatTurn("Phiên này chưa có cấu trúc đề. Em muốn ôn chương nào hoặc theo mẫu nào?")
         structure = load_structure(current)
