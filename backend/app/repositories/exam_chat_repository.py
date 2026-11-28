@@ -49,6 +49,7 @@ class ExamChatRepository:
     async def rename_session(self, session: ExamChatSession, title: str) -> None:
         session.title = title
         await self._session.commit()
+        await self._session.refresh(session)
 
     async def hide_session(self, session: ExamChatSession) -> None:
         """Ẩn khỏi danh sách đoạn chat. Đề nháp của phiên vẫn còn để "Đề của tôi" và lượt làm bài dùng tiếp."""
