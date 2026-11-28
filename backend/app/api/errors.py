@@ -21,6 +21,7 @@ from app.usecase.auth import (
     SessionRevoked,
 )
 from app.usecase.user_management import CannotModifyRoot, CannotModifySelf, UserNotFound
+from app.usecase.admin_questions import InvalidMedia, InvalidQuestion, MediaNotFound, QuestionNotFound
 
 from app.usecase.student_auth import (
     EmailUnavailable, ExpiredOtp, InvalidChallenge, InvalidGoogleLogin, InvalidOtp, InvalidResetToken, ResendLimited,
@@ -50,6 +51,11 @@ _STATUS: dict[type[AuthError], int] = {
     UserNotFound: status.HTTP_404_NOT_FOUND,
     CannotModifyRoot: status.HTTP_403_FORBIDDEN,
     CannotModifySelf: status.HTTP_403_FORBIDDEN,
+    # Ngân hàng câu hỏi và danh mục chương (#11).
+    QuestionNotFound: status.HTTP_404_NOT_FOUND,
+    InvalidQuestion: 422,
+    MediaNotFound: status.HTTP_404_NOT_FOUND,
+    InvalidMedia: 422,
 }
 
 # Phiên trong cookie không còn dùng được: xoá cookie để trình duyệt khỏi gửi lại.
