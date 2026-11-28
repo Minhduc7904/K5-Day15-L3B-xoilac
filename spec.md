@@ -164,7 +164,7 @@ flowchart LR
 - Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 27 câu từ CP3 (thuong 8 · kho 12 · tu_choi 7, trong đó 2 câu tấn công; 13 câu đầu giữ nguyên từ CP2) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
 - Nguồn bộ câu thử: `nguoi_dung` 5 (B14–B18, nguyên văn câu 9 của khảo sát) · `data_that` 5 (B19–B23, số liệu ngân hàng thật) · `tu_viet` 17 → từ người dùng / data thật 10/27, đạt mốc ≥1/3 của `run.py check`. Chi tiết `eval/README.md` mục 2.
 - **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua (≥ 11/13), và 100% câu tu_choi qua (4/4), và 0 mã câu ngoài ngân hàng hoặc câu tự viết trong mọi đề nháp (metric `cau_trong_ngan_hang` 100%)". Ngưỡng từng metric nằm trong `eval/metric_spec.yaml`: `chuong_yeu_dung` ≥ 3/4 câu thuong · `xu_ly_kho_khong_doan` ≥ 4/5 câu kho.
-- Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Kết quả: lượt 1 22/27 (81%) · lượt 2 __/__ (__%) — run ID: `run-1@20261128-090856` / __ (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
 - Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
