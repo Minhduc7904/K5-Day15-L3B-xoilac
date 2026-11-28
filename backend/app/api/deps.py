@@ -15,6 +15,7 @@ from app.repositories.student_profiles import StudentProfileRepository
 from app.repositories.exam_attempts import ExamAttemptRepository
 from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.exam_template_repository import ExamTemplateRepository
+from app.repositories.notifications import NotificationRepository
 from app.repositories.pdf_imports import PdfImportRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.repositories.sample_item_repository import SampleItemRepository
@@ -40,6 +41,7 @@ from app.usecase.live_exam_chat import LiveExamChat
 from app.service.exam_chat_model import ExamChatModel
 from app.service.exam_chat_ocr import ExamChatOcr
 from app.usecase.exam_templates import ExamTemplateUseCase
+from app.usecase.notifications import Notifications
 from app.usecase.pdf_imports import PdfImportUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
@@ -203,6 +205,13 @@ def get_student_profile(session: SessionDep) -> StudentProfileUseCase:
 
 
 StudentProfileDep = Annotated[StudentProfileUseCase, Depends(get_student_profile)]
+
+
+def get_notifications(session: SessionDep) -> Notifications:
+    return Notifications(NotificationRepository(session))
+
+
+NotificationsDep = Annotated[Notifications, Depends(get_notifications)]
 
 
 @lru_cache

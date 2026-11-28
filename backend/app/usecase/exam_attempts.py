@@ -5,6 +5,7 @@ from json import dumps
 
 from app.models.exam_attempt import ExamAttempt
 from app.repositories.exam_attempts import ExamAttemptRepository
+from app.repositories.notifications import NotificationRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.schemas.exam_attempt import AttemptSave
 from app.schemas.exam_chat import DraftItem
@@ -225,6 +226,14 @@ class ExamAttempts:
         attempt.finished_at, attempt.graded_at, attempt.reason = finished, now, reason
         attempt.status = "graded"
         attempt.revision += 1
+        if reason == "timeout":
+            # Cùng giao dịch với việc chấm: worker và API mở lại lượt đều đi qua đây, dedupe_key chặn thông báo lặp.
+            await NotificationRepository(self.repo.session).add(
+                attempt.user_id, "attempt_graded", "Hết giờ, bài đã được tự động nộp và chấm",
+                body=f"{attempt.snapshot.get('title') or 'Đề luyện tập'}: {attempt.result['score']:g}/10 điểm.",
+                link=f"/results/online-{attempt.attempt_id}", dedupe_key=f"attempt:{attempt.attempt_id}:finished",
+                payload={"attempt_id": attempt.attempt_id},
+            )
         await self.repo.commit()
 
     async def _expire(self, attempt: ExamAttempt, now: datetime) -> bool:

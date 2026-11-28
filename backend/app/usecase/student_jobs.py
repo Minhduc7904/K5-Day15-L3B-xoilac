@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.study_time import STUDY_TZ, study_date
 from app.repositories.credits import CREDIT_LIMIT, DAILY_CREDITS, CreditRepository
+from app.repositories.notifications import NotificationRepository
 from app.repositories.study_reminders import MAX_ATTEMPTS, StudyReminderRepository
 from app.service.email_service import (
     EmailConfigurationError, EmailDeliveryError, GmailEmailService, RejectedEmailError, RetryableEmailError,
@@ -30,9 +31,16 @@ class DailyCreditJob:
             async with self._sessions.begin() as session:
                 credits = CreditRepository(session)
                 accounts = await credits.lock_due_accounts(day, BATCH_SIZE)
+                notifications = NotificationRepository(session)
                 for account in accounts:
                     amount = min(DAILY_CREDITS, CREDIT_LIMIT - account.balance)
                     credits.apply_daily_grant(account, day, amount)
+                    if amount:
+                        await notifications.add(
+                            account.user_id, "credit_granted", f"Đã cộng {amount} credit hằng ngày",
+                            body=f"Số dư hiện tại: {account.balance}/{CREDIT_LIMIT} credit.", link="/profile#credit",
+                            dedupe_key=f"credit:{day.isoformat()}",
+                        )
                     processed += 1
                     granted += int(amount > 0)
             if len(accounts) < BATCH_SIZE:
@@ -105,4 +113,9 @@ class StudyReminderJob:
             await StudyReminderRepository(session).finish(
                 user_id, day, status, next_attempt_at=next_attempt, sent_at=sent_at, message_id=message_id,
             )
+            if status == "sent":
+                await NotificationRepository(session).add(
+                    user_id, "study_reminder", "Đến giờ ôn luyện", body="Mở Examind để làm một đề theo lịch bạn đã chọn.",
+                    link="/dashboard", dedupe_key=f"reminder:{day.isoformat()}",
+                )
         return "retry" if status == "pending" else status

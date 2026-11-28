@@ -10,6 +10,7 @@ from app.api.v1 import (
     exam_templates,
     google_auth,
     health,
+    notifications,
     sample_files,
     sample_items,
     student_profile,
@@ -20,6 +21,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(student_profile.router)
+api_router.include_router(notifications.router)
 api_router.include_router(google_auth.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_accounts.router)
