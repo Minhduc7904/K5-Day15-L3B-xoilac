@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from app.usecase.exam_preview_rules import PreviewEdit, PreviewStructure
 from app.usecase.exam_template_plan import TemplatePreviewStructure
@@ -32,9 +32,29 @@ class SessionListItem(SessionOut):
     title: str
 
 
+class SessionRename(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+    @field_validator("title")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Tên đoạn chat không được để trống")
+        return value.strip()
+
+
+class StudentPlan(BaseModel):
+    """Tổng quan học sinh vừa chỉnh trên bảng cấu trúc, nhờ agent phân bổ lại thành ma trận chi tiết."""
+
+    chapter_counts: dict[str, Annotated[int, Field(ge=1, le=50)]] = Field(default_factory=dict, max_length=20)
+    type_counts: dict[str, Annotated[int, Field(ge=1, le=50)]] = Field(default_factory=dict, max_length=5)
+    difficulty_counts: dict[Literal["NB", "TH", "VD", "VDC"], Annotated[int, Field(ge=0, le=50)]] = Field(default_factory=dict)
+
+
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     version: int | None = Field(None, ge=0)
+    plan: StudentPlan | None = None
 
 
 class AttachmentOut(BaseModel):

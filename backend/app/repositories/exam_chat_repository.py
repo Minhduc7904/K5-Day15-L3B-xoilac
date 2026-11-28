@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import noload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,9 +41,19 @@ class ExamChatRepository:
                 ExamChatMessage.session_id == ExamChatSession.session_id, ExamChatMessage.role == "student",
             ).order_by(ExamChatMessage.message_id).limit(1).scalar_subquery()
         )
-        query = (select(ExamChatSession, first_message).where(ExamChatSession.user_id == user_id)
+        query = (select(ExamChatSession, first_message)
+                 .where(ExamChatSession.user_id == user_id, ExamChatSession.deleted_at.is_(None))
                  .order_by(ExamChatSession.updated_at.desc(), ExamChatSession.session_id.desc()))
         return (await self._session.execute(query)).all()
+
+    async def rename_session(self, session: ExamChatSession, title: str) -> None:
+        session.title = title
+        await self._session.commit()
+
+    async def hide_session(self, session: ExamChatSession) -> None:
+        """Ẩn khỏi danh sách đoạn chat. Đề nháp của phiên vẫn còn để "Đề của tôi" và lượt làm bài dùng tiếp."""
+        session.deleted_at = func.now()
+        await self._session.commit()
 
     async def message_page(self, session_id: int, before: int | None, limit: int):
         query = select(ExamChatMessage).where(ExamChatMessage.session_id == session_id)
