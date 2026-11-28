@@ -8,10 +8,8 @@ import { Alert } from '@/components/ui/feedback';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-import { mockMode } from '@/lib/config';
 import { authApi } from '../api';
-import { AuthHeader, AuthSwitch, MockNote } from '../components/auth-shell';
-import { MOCK_OTP } from '../mock';
+import { AuthHeader, AuthSwitch } from '../components/auth-shell';
 import { readResetFlow, writeResetFlow } from '../reset-flow';
 import { toAuthError } from '../types';
 import { useAuthForm } from '../use-auth-form';
@@ -20,7 +18,8 @@ import { normalizeEmail, validateEmail } from '../validation';
 export function ForgotPasswordForm() {
   const router = useRouter();
   const toast = useToast();
-  const [networkError, setNetworkError] = useState(false);
+  /** Thông báo khi chưa gửi được mã: lỗi mạng, gửi quá nhiều lần (429) hoặc máy chủ thư lỗi (503). */
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const form = useAuthForm({ email: '' }, (v) => ({ email: validateEmail(v.email) }));
 
@@ -32,7 +31,7 @@ export function ForgotPasswordForm() {
   }, []);
 
   const submit = form.handleSubmit(async ({ email }) => {
-    setNetworkError(false);
+    setSendError(null);
     const normalized = normalizeEmail(email);
     try {
       await authApi.forgotPassword(normalized);
@@ -40,13 +39,14 @@ export function ForgotPasswordForm() {
       toast({
         tone: 'success',
         title: 'Đã gửi mã xác minh',
-        description: mockMode ? `Mock: mã của bạn là ${MOCK_OTP}.` : 'Kiểm tra hộp thư, kể cả mục Spam.',
+        description: 'Kiểm tra hộp thư, kể cả mục Spam.',
       });
       router.push('/verify-otp');
     } catch (error) {
       const authError = toAuthError(error);
       if (authError.code === 'VALIDATION') form.setServerErrors({ email: 'Email chưa đúng định dạng.' });
-      else setNetworkError(true);
+      else if (authError.code === 'NETWORK') setSendError('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại nhé.');
+      else setSendError(authError.message);
     }
   });
 
@@ -59,7 +59,7 @@ export function ForgotPasswordForm() {
         description="Nhập email bạn đã đăng ký. Mình sẽ gửi mã xác minh 6 số để bạn đặt lại mật khẩu."
       />
 
-      {networkError && (
+      {sendError && (
         <Alert
           tone="danger"
           title="Chưa gửi được mã"
@@ -69,7 +69,7 @@ export function ForgotPasswordForm() {
             </Button>
           }
         >
-          Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại nhé.
+          {sendError}
         </Alert>
       )}
 
@@ -101,11 +101,6 @@ export function ForgotPasswordForm() {
       </form>
 
       <AuthSwitch question="Nhớ ra mật khẩu rồi?" href="/login" label="Đăng nhập" />
-
-      <MockNote>
-        Dùng <code>hs01@example.com</code> để nhận mã thật trong mock. Email chưa đăng ký vẫn báo đã gửi (để không lộ tài
-        khoản) nhưng mã sẽ không dùng được.
-      </MockNote>
     </div>
   );
 }

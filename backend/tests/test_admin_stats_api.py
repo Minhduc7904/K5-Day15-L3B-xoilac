@@ -1,21 +1,28 @@
-"""API GET /api/v1/admin/stats/online-students (#20), đọc từ PresenceRegistry giả lập bằng bản trong bộ nhớ."""
+"""API GET /api/v1/admin/stats/online-students (#20), đọc PresenceRegistry của app.state.realtime (thay bằng bản mới)."""
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 
-from app.api.deps import get_presence_registry
 from app.main import app
-from app.service.presence_service import InMemoryPresenceRegistry
+from app.service.presence import PresenceRegistry, SocketConnection
 from tests.conftest import new_password
 from tests.test_auth import API, COOKIE, make_admin, register
 
 STATS = f"{API}/admin/stats/online-students"
 
 
+class Presence(PresenceRegistry):
+    """PresenceRegistry của main với cách gọi ngắn cho test: connect(sid, user_id, role, session_id)."""
+
+    def connect(self, sid: str, user_id: int, role: str, session_id: int) -> None:
+        self.add(sid, SocketConnection(user_id=user_id, session_id=session_id, role=role))
+
+
 @pytest.fixture
-def presence(client):
-    registry = InMemoryPresenceRegistry()
-    app.dependency_overrides[get_presence_registry] = lambda: registry
+def presence(client, monkeypatch):
+    registry = Presence()
+    monkeypatch.setitem(app.state._state, "realtime", SimpleNamespace(presence=registry))
     return registry
 
 
@@ -50,15 +57,15 @@ async def test_counts_two_tabs_as_one_student(client, presence, admin_h):
     assert body["as_of"].endswith("Z")
     datetime.fromisoformat(body["as_of"].replace("Z", "+00:00"))
 
-    await presence.connect("a1", 11, "student", 1)
-    await presence.connect("a2", 11, "student", 1)  # hai tab học sinh A
-    await presence.connect("b1", 12, "student", 2)
-    await presence.connect("adm", 99, "admin", 9)  # admin không tính
+    presence.connect("a1", 11, "student", 1)
+    presence.connect("a2", 11, "student", 1)  # hai tab học sinh A
+    presence.connect("b1", 12, "student", 2)
+    presence.connect("adm", 99, "admin", 9)  # admin không tính
     body = (await client.get(STATS, headers=admin_h)).json()
     assert (body["online_students"], body["connections"]) == (2, 3)
 
-    await presence.disconnect("a1")
-    await presence.disconnect("a2")
+    presence.remove("a1")
+    presence.remove("a2")
     body = (await client.get(STATS, headers=admin_h)).json()
     assert (body["online_students"], body["connections"]) == (1, 1)
 
@@ -67,9 +74,9 @@ async def test_include_users_with_names_and_paging(client, presence, admin_h):
     a = (await register(client, email="a@example.com", display_name="Học sinh A")).json()
     b = (await register(client, email="b@example.com")).json()
     client.cookies.clear()
-    await presence.connect("a1", a["user_id"], "student", 1)
-    await presence.connect("a2", a["user_id"], "student", 1)
-    await presence.connect("b1", b["user_id"], "student", 2)
+    presence.connect("a1", a["user_id"], "student", 1)
+    presence.connect("a2", a["user_id"], "student", 1)
+    presence.connect("b1", b["user_id"], "student", 2)
 
     body = (await client.get(STATS, params={"include": "users"}, headers=admin_h)).json()
     assert body["page"] == 1 and body["page_size"] == 20

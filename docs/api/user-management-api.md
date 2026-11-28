@@ -131,24 +131,9 @@ Tạo tài khoản: admin thường tạo được học sinh; tạo admin thì 
 
 Hệ thống luôn còn ít nhất một admin, vì admin gốc không khoá hay hạ được. Vì vậy API này không có luật "admin cuối" (`LAST_ADMIN`) như `/admin/accounts` cũ.
 
-## Hướng dẫn mock cho frontend
-
-Dùng tài khoản mock của [auth-api.md](auth-api.md#hướng-dẫn-mock-cho-frontend). Khi mock, coi `admin@example.com` là **admin gốc** (`is_root: true`). Muốn thử giao diện của admin thường thì thêm một admin mock khác với `is_root: false`. Trạng thái giữ trong bộ nhớ.
-
-| Request | Mock trả |
-| --- | --- |
-| `GET /api/v1/admin/users?...` | 200 `UserListOut`, lọc và phân trang trên mảng trong bộ nhớ |
-| `POST /api/v1/admin/users` email mới | 201 `UserAdminOut`, `created_by` = user mock đang đăng nhập |
-| `POST` email đã có | 409 `{"detail": "Email này đã được đăng ký", "code": "EMAIL_TAKEN"}` |
-| `PATCH` dòng admin gốc với `status`/`role`/`email` | 403 `{"detail": "Không thể khóa, đổi vai trò, đổi email hay đặt lại mật khẩu của admin gốc", "code": "CANNOT_MODIFY_ROOT"}` |
-| `PATCH` chính mình `{"status": "disabled"}` | 403 `{"detail": "Không thể tự khóa hoặc tự hạ vai trò của chính mình", "code": "CANNOT_MODIFY_SELF"}` |
-| Admin thường `PATCH` dòng admin | 403 `{"detail": "Tài khoản không có quyền dùng chức năng này", "code": "FORBIDDEN_ROLE"}` |
-| `GET /api/v1/admin/users/999` | 404 `{"detail": "Không có tài khoản này", "code": "USER_NOT_FOUND"}` |
-| `POST /api/v1/admin/users/{id}/reset-password` | 204 |
-
 ## Luồng kiểm thử
 
-Đã chạy ngày 2026-11-28 trên PostgreSQL 16 của `docker compose`, backend chạy `uvicorn app.main:asgi_app`. Admin gốc do `ensure_admin` tạo trong `db-init`. Mật khẩu và token đã thay bằng `***`.
+Đã chạy ngày 2026-11-28 trên PostgreSQL 16 của `docker compose`, backend chạy `uvicorn app.main:app`. Admin gốc do `ensure_admin` tạo trong `db-init`. Mật khẩu và token đã thay bằng `***`.
 
 ```bash
 B=http://localhost:8000/api/v1; H="Authorization: Bearer ***"; J='content-type: application/json'
@@ -160,7 +145,7 @@ curl -H "$H" -H "$J" -X PATCH $B/admin/users/1 -d '{"is_root":false}'          #
 curl -H "$H" $B/admin/users/9999                                                # 404 USER_NOT_FOUND
 ```
 
-Khoá một học sinh đang mở socket: xem kịch bản `scripts/socket_smoke.py` ở [realtime-api.md](realtime-api.md#luồng-kiểm-thử). Học sinh nhận `session:revoked` `{"reason": "disabled"}` ngay (đo được dưới 0,1 s trên máy local).
+Khoá một học sinh đang mở socket: xem kịch bản `scripts/socket_smoke.py` ở [realtime-api.md](realtime-api.md#lỗi-và-kiểm-thử). Học sinh nhận `session:revoked` `{"reason": "disabled"}` ngay (đo được dưới 0,1 s trên máy local).
 
 Test tự động: `cd backend && pytest -q tests/test_user_permissions.py tests/test_user_management_api.py`.
 

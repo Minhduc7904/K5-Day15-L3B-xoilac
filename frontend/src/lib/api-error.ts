@@ -17,10 +17,6 @@ export class ApiError extends Error {
   }
 }
 
-/** Chỉ các mã SESSION_* mới có nghĩa là mất phiên (xem docs/api/auth-api.md). */
-export const isSessionLost = (error: unknown) =>
-  error instanceof ApiError && (error.code.startsWith('SESSION_') || error.code === 'ACCOUNT_DISABLED');
-
 export function toApiError(error: unknown, fieldMessages: Record<string, string> = {}): ApiError {
   if (error instanceof ApiError) return error;
   if (!isAxiosError(error)) return new ApiError('UNKNOWN', 'Đã có lỗi không mong muốn.');

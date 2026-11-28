@@ -19,6 +19,15 @@ export interface RegisterInput {
   display_name?: string;
 }
 
+export type OtpPurpose = 'registration' | 'google_email';
+
+export interface PendingOtp {
+  challenge: string;
+  email: string;
+  expires_in: number;
+  resend_after: number;
+}
+
 export type AuthErrorCode =
   // Có trong hợp đồng backend #8
   | 'INVALID_CREDENTIALS'
@@ -32,6 +41,12 @@ export type AuthErrorCode =
   | 'OTP_INVALID'
   | 'OTP_EXPIRED'
   | 'TOO_MANY_ATTEMPTS'
+  | 'OTP_RESEND_LIMIT'
+  | 'INVALID_CHALLENGE'
+  | 'EMAIL_UNAVAILABLE'
+  | 'GOOGLE_INVALID'
+  | 'GOOGLE_UNAVAILABLE'
+  | 'GOOGLE_ACCOUNT_CONFLICT'
   | 'RESET_TOKEN_INVALID'
   // Phía client
   | 'VALIDATION'

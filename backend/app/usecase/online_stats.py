@@ -6,8 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from app.models.user import ROLE_STUDENT
 from app.repositories.user_repository import UserRepository
-from app.service.presence_service import PresenceRegistry
+from app.service.presence import PresenceRegistry
 
 
 @dataclass(frozen=True)
@@ -40,17 +41,18 @@ class OnlineStatsUseCase:
         self._now = now
 
     async def online_students(self, include_users: bool = False, page: int = 1, page_size: int = 20) -> OnlineStats:
-        students, connections = await self._presence.count_online_students()
+        counts = self._presence.connections_by_user(ROLE_STUDENT)
+        students, connections = len(counts), sum(counts.values())
         as_of = self._now()
         if not include_users:
             return OnlineStats(online_students=students, connections=connections, as_of=as_of)
 
-        online, _ = await self._presence.list_online_students(offset=(page - 1) * page_size, limit=page_size)
-        accounts = {u.user_id: u for u in await self._users.get_many([o.user_id for o in online])}
+        page_ids = sorted(counts)[(page - 1) * page_size : page * page_size]
+        accounts = {u.user_id: u for u in await self._users.get_many(page_ids)}
         listed = [
-            OnlineStudent(o.user_id, accounts[o.user_id].display_name, accounts[o.user_id].email, o.connections)
-            for o in online
-            if o.user_id in accounts
+            OnlineStudent(uid, accounts[uid].display_name, accounts[uid].email, counts[uid])
+            for uid in page_ids
+            if uid in accounts
         ]
         return OnlineStats(
             online_students=students,

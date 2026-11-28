@@ -42,7 +42,7 @@ Backend đọc cấu hình local từ `backend/.env`. Frontend có cấu hình c
 
 ### Realtime (issue #20)
 
-- Socket.IO (python-socketio) gắn cùng tiến trình với FastAPI tại `/api/socket.io` (`uvicorn app.main:asgi_app`). Client nối thẳng backend qua `NEXT_PUBLIC_SOCKET_URL` vì Vercel rewrites không chuyển WebSocket.
+- Socket.IO (python-socketio, `app/api/realtime.py`) gắn cùng tiến trình với FastAPI tại `/api/socket.io`. Client nối thẳng backend qua `NEXT_PUBLIC_SOCKET_URL` vì Vercel rewrites không chuyển WebSocket.
 - Xác thực bằng ticket một lần (`POST /api/v1/auth/socket-ticket`), vào room `role:student`/`role:admin` và `user:{id}`. Đăng xuất, khoá, đặt lại mật khẩu, hạ vai trò thì server gửi `session:revoked` và ngắt socket.
 - Ai đang online nằm trong bộ nhớ tiến trình, nên backend chạy **một worker**. Chi tiết: [backend-realtime.md](backend-realtime.md), hợp đồng: [realtime-api.md](../api/realtime-api.md).
 

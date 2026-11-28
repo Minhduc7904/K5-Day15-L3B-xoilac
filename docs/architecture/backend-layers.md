@@ -26,7 +26,7 @@ Thư mục hỗ trợ:
 - `app/schemas/`: Pydantic cho request và response.
 - `app/core/`: cấu hình (`config.py`, đọc `backend/.env`) và kết nối DB (`database.py`).
 - `app/api/deps.py`: nơi duy nhất ghép các lớp bằng dependency injection của FastAPI. Test thay thế phần phụ thuộc ở đây.
-- `app/api/socket/`: server Socket.IO (`server.py`, handler mỏng gọi `usecase/realtime.py`) và tên room (`rooms.py`). Xem [backend-realtime.md](backend-realtime.md).
+- `app/api/realtime.py`: server Socket.IO (`RealtimeServer`), room theo vai trò và ngắt socket khi thu hồi phiên. Xem [backend-realtime.md](backend-realtime.md).
 - `alembic/`: migration.
 
 ## Luồng dữ liệu và tích hợp
@@ -34,6 +34,8 @@ Thư mục hỗ trợ:
 Ví dụ `POST /api/v1/sample-items`: `api/v1/sample_items.py` nhận body đã kiểm bằng `SampleItemCreate` → `SampleItemUseCase.create` chuẩn hoá tên → `SampleItemRepository.add` ghi bằng session async → trả `SampleItemOut`.
 
 Ví dụ `POST /api/v1/sample-files`: router đọc tệp (tối đa 5 MB) → `SampleFileUseCase.upload` sinh khoá `samples/<uuid>` → `StorageService.put` gọi MinIO. `boto3` là đồng bộ nên được gọi trong threadpool.
+
+Backend có thể lấy `GmailEmailService` qua `get_email_service()` trong `app/api/deps.py`. Usecase có bước duyệt gửi gọi `await email_service.send(to=..., subject=..., text=...)` và nhận mã thư Gmail. Service báo `EmailConfigurationError` khi cấu hình thiếu hoặc bị tắt và `EmailDeliveryError` khi Google không xác nhận yêu cầu. Cấu hình nằm trong [runbook triển khai backend](../operations/deploy-backend-ci-cd.md#cấu-hình-otp-và-google).
 
 ## Quyết định và cách kiểm chứng
 

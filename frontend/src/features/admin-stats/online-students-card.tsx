@@ -1,31 +1,22 @@
 'use client';
 
 /** Ô "Học sinh online" cho admin (#20): gọi API thống kê, tự làm mới mỗi 15 giây. */
-import { RefreshCw, Users, Wifi } from 'lucide-react';
+import { RefreshCw, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { IconButton } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, Badge, Skeleton } from '@/components/ui/feedback';
+import { Alert, Skeleton } from '@/components/ui/feedback';
 import { ApiError, toApiError } from '@/lib/api-error';
-import { useAppSelector } from '@/store';
 import { adminStatsApi, type OnlineStats } from './api';
 
 const REFRESH_MS = 15_000;
 
-const SOCKET_LABEL = {
-  idle: { tone: 'neutral', text: 'Chưa nối' },
-  connecting: { tone: 'info', text: 'Đang nối' },
-  connected: { tone: 'success', text: 'Đã nối' },
-  reconnecting: { tone: 'warning', text: 'Đang nối lại' },
-  mock: { tone: 'neutral', text: 'Chế độ mock' },
-} as const;
 
 export function OnlineStudentsCard() {
   const [stats, setStats] = useState<OnlineStats | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [showList, setShowList] = useState(false);
   const [loading, setLoading] = useState(false);
-  const socket = SOCKET_LABEL[useAppSelector((s) => s.realtime.status)];
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -60,9 +51,6 @@ export function OnlineStudentsCard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge tone={socket.tone} icon={<Wifi aria-hidden="true" className="size-3.5" />}>
-            {socket.text}
-          </Badge>
           <IconButton label="Làm mới" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw aria-hidden="true" className={loading ? 'animate-spin' : undefined} />
           </IconButton>

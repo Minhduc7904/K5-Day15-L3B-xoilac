@@ -12,8 +12,9 @@ import { useToast } from '@/components/ui/toast';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
 import { signedIn } from '../auth-slice';
-import { AuthHeader, AuthSwitch, MockLoginHint, TextLink } from '../components/auth-shell';
-import { SignedInNotice } from '../components/signed-in-notice';
+import { homeFor } from '../route-guard';
+import { AuthHeader, AuthSwitch, TextLink } from '../components/auth-shell';
+import { GoogleSignIn } from '../components/google-sign-in';
 import { toAuthError, type AuthErrorCode } from '../types';
 import { useAuthForm } from '../use-auth-form';
 import { normalizeEmail, validateEmail, validateLoginPassword } from '../validation';
@@ -69,7 +70,7 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
       const user = await authApi.login({ email: normalizeEmail(email), password });
       dispatch(signedIn(user));
       toast({ tone: 'success', title: `Chào ${user.display_name ?? 'bạn'}!`, description: 'Đăng nhập thành công.' });
-      router.push(user.role === 'admin' ? '/admin' : '/');
+      router.replace(homeFor(user));
     } catch (error) {
       const authError = toAuthError(error);
       if (authError.code === 'VALIDATION' && authError.fieldErrors) {
@@ -90,8 +91,6 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
         title="Đăng nhập"
         description="Chào bạn quay lại! Đăng nhập để tiếp tục ôn tập."
       />
-
-      <SignedInNotice />
 
       {alert && (
         <Alert
@@ -150,14 +149,9 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
         </Button>
       </form>
 
-      <AuthSwitch question="Chưa có tài khoản?" href="/register" label="Tạo tài khoản" />
+      <GoogleSignIn />
 
-      <MockLoginHint
-        onPick={(email, password) => {
-          setFailure(null);
-          form.patch({ email, password });
-        }}
-      />
+      <AuthSwitch question="Chưa có tài khoản?" href="/register" label="Tạo tài khoản" />
     </div>
   );
 }

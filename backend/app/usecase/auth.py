@@ -11,9 +11,10 @@ from app.models.session import UserSession
 from app.models.user import ROLE_ADMIN, ROLE_STUDENT, STATUS_ACTIVE, User
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import DuplicateEmailError, UserRepository
+from app.service.google_identity import GoogleIdentity
 from app.service.password_service import PasswordService
 from app.service.token_service import TokenService
-from app.usecase.ports import RealtimeNotifier
+from app.usecase.realtime_notifier import RealtimeNotifier, RevokeReason
 
 ROLES = (ROLE_STUDENT, ROLE_ADMIN)
 # Mật khẩu MỚI phải dài 8–128 ký tự (từ review PR #17; trước đó là 6). Đăng nhập không kiểm độ dài,
@@ -35,6 +36,11 @@ class AuthError(Exception):
 class EmailAlreadyRegistered(AuthError):
     code = "EMAIL_TAKEN"
     message = "Email này đã được đăng ký"
+
+
+class GoogleAccountConflict(AuthError):
+    code = "GOOGLE_ACCOUNT_CONFLICT"
+    message = "Email này không thể liên kết với tài khoản Google này"
 
 
 class InvalidCredentials(AuthError):
@@ -108,6 +114,21 @@ def ensure_role(current: CurrentUser, *roles: str) -> CurrentUser:
     return current
 
 
+def validate_session(
+    found: tuple[UserSession, User] | None, now: datetime,
+) -> tuple[UserSession, User]:
+    if found is None:
+        raise SessionInvalid()
+    row, user = found
+    if row.revoked_at is not None:
+        raise SessionRevoked()
+    if _aware(row.expires_at) <= now:
+        raise SessionExpired()
+    if user.status != STATUS_ACTIVE:
+        raise AccountDisabled()
+    return row, user
+
+
 class AuthUseCase:
     def __init__(
         self,
@@ -117,7 +138,7 @@ class AuthUseCase:
         tokens: TokenService,
         session_ttl_hours: int,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
-        notifier: RealtimeNotifier | None = None,
+        realtime: RealtimeNotifier | None = None,
     ) -> None:
         self._users = users
         self._sessions = sessions
@@ -125,16 +146,23 @@ class AuthUseCase:
         self._tokens = tokens
         self._ttl = timedelta(hours=session_ttl_hours)
         self._now = now
-        # Đăng xuất thì ngắt socket của phiên đó (#20). None: không có socket nào để ngắt (CLI, test).
-        self._notifier = notifier
+        self._realtime = realtime
 
-    async def register(
-        self, email: str, password: str, display_name: str | None = None, user_agent: str | None = None
+    async def prepare_registration(self, email: str, password: str) -> str:
+        if await self._users.get_by_email(email) is not None:
+            raise EmailAlreadyRegistered()
+        return await self._passwords.hash(password)
+
+    async def register_verified(
+        self, email: str, password_hash: str, display_name: str | None, user_agent: str | None
     ) -> tuple[User, str]:
-        """Đăng ký công khai: luôn tạo student và mở phiên. Trả (user, token)."""
-        user = await self.create_user(email, password, ROLE_STUDENT, display_name)
-        token = await self._open_session(user, user_agent)
-        return user, token
+        try:
+            user = await self._users.add(
+                email, password_hash, ROLE_STUDENT, display_name, verified_at=self._now(), commit=False
+            )
+        except DuplicateEmailError:
+            raise EmailAlreadyRegistered() from None
+        return user, await self._open_session(user, user_agent)
 
     async def create_user(
         self,
@@ -144,7 +172,7 @@ class AuthUseCase:
         display_name: str | None = None,
         created_by: int | None = None,
     ) -> User:
-        """Tạo tài khoản. Chỉ được gọi từ: register (student), CLI create_admin / ensure_admin (admin,
+        """Tạo tài khoản. Được dùng bởi CLI create_admin / ensure_admin (admin,
         created_by=None) và UserManagementUseCase.create_user (#20, created_by = admin đang thao tác)."""
         if role not in ROLES:
             raise InvalidInput(f"Vai trò không hợp lệ: {role}")
@@ -161,8 +189,8 @@ class AuthUseCase:
             raise EmailAlreadyRegistered() from None
 
     async def login(self, email: str, password: str, user_agent: str | None = None) -> tuple[User, str]:
-        user = await self._users.get_by_email(normalize_email(email))
-        if user is None:
+        user = await self._users.get_by_email(normalize_email(email), lock=True)
+        if user is None or user.password_hash is None:
             await self._passwords.verify_dummy(password)
             raise InvalidCredentials()
         if not await self._passwords.verify(user.password_hash, password):
@@ -170,31 +198,78 @@ class AuthUseCase:
         # Chỉ báo khóa khi mật khẩu đúng, để người ngoài không dò được tài khoản nào bị khóa.
         if user.status != STATUS_ACTIVE:
             raise AccountDisabled()
-        await self._users.set_last_login(user, self._now())
+        user.last_login_at = self._now()
         token = await self._open_session(user, user_agent)
         return user, token
 
-    async def get_current_user(self, token: str | None) -> CurrentUser:
-        """Kiểm phiên: tồn tại, chưa thu hồi, chưa hết hạn, user còn active. Cập nhật last_used_at."""
-        if not token:
-            raise SessionMissing()
-        found = await self._sessions.get_with_user(self._tokens.hash(token))
-        return await self._accept(found)
+    async def has_google_account(self, subject: str) -> bool:
+        return await self._users.get_by_google_subject(subject) is not None
 
-    async def get_current_user_by_session(self, session_id: int) -> CurrentUser:
-        """Như get_current_user nhưng tra theo session_id (ticket socket gắn với phiên, #20). Cùng luật kiểm."""
-        return await self._accept(await self._sessions.get_by_id_with_user(session_id))
+    async def google_login(self, identity: GoogleIdentity, user_agent: str | None) -> tuple[User, str]:
+        user = await self._users.get_by_google_subject(identity.subject, lock=True)
+        if user is None:
+            user = await self._users.get_by_email(identity.email, lock=True)
+        if user is None:
+            try:
+                user = await self._users.add(
+                    identity.email, None, ROLE_STUDENT, identity.name,
+                    verified_at=self._now(), google_subject=identity.subject, commit=False,
+                )
+            except DuplicateEmailError:
+                user = await self._users.get_by_google_subject(identity.subject, lock=True)
+                if user is None:
+                    user = await self._users.get_by_email(identity.email, lock=True)
+                if user is None:
+                    raise GoogleAccountConflict() from None
 
-    async def _accept(self, found: tuple[UserSession, User] | None) -> CurrentUser:
-        if found is None:
-            raise SessionInvalid()
-        row, user = found
-        if row.revoked_at is not None:
-            raise SessionRevoked()
-        if _aware(row.expires_at) <= self._now():
-            raise SessionExpired()
+        if user.role != ROLE_STUDENT or user.google_subject not in (None, identity.subject):
+            raise GoogleAccountConflict()
         if user.status != STATUS_ACTIVE:
             raise AccountDisabled()
+        revoke_old_sockets = user.google_subject is None and user.email_verified_at is None
+        if user.google_subject is None:
+            if revoke_old_sockets:
+                # A legacy password may have been set by someone who never owned the address.
+                await self._sessions.revoke_all_for_user(user.user_id, self._now())
+            try:
+                await self._users.link_google(user, identity.subject, self._now())
+            except DuplicateEmailError:
+                raise GoogleAccountConflict() from None
+        user.last_login_at = self._now()
+        token = await self._open_session(user, user_agent)
+        if revoke_old_sockets:
+            await self.revoke_user_sockets(user.user_id)
+        return user, token
+
+    async def password_reset_candidate(self, email: str) -> User | None:
+        """Tài khoản được tự đặt lại mật khẩu qua email: học sinh đang hoạt động. Admin dùng CLI."""
+        user = await self._users.get_by_email(normalize_email(email))
+        if user is None or user.role != ROLE_STUDENT or user.status != STATUS_ACTIVE:
+            return None
+        return user
+
+    async def set_password(self, user_id: int, password: str) -> bool:
+        """Đặt mật khẩu mới, thu hồi mọi phiên cũ rồi commit. Trả False nếu tài khoản không còn hợp lệ."""
+        if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
+            raise InvalidInput(f"Mật khẩu phải dài {PASSWORD_MIN}–{PASSWORD_MAX} ký tự")
+        user = await self._users.get(user_id)
+        if user is None or user.role != ROLE_STUDENT or user.status != STATUS_ACTIVE:
+            return False
+        user.password_hash = await self._passwords.hash(password)
+        if user.email_verified_at is None:
+            user.email_verified_at = self._now()
+        await self._sessions.revoke_all_for_user(user.user_id, self._now())
+        await self._users.commit()
+        await self.revoke_user_sockets(user.user_id, "password_reset")
+        return True
+
+    async def revoke_user_sockets(self, user_id: int, reason: RevokeReason | None = None) -> None:
+        if self._realtime is not None:
+            await self._realtime.revoke_user(user_id, reason)
+
+    async def get_current_user(self, token: str | None) -> CurrentUser:
+        """Kiểm phiên: tồn tại, chưa thu hồi, chưa hết hạn, user còn active. Cập nhật last_used_at."""
+        row, user = await self._load_session(token)
         await self._sessions.touch(row, self._now())
         return CurrentUser(user=user, session_id=row.session_id)
 
@@ -209,9 +284,14 @@ class AuthUseCase:
         row, _ = found
         if row.revoked_at is None:
             await self._sessions.revoke(row.session_id, self._now())
-        # Ngắt socket mở bằng ticket của CHÍNH phiên này; tab của phiên khác giữ nguyên (#20).
-        if self._notifier is not None:
-            await self._notifier.kick_session(row.session_id, "logout")
+        if self._realtime is not None:
+            await self._realtime.revoke_session(row.session_id, "logout")
+
+    async def _load_session(self, token: str | None) -> tuple[UserSession, User]:
+        if not token:
+            raise SessionMissing()
+        found = await self._sessions.get_with_user(self._tokens.hash(token))
+        return validate_session(found, self._now())
 
     async def _open_session(self, user: User, user_agent: str | None) -> str:
         token = self._tokens.generate()

@@ -7,7 +7,7 @@ Cần backend chạy với một admin (vd admin gốc do ensure_admin tạo) v�
 Script tự đăng ký hai học sinh mới (email ngẫu nhiên, mật khẩu ngẫu nhiên), rồi đi kịch bản:
   A mở 2 kết nối, B mở 1 → thống kê 2 học sinh / 3 kết nối
   đóng 2 kết nối của A → 1 / 1
-  dùng lại một ticket → bị từ chối (TICKET_INVALID)
+  dùng lại một ticket → bị từ chối
   admin khoá B → B nhận session:revoked {reason: disabled}, thống kê về 0 / 0
   A mở kết nối mới rồi đăng xuất → A nhận session:revoked {reason: logout}
 Không in mật khẩu hay token. Thoát mã 0 nếu mọi bước đạt.
@@ -122,8 +122,8 @@ async def main(base: str, admin_email: str, admin_password: str) -> int:
 
         reuse = Conn("A-reuse")
         refused = not await reuse.open(base, ticket_a1)
-        code = reuse.refused[0].get("data", {}).get("code") if reuse.refused else None
-        step("Dùng lại ticket đã dùng", refused and code == "TICKET_INVALID", f"bị từ chối, code={code}")
+        # Server từ chối handshake bằng connect_error chung (không có mã lỗi riêng).
+        step("Dùng lại ticket đã dùng", refused and bool(reuse.refused), f"bị từ chối: {reuse.refused[0] if reuse.refused else '-'}")
 
         b_id = (await api.me(token_b))["user_id"]
         r = await http.patch(f"/api/v1/admin/users/{b_id}", json={"status": "disabled"}, headers=api.h(admin))

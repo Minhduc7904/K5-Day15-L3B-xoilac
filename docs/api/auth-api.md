@@ -30,13 +30,13 @@ Tài liệu này mô tả các endpoint đăng ký, đăng nhập, đăng xuất
 
 ### POST /auth/register
 
-Công khai. Tạo tài khoản **student** và đăng nhập luôn.
+Công khai. Gửi mã OTP 6 số. Tạo tài khoản học sinh và phiên sau khi OTP được xác minh.
 
 ```json
 // request
 {"email": " HS01@Example.com ", "password": "<mat-khau-cua-ban>", "display_name": "Học sinh 01"}
-// 201 + set-cookie: examind_session=<token>; HttpOnly; Max-Age=604800; Path=/; SameSite=lax
-{"user_id": 1, "email": "hs01@example.com", "role": "student", "status": "active", "display_name": "Học sinh 01", "created_at": "2026-11-27T15:52:23.845134Z"}
+// 202, không đặt cookie
+{"challenge":"<ma-yeu-cau>","email":"hs01@example.com","expires_in":300,"resend_after":60}
 ```
 
 | Trường | Ràng buộc |
@@ -48,9 +48,25 @@ Công khai. Tạo tài khoản **student** và đăng nhập luôn.
 
 Tên miền dùng riêng như `.local`, `.test` bị coi là email sai định dạng (422).
 
+### POST /auth/otp/verify
+
+Nhận `{"challenge":"<ma-yeu-cau>","purpose":"registration","otp":"123456"}`. Mã đúng trả `201 UserOut` và đặt cookie phiên. Với `purpose: "google_email"`, mã đúng trả `200 UserOut`. Mỗi mã dùng một lần.
+
+### POST /auth/otp/resend
+
+Nhận `{"challenge":"<ma-yeu-cau>","purpose":"registration"}` hoặc mục đích `google_email`. Trả `202` với dữ liệu như bước đăng ký. Mã cũ hết hiệu lực. Chờ tối thiểu 60 giây giữa hai lượt gửi, tối đa 5 lượt mỗi email mỗi giờ cho mỗi mục đích.
+
+### Đăng nhập Google
+
+1. `POST /auth/google/start` nhận `{"challenge":"<S256-cua-verifier>"}` và trả `{"url":"<Google-OAuth-URL>"}`.
+2. Google chuyển hướng về `GET /api/auth/google/callback` trên backend. Backend kiểm token rồi chuyển trình duyệt về `/login/google#ticket=...` ở frontend.
+3. `POST /auth/google/exchange` nhận `{"ticket":"<ticket>","verifier":"<verifier>"}`. Trả `200 UserOut` và cookie hoặc trả `202` với yêu cầu OTP khi lần đầu dùng email có tên miền ngoài Google.
+
+Xem [quy tắc nối tài khoản học sinh](../architecture/backend-auth.md#đăng-ký-và-đăng-nhập).
+
 ### POST /auth/login
 
-Công khai. Mở một phiên mới; các phiên cũ của cùng người dùng vẫn giữ nguyên.
+Công khai. Đăng nhập bằng mật khẩu mở phiên khi thông tin đúng. Các phiên cũ vẫn dùng được. OTP áp dụng lúc đăng ký.
 
 ```json
 // request
@@ -69,6 +85,18 @@ Công khai. Mở một phiên mới; các phiên cũ của cùng người dùng 
 
 Cần phiên. Trả `UserOut` của người đang đăng nhập (200). Phản hồi có `Cache-Control: no-store`. Frontend gọi endpoint này khi tải trang để biết đã đăng nhập chưa và vai trò là gì.
 
+### Quên mật khẩu
+
+Công khai. Ba bước, chỉ áp dụng cho tài khoản học sinh đang hoạt động. Admin quên mật khẩu thì người vận hành dùng CLI.
+
+| Request | Body | Thành công | Lỗi |
+| --- | --- | --- | --- |
+| `POST /auth/password/forgot` | `{"email"}` | 204, kể cả khi email chưa có tài khoản | 422 email sai định dạng, 429 `OTP_RESEND_LIMIT` (chờ 60 giây giữa hai lượt, tối đa 5 lượt mỗi giờ), 503 `EMAIL_UNAVAILABLE` |
+| `POST /auth/password/verify-otp` | `{"email", "otp"}` | 200 `{"reset_token"}`, hạn 10 phút, dùng một lần | 400 `OTP_INVALID`, 400 `OTP_EXPIRED` (hết hạn, chưa yêu cầu mã hoặc mã đã dùng), 429 `TOO_MANY_ATTEMPTS` sau 5 lần sai |
+| `POST /auth/password/reset` | `{"reset_token", "password"}` | 204. Thu hồi mọi phiên của tài khoản, không đặt cookie | 400 `RESET_TOKEN_INVALID`, 422 mật khẩu ngoài 8–128 ký tự |
+
+Gọi lại `forgot` sau 60 giây sẽ gửi mã mới và mã cũ hết hiệu lực. Email chưa có tài khoản nhận cùng phản hồi như email có tài khoản để không lộ email nào đã đăng ký.
+
 ### GET /admin/ping
 
 Chỉ admin. Đây là endpoint mẫu chứng minh phân quyền.
@@ -84,7 +112,7 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
 
 | HTTP | `code` | Khi nào | Frontend nên làm gì |
 | --- | --- | --- | --- |
-| 422 | (không có) | Email sai định dạng; mật khẩu < 6 hoặc > 128 ký tự; thiếu trường | Hiện lỗi ở trường tương ứng |
+| 422 | (không có) | Email sai định dạng; mật khẩu mới < 8 hoặc > 128 ký tự; thiếu trường | Hiện lỗi ở trường tương ứng |
 | 409 | `EMAIL_TAKEN` | Đăng ký với email đã có (không phân biệt hoa thường) | Gợi ý đăng nhập. Việc này cố ý cho biết email đã tồn tại |
 | 401 | `INVALID_CREDENTIALS` | Đăng nhập sai email **hoặc** sai mật khẩu. Hai trường hợp có cùng thông báo và thời gian xử lý tương đương | "Email hoặc mật khẩu không đúng" |
 | 403 | `ACCOUNT_DISABLED` | Đăng nhập đúng mật khẩu nhưng tài khoản bị khoá, **hoặc** gọi API bằng phiên của tài khoản vừa bị khoá | Báo tài khoản bị khoá, không thử lại |
@@ -93,6 +121,12 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
 | 401 | `SESSION_EXPIRED` | Phiên quá `expires_at` | Báo hết phiên, chuyển tới trang đăng nhập |
 | 401 | `SESSION_REVOKED` | Phiên đã đăng xuất | Chuyển tới trang đăng nhập |
 | 403 | `FORBIDDEN_ROLE` | Đăng nhập rồi nhưng sai vai trò (vd student gọi API admin) | Báo không có quyền, không chuyển tới trang đăng nhập |
+| 400 | `OTP_INVALID`, `OTP_EXPIRED`, `INVALID_CHALLENGE` | Sai mã, hết hạn hoặc yêu cầu đã kết thúc | Thử lại hoặc gửi mã mới theo thông báo |
+| 429 | `TOO_MANY_ATTEMPTS`, `OTP_RESEND_LIMIT` | Đã thử sai 5 lần hoặc vượt giới hạn gửi (đăng ký, Google, quên mật khẩu) | Chờ và gửi mã mới |
+| 400 | `RESET_TOKEN_INVALID` | `reset_token` sai, hết hạn hoặc đã dùng | Bắt đầu lại từ bước nhập email |
+| 400 | `GOOGLE_INVALID` | Ticket hết hạn, đã dùng hoặc verifier không khớp | Bắt đầu lại đăng nhập Google |
+| 409 | `GOOGLE_ACCOUNT_CONFLICT` | Email thuộc admin hoặc đã nối Google khác | Dùng phương thức đăng nhập của tài khoản hiện có |
+| 503 | `EMAIL_UNAVAILABLE`, `GOOGLE_UNAVAILABLE` | Cấu hình chưa sẵn sàng hoặc gửi thư thất bại | Thử lại sau |
 
 - Mọi phản hồi 401 có header `WWW-Authenticate: Bearer`.
 - Các phản hồi `SESSION_INVALID`, `SESSION_EXPIRED`, `SESSION_REVOKED`, `ACCOUNT_DISABLED` kèm lệnh xoá cookie.
@@ -100,7 +134,7 @@ Lỗi nghiệp vụ trả body `{"detail": "<thông báo tiếng Việt>", "code
 - Ví dụ 422 khi mật khẩu quá ngắn:
 
   ```json
-  {"detail": [{"type": "string_too_short", "loc": ["body", "password"], "msg": "String should have at least 8 characters", "input": "xxxxxxx", "ctx": {"min_length": 8}}]}
+  {"detail": [{"type": "string_too_short", "loc": ["body", "password"], "msg": "String should have at least 8 characters"}]}
   ```
 
 - Frontend phân nhánh theo `code`, không theo mã HTTP: chỉ `SESSION_MISSING`, `SESSION_INVALID`, `SESSION_EXPIRED`, `SESSION_REVOKED` mới chuyển tới trang đăng nhập. Socket nhận `session:revoked` cũng xử lý như mất phiên ([realtime-api.md](realtime-api.md)).
@@ -144,39 +178,11 @@ Với SSE, dùng cùng dependency. `EventSource` tự gửi cookie khi cùng ori
 
 Trong test, tạo người dùng rồi đăng nhập qua API như `tests/test_auth.py`. Admin tạo bằng `AuthUseCase.create_user(..., "admin")` (hàm `make_admin` trong cùng file).
 
-## Hướng dẫn mock cho frontend
+## Gợi ý cho frontend
 
-Hai tài khoản dưới đây là **giá trị mock, chỉ dùng phía frontend ở chế độ mock** (`NEXT_PUBLIC_MOCK_MODE=true`). Backend thật không có sẵn tài khoản hay mật khẩu nào: không dùng các giá trị này cho DB local, EC2 hay bất kỳ môi trường thật nào. Email dùng tên miền `example.com` dành cho tài liệu.
+Chỉ lưu `UserOut` trong store Redux, không lưu token. Khi nhận 401 với `code` bắt đầu bằng `SESSION_` thì xoá user khỏi store và chuyển tới trang đăng nhập; 401 `REAUTH_FAILED` chỉ là sai mật khẩu xác nhận, giữ phiên. Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền.
 
-| Vai trò | Email | Mật khẩu mock (chỉ chế độ mock) |
-| --- | --- | --- |
-| student | `hs01@example.com` | `mock-hs01` |
-| admin | `admin@example.com` | `mock-admin` |
-
-Mock theo bảng sau (đường dẫn tương đối, cùng origin):
-
-| Request | Mock trả |
-| --- | --- |
-| `POST /api/v1/auth/login` đúng tài khoản student | 200, body bên dưới |
-| `POST /api/v1/auth/login` đúng tài khoản admin | 200, body bên dưới |
-| `POST /api/v1/auth/login` sai | 401 `{"detail": "Email hoặc mật khẩu không đúng", "code": "INVALID_CREDENTIALS"}` |
-| `POST /api/v1/auth/register` email mới | 201, `UserOut` với `role: "student"` |
-| `POST /api/v1/auth/register` email `hs01@example.com` | 409 `{"detail": "Email này đã được đăng ký", "code": "EMAIL_TAKEN"}` |
-| `GET /api/v1/auth/me` khi đã đăng nhập | 200, `UserOut` của người đã đăng nhập |
-| `GET /api/v1/auth/me` khi chưa đăng nhập | 401 `{"detail": "Chưa đăng nhập", "code": "SESSION_MISSING"}` |
-| `POST /api/v1/auth/logout` | 204, xoá trạng thái đăng nhập của mock |
-| `GET /api/v1/admin/ping` với student | 403 `{"detail": "Tài khoản không có quyền dùng chức năng này", "code": "FORBIDDEN_ROLE"}` |
-
-```json
-// student
-{"user_id": 1, "email": "hs01@example.com", "role": "student", "status": "active", "display_name": "Học sinh 01", "created_at": "2026-11-27T15:52:23.845134Z"}
-// admin
-{"user_id": 2, "email": "admin@example.com", "role": "admin", "status": "active", "display_name": "Quản trị", "created_at": "2026-11-27T15:52:41.085593Z"}
-```
-
-Gợi ý cho Redux: chỉ lưu `UserOut` trong store, không lưu token. Khi nhận 401 với `code` bắt đầu bằng `SESSION_` thì xoá user khỏi store và chuyển tới trang đăng nhập; Khi nhận 403 `FORBIDDEN_ROLE` thì giữ phiên và báo không có quyền. Mock cho màn quản lý người dùng: [user-management-api.md](user-management-api.md#hướng-dẫn-mock-cho-frontend)..
-
-Muốn có tài khoản tương tự trên DB local thật: đặt `ADMIN_EMAIL` và `ADMIN_PASSWORD` (mật khẩu của riêng bạn, không dùng giá trị mock) trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký một học sinh qua API ([run-local-stack.md](../operations/run-local-stack.md)).
+Muốn có tài khoản trên DB local: đặt `ADMIN_EMAIL` và `ADMIN_PASSWORD` (mật khẩu của riêng bạn) trong `.env` để `docker compose up` tự tạo admin, rồi đăng ký một học sinh qua API ([run-local-stack.md](../operations/run-local-stack.md)).
 
 ## Luồng kiểm thử
 
@@ -189,8 +195,10 @@ B=http://localhost:8000/api/v1
 export HS01_PASSWORD='<mat-khau-cua-ban>' ADMIN_PASSWORD='<mat-khau-admin>'
 curl -s -i -c jar.txt -b jar.txt -X POST $B/auth/register -H "content-type: application/json" \
   -d "{\"email\":\" HS01@Example.com \",\"password\":\"$HS01_PASSWORD\",\"role\":\"admin\"}"
-# 201, set-cookie examind_session=<token>; HttpOnly; Max-Age=604800; Path=/; SameSite=lax
-# {"user_id":1,"email":"hs01@example.com","role":"student",...}   ← role bị bỏ qua
+# 202. Thay email ví dụ bằng email bạn kiểm soát để nhận mã.
+curl -s -i -c jar.txt -b jar.txt -X POST "$B/auth/otp/verify" -H "content-type: application/json" \
+  -d '{"challenge":"<ma-yeu-cau>","purpose":"registration","otp":"<ma-trong-email>"}'
+# 201, UserOut và cookie examind_session.
 curl -s -i -c jar.txt -b jar.txt $B/auth/me                # 200 UserOut
 curl -s -i -c jar.txt -b jar.txt -X POST $B/auth/logout    # 204, set-cookie examind_session=""; Max-Age=0
 curl -s -i -c jar.txt -b jar.txt $B/auth/me                # 401 {"detail":"Chưa đăng nhập","code":"SESSION_MISSING"}
@@ -215,7 +223,7 @@ Các ca lỗi đã kiểm cùng ngày:
 | Đăng nhập tài khoản đã khoá, đúng mật khẩu | 403 `ACCOUNT_DISABLED` |
 | Đặt `sessions.expires_at` về quá khứ, rồi gọi `/admin/ping` | 401 `SESSION_EXPIRED`, kèm xoá cookie |
 
-Test tự động: `cd backend && pytest -q` (40 test, không cần Docker).
+Chạy `python -m pytest -q` trong `backend/`. Test OTP và Google thay nhà cung cấp bằng dịch vụ giả lập.
 
 ## Tài liệu liên quan
 

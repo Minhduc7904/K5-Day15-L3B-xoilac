@@ -2,7 +2,7 @@
 
 Toàn bộ luật "ai được làm gì với ai" nằm trong hàm thuần `can_manage`, có test riêng cho mọi tổ hợp.
 Xoá tài khoản = khoá (status=disabled), không xoá dòng.
-Khoá, đặt lại mật khẩu, hạ vai trò → thu hồi mọi phiên và gọi RealtimeNotifier.kick_user.
+Khoá, đặt lại mật khẩu, hạ vai trò → thu hồi mọi phiên và gọi RealtimeNotifier.revoke_user (ngắt mọi socket).
 """
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -25,7 +25,7 @@ from app.usecase.auth import (
     RoleForbidden,
     normalize_email,
 )
-from app.usecase.ports import RealtimeNotifier, RevokeReason
+from app.usecase.realtime_notifier import RealtimeNotifier, RevokeReason
 
 Action = Literal["create", "update", "reset_password"]
 UPDATABLE_FIELDS = frozenset({"display_name", "email", "role", "status"})
@@ -196,7 +196,7 @@ class UserManagementUseCase:
         """Thu hồi mọi phiên trong DB trước, rồi mới đẩy socket ra: kể cả khi đẩy socket lỗi, phiên đã chết."""
         await self._sessions.revoke_all_for_user(user_id, self._now())
         await self._users.commit()
-        await self._notifier.kick_user(user_id, reason)
+        await self._notifier.revoke_user(user_id, reason)
 
     @staticmethod
     def _check(actor: Principal, target: Principal | None, action: Action, changes: Mapping[str, Any]) -> None:

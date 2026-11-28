@@ -12,23 +12,23 @@ Frontend nằm trong `frontend/` và build độc lập với FastAPI. Hai route
 | --- | --- |
 | `app/(student)/page.tsx` | Entry point `/`. Hiện render landing page cho khách (`features/landing/`). Route group giữ thư mục riêng và giữ URL gốc |
 | `app/admin/page.tsx`, `app/admin/layout.tsx` | Entry point `/admin` cho quản trị, header có logo. Trang render `AdminDashboard` (#20): ô học sinh online và màn quản lý người dùng |
-| `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password` (đang chạy mock). Xem [Trang xác thực frontend](frontend-auth.md) |
-| `features/auth/` | Lớp API auth (mock hoặc Axios), reducer `auth`, form và validation |
-| `features/realtime/` | Client Socket.IO duy nhất, hook `useRealtime` (gắn một lần qua `<RealtimeBridge />` trong `AppProvider`) và reducer `realtime`. Xin ticket, nối, nối lại khi mất mạng, nhận `session:revoked` thì xoá user và về `/login`. Chế độ mock không nối. Xem [realtime-api.md](../api/realtime-api.md) |
-| `features/admin-users/` | Lớp API `/admin/users` (mock hoặc Axios), `permissions.ts` (bản sao luật `can_manage` của backend, chỉ để ẩn thao tác), bảng và hộp thoại quản lý người dùng. Xem [user-management-api.md](../api/user-management-api.md) |
-| `features/admin-stats/` | Lớp API thống kê và ô "Học sinh online" tự làm mới mỗi 15 giây |
-| `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở dev hoặc chế độ mock |
+| `features/admin-users/` | Lớp API `/admin/users`, `permissions.ts` (bản sao luật `can_manage` của backend, chỉ để ẩn thao tác), bảng và hộp thoại quản lý người dùng (#20). Xem [user-management-api.md](../api/user-management-api.md) |
+| `features/admin-stats/` | Lớp API thống kê và ô "Học sinh online" tự làm mới mỗi 15 giây (#20) |
+| `app/(auth)/` | Trang `/login`, `/register`, `/forgot-password`, `/verify-otp`, `/reset-password`. Xem [Trang xác thực frontend](frontend-auth.md) |
+| `features/auth/` | Lớp API auth (Axios), reducer `auth`, form và validation |
+| `app/(student)/(app)/`, `app/(student)/(focus)/`, `features/study/` | Trang học sinh (dashboard, tạo đề với AI, đề, làm bài, kết quả, hồ sơ). Xem [Trang học sinh frontend](frontend-student-pages.md) |
+| `app/design-system/page.tsx` | Trang xem thử token và component, chỉ bật ở môi trường dev |
 | `app/layout.tsx` | Layout gốc: font, favicon, metadata và `AppProvider` |
 | `components/ui/`, `components/layout/`, `components/motion/` | Component dùng chung, xem [Design system frontend](frontend-design-system.md) |
 | `components/splash/`, `lib/bootstrap.ts` | Splash và các bước khởi động app |
 | `app/globals.css` | Token màu, thang chữ và font stack dùng chung. Xem [Design system frontend](frontend-design-system.md) |
 | `app/manifest.ts` | Manifest web với tên, màu và icon ứng dụng |
 | `../public/brand/` | Logo chữ WebP, biểu tượng PNG và các cỡ icon cho trình duyệt |
-| `store/index.ts` | Khởi tạo Redux store với reducer `auth`, `realtime` và cung cấp hook có kiểu |
-| `store/provider.tsx` | Bọc app bằng Redux, `MotionConfig`, `ToastProvider`, `RealtimeBridge` và `SplashScreen` |
-| `lib/config.ts` | Cấu hình công khai: base URL, cờ chế độ mock và `socketUrl` (`NEXT_PUBLIC_SOCKET_URL`, mặc định origin của base URL; socket nối thẳng backend vì Vercel rewrites không chuyển WebSocket) |
+| `store/index.ts` | Khởi tạo Redux store với reducer `auth` và cung cấp hook có kiểu |
+| `store/provider.tsx` | Bọc app bằng Redux, `MotionConfig`, `ToastProvider` và `SplashScreen` |
+| `lib/config.ts` | Cấu hình công khai (base URL của API) |
 | `lib/api-client.ts` | Axios client dùng chung với base URL và timeout |
-| `lib/api-error.ts` | `ApiError` có `code` theo body lỗi `{detail, code}` của backend, `request()` bọc lời gọi Axios, `isSessionLost()` |
+| `lib/api-error.ts` | `ApiError` có `code` theo body lỗi `{detail, code}` của backend, `request()` bọc lời gọi Axios. Lỗi mất phiên vẫn do interceptor của `lib/api-client.ts` xử lý |
 
 ## Luồng dữ liệu và tích hợp
 
@@ -63,7 +63,7 @@ import { BookOpen } from 'lucide-react';
 
 ## Quyết định và cách kiểm chứng
 
-Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin`, các trang auth và `/design-system` (khi bật chế độ mock) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
+Dùng `npm run typecheck` và `npm run build` trong `frontend/`. Sau khi chạy `npm run start`, `/`, `/admin`, các trang auth và `/design-system` (ở môi trường dev) trả HTTP 200. Endpoint mẫu để kiểm tra Axios là `GET /health` tương đối với base URL chứa `/api/v1`.
 
 ## Tài liệu liên quan
 

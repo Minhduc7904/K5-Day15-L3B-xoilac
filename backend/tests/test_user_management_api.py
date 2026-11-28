@@ -1,8 +1,7 @@
-"""API /api/v1/admin/users (#20) với RealtimeNotifier giả (không cần socket thật)."""
+"""API /api/v1/admin/users (#20) với RealtimeNotifier giả thay app.state.realtime (không cần socket thật)."""
 import pytest
 from sqlalchemy import func, select
 
-from app.api.deps import get_realtime_notifier
 from app.main import app
 from app.models import User, UserSession
 from app.repositories.user_repository import UserRepository
@@ -13,21 +12,24 @@ USERS = f"{API}/admin/users"
 
 
 class FakeNotifier:
-    def __init__(self) -> None:
-        self.kicked_users: list[tuple[int, str]] = []
-        self.kicked_sessions: list[tuple[int, str]] = []
+    """Thay RealtimeServer: ghi lại các lần ngắt socket. Có presence thật để các API khác vẫn chạy."""
 
-    async def kick_user(self, user_id: int, reason: str) -> None:
+    def __init__(self, presence) -> None:
+        self.presence = presence
+        self.kicked_users: list[tuple[int, str | None]] = []
+        self.kicked_sessions: list[tuple[int, str | None]] = []
+
+    async def revoke_user(self, user_id: int, reason: str | None = None) -> None:
         self.kicked_users.append((user_id, reason))
 
-    async def kick_session(self, session_id: int, reason: str) -> None:
+    async def revoke_session(self, session_id: int, reason: str | None = None) -> None:
         self.kicked_sessions.append((session_id, reason))
 
 
 @pytest.fixture
-def notifier(client):
-    fake = FakeNotifier()
-    app.dependency_overrides[get_realtime_notifier] = lambda: fake
+def notifier(client, monkeypatch):
+    fake = FakeNotifier(app.state.realtime.presence)
+    monkeypatch.setitem(app.state._state, "realtime", fake)
     return fake
 
 

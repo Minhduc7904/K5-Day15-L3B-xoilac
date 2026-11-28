@@ -3,11 +3,24 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.cookies import clear_session_cookie, set_session_cookie
-from app.api.deps import AuthUseCaseDep, CurrentUserDep, RealtimeUseCaseDep, SettingsDep, get_session_token
+from app.api.deps import AuthUseCaseDep, CurrentUserDep, SettingsDep, StudentAuthDep, get_session_token
 from app.api.errors import to_api_error
-from app.schemas.auth import ErrorOut, LoginIn, RegisterIn, UserOut
-from app.schemas.realtime import SocketTicketOut
+from app.service.socket_tickets import TICKET_TTL_SECONDS
+from app.schemas.auth import (
+    ErrorOut,
+    LoginIn,
+    OtpChallengeOut,
+    OtpIn,
+    OtpResendIn,
+    PasswordForgotIn,
+    PasswordResetIn,
+    PasswordVerifyIn,
+    RegisterIn,
+    ResetTokenOut,
+    UserOut,
+)
 from app.usecase.auth import AuthError
+from app.usecase.student_auth import REGISTRATION
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -23,20 +36,42 @@ def _no_store(response: Response) -> None:
 
 @router.post(
     "/register",
-    response_model=UserOut,
-    status_code=status.HTTP_201_CREATED,
+    response_model=OtpChallengeOut,
+    status_code=status.HTTP_202_ACCEPTED,
     responses={409: {"model": ErrorOut, "description": "EMAIL_TAKEN"}},
 )
-async def register(body: RegisterIn, request: Request, response: Response, usecase: AuthUseCaseDep, settings: SettingsDep):
-    """Đăng ký học sinh và đăng nhập luôn (đặt cookie). Trường `role` trong body bị bỏ qua."""
+async def register(body: RegisterIn, response: Response, student: StudentAuthDep):
+    """Yêu cầu mã xác minh để đăng ký học sinh."""
     try:
-        user, token = await usecase.register(
-            body.email, body.password, body.display_name, request.headers.get("user-agent")
+        pending = await student.start_registration(body.email, body.password, body.display_name)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    _no_store(response)
+    return OtpChallengeOut.model_validate(pending)
+
+
+@router.post("/otp/resend", response_model=OtpChallengeOut, status_code=status.HTTP_202_ACCEPTED)
+async def resend_otp(body: OtpResendIn, student: StudentAuthDep, response: Response):
+    try:
+        pending = await student.resend(body.purpose, body.challenge)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    _no_store(response)
+    return OtpChallengeOut.model_validate(pending)
+
+
+@router.post("/otp/verify", response_model=UserOut, responses={201: {"model": UserOut}})
+async def verify_otp(body: OtpIn, request: Request, response: Response, student: StudentAuthDep, settings: SettingsDep):
+    try:
+        user, token = await student.verify_email(
+            body.purpose, body.challenge, body.otp, request.headers.get("user-agent")
         )
-    except AuthError as e:
-        raise to_api_error(e) from None
+    except AuthError as error:
+        raise to_api_error(error) from None
     set_session_cookie(response, token, settings)
     _no_store(response)
+    if body.purpose == REGISTRATION:
+        response.status_code = status.HTTP_201_CREATED
     return user
 
 
@@ -72,16 +107,64 @@ async def logout(
     return response
 
 
+@router.post("/socket-ticket", responses=_SESSION_ERRORS)
+async def socket_ticket(current: CurrentUserDep, request: Request, response: Response):
+    _no_store(response)
+    return {
+        "ticket": request.app.state.realtime.tickets.issue(current.session_id),
+        "expires_in": TICKET_TTL_SECONDS,
+    }
+
+
 @router.get("/me", response_model=UserOut, responses=_SESSION_ERRORS)
 async def me(current: CurrentUserDep, response: Response):
     _no_store(response)
     return current.user
 
 
-@router.post("/socket-ticket", response_model=SocketTicketOut, responses=_SESSION_ERRORS)
-async def socket_ticket(current: CurrentUserDep, realtime: RealtimeUseCaseDep, response: Response):
-    """Ticket một lần, sống `expires_in` giây, để nối Socket.IO bằng `auth: {ticket}` (#20).
-    Gắn với người dùng và phiên hiện tại: đăng xuất phiên này thì socket mở bằng ticket của nó bị ngắt."""
-    ticket, ttl = realtime.issue_ticket(current)
+@router.post(
+    "/password/forgot",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        429: {"model": ErrorOut, "description": "OTP_RESEND_LIMIT"},
+        503: {"model": ErrorOut, "description": "EMAIL_UNAVAILABLE"},
+    },
+)
+async def forgot_password(body: PasswordForgotIn, student: StudentAuthDep) -> Response:
+    """Gửi mã OTP đặt lại mật khẩu. Luôn 204 kể cả khi email chưa có tài khoản."""
+    try:
+        await student.start_password_reset(body.email)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})
+
+
+@router.post(
+    "/password/verify-otp",
+    response_model=ResetTokenOut,
+    responses={
+        400: {"model": ErrorOut, "description": "OTP_INVALID / OTP_EXPIRED"},
+        429: {"model": ErrorOut, "description": "TOO_MANY_ATTEMPTS"},
+    },
+)
+async def verify_password_otp(body: PasswordVerifyIn, student: StudentAuthDep, response: Response):
+    try:
+        token = await student.verify_password_reset(body.email, body.otp)
+    except AuthError as error:
+        raise to_api_error(error) from None
     _no_store(response)
-    return SocketTicketOut(ticket=ticket, expires_in=ttl)
+    return ResetTokenOut(reset_token=token)
+
+
+@router.post(
+    "/password/reset",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={400: {"model": ErrorOut, "description": "RESET_TOKEN_INVALID"}},
+)
+async def reset_password(body: PasswordResetIn, student: StudentAuthDep) -> Response:
+    """Đặt mật khẩu mới và thu hồi mọi phiên cũ. Không mở phiên mới: người dùng đăng nhập lại."""
+    try:
+        await student.reset_password(body.reset_token, body.password)
+    except AuthError as error:
+        raise to_api_error(error) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})

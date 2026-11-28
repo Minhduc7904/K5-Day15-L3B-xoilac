@@ -1,31 +1,53 @@
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.errors import to_api_error
-from app.api.socket.server import RealtimeScope, sio
 from app.core.config import Settings, get_settings
-from app.core.database import get_session
+from app.core.database import get_session, get_sessionmaker
+from app.repositories.auth_challenge_repository import AuthChallengeRepository
+from app.repositories.credits import CreditRepository
+from app.repositories.student_profiles import StudentProfileRepository
+from app.repositories.exam_attempts import ExamAttemptRepository
+from app.repositories.exam_chat_repository import ExamChatRepository
+from app.repositories.exam_template_repository import ExamTemplateRepository
+from app.repositories.notifications import NotificationRepository
+from app.repositories.pdf_imports import PdfImportRepository
+from app.repositories.question_bank_repository import QuestionBankRepository
 from app.repositories.sample_item_repository import SampleItemRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
+from app.service.exam_chat_sources import (
+    ExamTemplateSource,
+    PlainReplyWriter,
+    ReplyWriter,
+    StudentHistorySource,
+    TemplateLookupSource,
+)
+from app.service.email_service import GmailEmailService
+from app.service.google_identity import GoogleIdentityService
 from app.service.password_service import PasswordService
-from app.service.presence_service import InMemoryPresenceRegistry, PresenceRegistry
-from app.service.socket_ticket_service import SocketTicketService
-from app.service.socketio_notifier import SocketIONotifier
+from app.service.pdf_import_models import PdfImportModels
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
+from app.usecase.exam_chat import ExamChatUseCase, Requester
+from app.usecase.live_exam_chat import LiveExamChat
+from app.service.exam_chat_model import ExamChatModel
+from app.service.exam_chat_ocr import ExamChatOcr
+from app.usecase.exam_templates import ExamTemplateUseCase
+from app.usecase.notifications import Notifications
 from app.usecase.online_stats import OnlineStatsUseCase
-from app.usecase.ports import RealtimeNotifier
-from app.usecase.realtime import RealtimeUseCase
+from app.usecase.pdf_imports import PdfImportUseCase
 from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
+from app.usecase.student_auth import StudentAuthUseCase
+from app.usecase.student_profile import StudentProfileUseCase
+from app.usecase.study_dashboard import AttemptHistory, StudyDashboard
 from app.usecase.user_management import UserManagementUseCase
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -37,6 +59,16 @@ def get_storage() -> StorageService:
     return StorageService(get_settings())
 
 
+def get_email_service(settings: SettingsDep) -> GmailEmailService:
+    return GmailEmailService(settings)
+
+
+def get_google_identity(settings: SettingsDep) -> GoogleIdentityService:
+    return GoogleIdentityService(settings)
+
+
+GoogleIdentityDep = Annotated[GoogleIdentityService, Depends(get_google_identity)]
+EmailServiceDep = Annotated[GmailEmailService, Depends(get_email_service)]
 StorageDep = Annotated[StorageService, Depends(get_storage)]
 
 
@@ -48,8 +80,13 @@ def get_sample_file_usecase(storage: StorageDep) -> SampleFileUseCase:
     return SampleFileUseCase(storage)
 
 
+def get_exam_template_usecase(session: SessionDep) -> ExamTemplateUseCase:
+    return ExamTemplateUseCase(ExamTemplateRepository(session))
+
+
 SampleItemUseCaseDep = Annotated[SampleItemUseCase, Depends(get_sample_item_usecase)]
 SampleFileUseCaseDep = Annotated[SampleFileUseCase, Depends(get_sample_file_usecase)]
+ExamTemplateUseCaseDep = Annotated[ExamTemplateUseCase, Depends(get_exam_template_usecase)]
 
 
 # ---- Xác thực (issue #8) ----------------------------------------------------
@@ -64,34 +101,12 @@ def get_token_service() -> TokenService:
     return TokenService()
 
 
-# ---- Realtime (#20): tạo MỘT lần cho cả tiến trình (backend chạy một worker) -------------
-
-
-@lru_cache
-def get_presence_registry() -> PresenceRegistry:
-    return InMemoryPresenceRegistry()
-
-
-@lru_cache
-def get_socket_ticket_service() -> SocketTicketService:
-    return SocketTicketService(ttl_seconds=get_settings().socket_ticket_ttl_seconds)
-
-
-@lru_cache
-def get_realtime_notifier() -> RealtimeNotifier:
-    return SocketIONotifier(sio, get_presence_registry())
-
-
-RealtimeNotifierDep = Annotated[RealtimeNotifier, Depends(get_realtime_notifier)]
-PresenceDep = Annotated[PresenceRegistry, Depends(get_presence_registry)]
-
-
-def build_auth_usecase(
-    session: AsyncSession,
-    settings: Settings,
-    notifier: RealtimeNotifier,
-    passwords: PasswordService,
-    tokens: TokenService,
+def get_auth_usecase(
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    passwords: Annotated[PasswordService, Depends(get_password_service)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
 ) -> AuthUseCase:
     return AuthUseCase(
         users=UserRepository(session),
@@ -99,81 +114,58 @@ def build_auth_usecase(
         passwords=passwords,
         tokens=tokens,
         session_ttl_hours=settings.session_ttl_hours,
-        notifier=notifier,
+        realtime=request.app.state.realtime,
     )
-
-
-def get_auth_usecase(
-    session: SessionDep,
-    settings: SettingsDep,
-    notifier: RealtimeNotifierDep,
-    passwords: Annotated[PasswordService, Depends(get_password_service)],
-    tokens: Annotated[TokenService, Depends(get_token_service)],
-) -> AuthUseCase:
-    return build_auth_usecase(session, settings, notifier, passwords, tokens)
 
 
 AuthUseCaseDep = Annotated[AuthUseCase, Depends(get_auth_usecase)]
 
 
-def get_realtime_usecase(
+def get_student_auth(
+    session: SessionDep,
+    settings: SettingsDep,
     auth: AuthUseCaseDep,
-    tickets: Annotated[SocketTicketService, Depends(get_socket_ticket_service)],
-    presence: PresenceDep,
-) -> RealtimeUseCase:
-    return RealtimeUseCase(tickets=tickets, presence=presence, auth=auth)
+    emails: EmailServiceDep,
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> StudentAuthUseCase:
+    return StudentAuthUseCase(
+        auth,
+        AuthChallengeRepository(session),
+        emails,
+        tokens,
+        settings.auth_otp_secret.get_secret_value(),
+        settings.frontend_url,
+    )
 
 
-RealtimeUseCaseDep = Annotated[RealtimeUseCase, Depends(get_realtime_usecase)]
-
-
-def get_online_stats_usecase(session: SessionDep, presence: PresenceDep) -> OnlineStatsUseCase:
-    return OnlineStatsUseCase(presence=presence, users=UserRepository(session))
-
-
-OnlineStatsUseCaseDep = Annotated[OnlineStatsUseCase, Depends(get_online_stats_usecase)]
-
-
-def realtime_scope(app: FastAPI) -> RealtimeScope:
-    """Handler socket không đi qua dependency injection của FastAPI: mỗi sự kiện mở một phiên DB và ghép
-    RealtimeUseCase ở đây. Tôn trọng app.dependency_overrides (test thay get_session, get_settings, notifier)."""
-
-    def resolve(dep):
-        return app.dependency_overrides.get(dep, dep)
-
-    @asynccontextmanager
-    async def scope() -> AsyncIterator[RealtimeUseCase]:
-        async for session in resolve(get_session)():
-            auth = build_auth_usecase(
-                session,
-                resolve(get_settings)(),
-                resolve(get_realtime_notifier)(),
-                resolve(get_password_service)(),
-                resolve(get_token_service)(),
-            )
-            yield RealtimeUseCase(
-                tickets=resolve(get_socket_ticket_service)(), presence=resolve(get_presence_registry)(), auth=auth
-            )
-
-    return scope
+StudentAuthDep = Annotated[StudentAuthUseCase, Depends(get_student_auth)]
 
 
 def get_user_management_usecase(
+    request: Request,
     session: SessionDep,
     auth: AuthUseCaseDep,
     passwords: Annotated[PasswordService, Depends(get_password_service)],
-    notifier: RealtimeNotifierDep,
 ) -> UserManagementUseCase:
+    """#20: notifier là RealtimeServer của app (revoke_user ngắt mọi socket của người bị khoá)."""
     return UserManagementUseCase(
         auth=auth,
         users=UserRepository(session),
         sessions=SessionRepository(session),
         passwords=passwords,
-        notifier=notifier,
+        notifier=request.app.state.realtime,
     )
 
 
 UserManagementUseCaseDep = Annotated[UserManagementUseCase, Depends(get_user_management_usecase)]
+
+
+def get_online_stats_usecase(request: Request, session: SessionDep) -> OnlineStatsUseCase:
+    """#20: đọc PresenceRegistry của RealtimeServer (một tiến trình, trong bộ nhớ)."""
+    return OnlineStatsUseCase(presence=request.app.state.realtime.presence, users=UserRepository(session))
+
+
+OnlineStatsUseCaseDep = Annotated[OnlineStatsUseCase, Depends(get_online_stats_usecase)]
 
 # auto_error=False: thiếu header không báo lỗi ở đây; cookie vẫn được xét. Hiện nút Authorize trong Swagger.
 _bearer = HTTPBearer(auto_error=False, description="Token phiên (dùng cho curl/Swagger). Cookie được ưu tiên.")
@@ -221,3 +213,103 @@ def require_role(*roles: str):
 
 AdminDep = Annotated[CurrentUser, Depends(require_role("admin"))]
 StudentDep = Annotated[CurrentUser, Depends(require_role("student"))]
+
+
+def get_student_profile(session: SessionDep) -> StudentProfileUseCase:
+    return StudentProfileUseCase(StudentProfileRepository(session), CreditRepository(session))
+
+
+StudentProfileDep = Annotated[StudentProfileUseCase, Depends(get_student_profile)]
+
+
+def get_notifications(session: SessionDep) -> Notifications:
+    return Notifications(NotificationRepository(session))
+
+
+NotificationsDep = Annotated[Notifications, Depends(get_notifications)]
+
+
+@lru_cache
+def get_pdf_import_models() -> PdfImportModels:
+    return PdfImportModels(get_settings())
+
+
+def get_pdf_import_usecase(
+    session: SessionDep, storage: StorageDep,
+    models: Annotated[PdfImportModels, Depends(get_pdf_import_models)],
+) -> PdfImportUseCase:
+    return PdfImportUseCase(PdfImportRepository(session), storage, models, get_settings().s3_bucket)
+
+
+def get_pdf_import_runner(
+    storage: StorageDep,
+    models: Annotated[PdfImportModels, Depends(get_pdf_import_models)],
+    sessions: Annotated[async_sessionmaker[AsyncSession], Depends(get_sessionmaker)],
+):
+    async def run(import_id: int) -> None:
+        async with sessions() as session:
+            usecase = PdfImportUseCase(PdfImportRepository(session), storage, models, get_settings().s3_bucket)
+            await usecase.process(import_id)
+
+    return run
+
+
+PdfImportUseCaseDep = Annotated[PdfImportUseCase, Depends(get_pdf_import_usecase)]
+PdfImportRunnerDep = Annotated[Callable[[int], Awaitable[None]], Depends(get_pdf_import_runner)]
+
+
+# ---------- issue #4: pipeline học sinh tạo đề ôn ----------
+
+
+def get_requester(current: StudentDep) -> Requester:
+    """Học sinh đang đăng nhập. Mọi route /exam-chat cần vai trò học sinh và chỉ thấy phiên của chính mình (kể cả SSE).
+
+    student_ref là mã dùng tra lịch sử làm bài; khi có bảng kết quả làm bài thật, đổi cho khớp khoá của bảng đó.
+    """
+    return Requester(user_id=current.user_id, student_ref=f"U{current.user_id}")
+
+
+def get_study_dashboard(session: SessionDep) -> StudyDashboard:
+    return StudyDashboard(ExamAttemptRepository(session), QuestionBankRepository(session))
+
+
+StudentDashboardDep = Annotated[StudyDashboard, Depends(get_study_dashboard)]
+
+
+def get_student_history(dashboard: StudentDashboardDep) -> StudentHistorySource:
+    """Lịch sử làm bài thật từ các lượt đã chấm. Chưa có lượt nào thì agent nói chưa có lịch sử và hỏi chương."""
+    return AttemptHistory(dashboard)
+
+
+def get_exam_template_source(templates: ExamTemplateUseCaseDep) -> ExamTemplateSource:
+    """Nhánh ôn theo mẫu kỳ thi đọc mẫu ĐÃ DUYỆT qua hợp đồng tra cứu của #5."""
+    return TemplateLookupSource(templates.lookup)
+
+
+def get_reply_writer() -> ReplyWriter:
+    """Chưa chốt model và key: trả văn bản dựng bằng code, chia theo dòng để phát qua SSE."""
+    return PlainReplyWriter()
+
+
+def get_question_bank(session: SessionDep) -> QuestionBankRepository:
+    return QuestionBankRepository(session)
+
+
+def get_exam_chat_usecase(
+    session: SessionDep,
+    bank: Annotated[QuestionBankRepository, Depends(get_question_bank)],
+    history: Annotated[StudentHistorySource, Depends(get_student_history)],
+    templates: Annotated[ExamTemplateSource, Depends(get_exam_template_source)],
+    ocr_models: Annotated[PdfImportModels, Depends(get_pdf_import_models)],
+    storage: StorageDep,
+) -> ExamChatUseCase:
+    args = (ExamChatRepository(session), bank, history, templates)
+    settings = get_settings()
+    if settings.exam_chat_live:
+        return LiveExamChat(session, ExamChatModel(settings), ExamChatOcr(ocr_models), storage, *args)
+    return ExamChatUseCase(*args)
+
+
+ExamChatUseCaseDep = Annotated[ExamChatUseCase, Depends(get_exam_chat_usecase)]
+ReplyWriterDep = Annotated[ReplyWriter, Depends(get_reply_writer)]
+RequesterDep = Annotated[Requester | None, Depends(get_requester)]

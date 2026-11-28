@@ -4,7 +4,7 @@
  * Mỗi bước có giới hạn thời gian để splash không bao giờ treo.
  */
 import { authApi } from '@/features/auth/api';
-import { signedIn, signedOut } from '@/features/auth/auth-slice';
+import { sessionChecked } from '@/features/auth/auth-slice';
 import type { AppDispatch } from '@/store';
 
 export interface BootstrapContext {
@@ -28,7 +28,27 @@ function preloadImage(src: string) {
   });
 }
 
+/** Khoá localStorage của bản dùng dữ liệu mẫu cũ. Dữ liệu thật nằm ở server nên các khoá này không còn tác dụng. */
+const STALE_KEYS = ['examind:mock-study', 'examind:chat-sessions:v1', 'examind:mock-auth'];
+const STALE_PREFIXES = ['examind:attempt-draft:'];
+
+function clearStaleStorage() {
+  try {
+    const keys = Array.from({ length: window.localStorage.length }, (_, i) => window.localStorage.key(i) ?? '');
+    for (const key of keys) {
+      if (STALE_KEYS.includes(key) || STALE_PREFIXES.some((prefix) => key.startsWith(prefix))) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Không đọc được localStorage (chế độ riêng tư): bỏ qua.
+  }
+}
+
 export const bootstrapSteps: BootstrapStep[] = [
+  {
+    id: 'storage',
+    label: 'Dọn dữ liệu cũ',
+    run: async () => clearStaleStorage(),
+  },
   {
     id: 'fonts',
     label: 'Tải phông chữ',
@@ -48,12 +68,12 @@ export const bootstrapSteps: BootstrapStep[] = [
   {
     id: 'session',
     label: 'Kiểm tra phiên đăng nhập',
-    // Gọi GET /auth/me qua lớp API của feature auth (đang mock khi bật NEXT_PUBLIC_MOCK_MODE).
+    // Gọi GET /auth/me qua lớp API của feature auth.
     run: async ({ dispatch }) => {
       try {
-        dispatch(signedIn(await authApi.me()));
+        dispatch(sessionChecked(await authApi.me()));
       } catch {
-        dispatch(signedOut());
+        dispatch(sessionChecked(null));
       }
     },
   },

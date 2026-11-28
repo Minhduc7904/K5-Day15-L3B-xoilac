@@ -27,7 +27,7 @@ export const viewport: Viewport = { themeColor: '#03172f' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="vi" className={beVietnamPro.variable}>
+    <html lang="vi" className={beVietnamPro.variable} data-scroll-behavior="smooth">
       <head>
         <noscript>
           <style>{'[data-splash]{display:none!important}html{overflow:auto!important}'}</style>

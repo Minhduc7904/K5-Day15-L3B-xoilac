@@ -16,7 +16,7 @@ Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần me
 | Thư mục trên VPS | `/opt/examind/app` (mã nguồn), `/opt/examind/seed` (gói dữ liệu nền), `/opt/examind/prod.env` (mật khẩu, chmod 600, không nằm trong Git) |
 | Dịch vụ | `nginx` (cổng 80 và 443) → `backend` (FastAPI, nội bộ) → `postgres`, `minio`; `certbot` gia hạn chứng chỉ |
 | Địa chỉ API | `https://examind.duckdns.org/api/v1/health` (và `http://` ở cổng 80). DuckDNS trỏ về Elastic IP `54.79.136.46`, IP không đổi khi dừng/khởi động instance, xem [deploy-ec2.md](deploy-ec2.md) |
-| Địa chỉ socket | `wss://examind.duckdns.org/api/socket.io/` (nginx đã sẵn đường nâng cấp WebSocket, backend sẽ có ở issue #20) |
+| Địa chỉ socket | `wss://examind.duckdns.org/api/socket.io/` (nginx chuyển tiếp đến Socket.IO của issue #36) |
 | Chứng chỉ HTTPS | Let's Encrypt, lưu ở `/opt/examind/letsencrypt`; thư mục thử thách ACME `/opt/examind/certbot-www`. Không nằm trong Git |
 | Kiểm tra sống | `http://examind.duckdns.org/api/v1/health/live` trả `{"status":"ok","version":"0.1.0"}`, không chạm DB và MinIO |
 | Workflow | [.github/workflows/ci.yml](../../.github/workflows/ci.yml), [.github/workflows/deploy.yml](../../.github/workflows/deploy.yml) |
@@ -36,6 +36,35 @@ Dành cho người merge vào `main` hoặc vận hành VPS demo. Mỗi lần me
 4. Hai bước cuối gọi `http://<host>/api/v1/health` và `https://examind.duckdns.org/api/v1/health/live` từ runner để xác nhận cổng 80 và 443 mở ra ngoài, chứng chỉ hợp lệ.
 
 Log Docker của mỗi container giới hạn 3 file × 10 MB.
+
+## Cấu hình OTP và Google
+
+Cấu hình local nằm trong [`backend/.env.example`](../../backend/.env.example). Trên EC2, lưu các biến bên dưới trong `/opt/examind/prod.env` với quyền `600`. Compose truyền các biến này cho container backend khi triển khai.
+
+| Biến | Giá trị |
+| --- | --- |
+| `EMAIL_PROVIDER` | `gmail` để bật, để trống để tắt |
+| `EMAIL_FROM` | Địa chỉ Gmail đã cấp quyền gửi, ví dụ `examind.app@gmail.com` |
+| `EMAIL_FROM_NAME` | Tên hiển thị, mặc định `Examind` |
+| `GMAIL_CLIENT_ID` | Client ID của Google OAuth |
+| `GMAIL_CLIENT_SECRET` | Client secret của Google OAuth |
+| `GMAIL_REFRESH_TOKEN` | Refresh token của tài khoản gửi với scope `https://www.googleapis.com/auth/gmail.send` |
+| `AUTH_OTP_SECRET` | Chuỗi ngẫu nhiên bí mật, tối thiểu 32 byte. Dùng lệnh sinh trong cấu hình mẫu |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client loại Web Application cho đăng nhập Google |
+| `GOOGLE_CALLBACK_URL` | `https://examind.duckdns.org/api/auth/google/callback` |
+| `FRONTEND_URL` | Origin nhận kết quả. Production dùng `https://examind-frontend.vercel.app` |
+
+Đăng ký đúng callback trong **Authorized redirect URIs**. Client đăng nhập dùng `openid email profile`. Client Gmail chỉ gửi thư. Để chạy trọn luồng Google local, cấu hình callback localhost và origin frontend local trong cả app lẫn Google Auth Platform.
+
+Để bật chat tạo đề trên môi trường thử, đặt `EXAM_CHAT_LIVE=true`, `OPENAI_API_KEY` và tùy chọn `EXAM_CHAT_MODEL` trong `prod.env`. Thêm `MISTRAL_API_KEY` khi sẵn sàng bật đọc ảnh và dùng `OCR_MODEL` nếu cần chỉ định model OCR. Chat vẫn lưu ảnh khi chưa có khóa OCR. Kiểm tra migration `0014_exam_chat_images`, MinIO, SSE, số dư và danh sách đề trước khi bật `NEXT_PUBLIC_EXAM_CHAT_LIVE=true` trên Vercel. Khi cần tạm dừng rollout, tắt cờ trên frontend trước và giữ migration để bảo toàn các khoản đã ghi.
+
+Sau khi cập nhật `prod.env`, chạy lệnh sau từ `/opt/examind/app` để kiểm cú pháp mà không in cấu hình. Lần deploy backend tiếp theo sẽ nạp biến vào container.
+
+```bash
+docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+```
+
+Test backend dùng HTTP giả lập. Để kiểm tra thông tin OAuth trên VPS, đổi refresh token lấy access token qua endpoint OAuth của Google. Bước này không gửi thư. Nếu Google trả `invalid_grant`, kiểm tra xem token đã bị thu hồi hay hết hạn. Refresh token của ứng dụng OAuth External ở trạng thái Testing với scope Gmail thường hết hạn sau 7 ngày. [Tài liệu Google OAuth](https://developers.google.com/identity/protocols/oauth2#expiration).
 
 ## Sửa cấu hình nginx
 
@@ -58,7 +87,7 @@ Script cài Docker và Compose, thêm swap 2 GB (VPS chỉ có ~1,9 GB RAM), t�
 | Biến | Container | Mặc định nếu thiếu | Ghi chú |
 | --- | --- | --- | --- |
 | `POSTGRES_PASSWORD`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | tất cả | bắt buộc (`:?`) | Sinh ngẫu nhiên khi bootstrap |
-| `CORS_ORIGINS` | backend | `http://localhost:3000` | Chỉ cần khi frontend gọi thẳng backend khác origin |
+| `CORS_ORIGINS` | backend | `http://localhost:3000` | Danh sách origin frontend được phép mở socket, phân cách bằng dấu phẩy |
 | `COOKIE_SECURE` | backend, db-init | `true` | nginx có TLS. Cookie phiên chỉ gửi qua HTTPS; ở db-init bật luật mật khẩu admin ≥ 12 ký tự |
 | `COOKIE_NAME` | backend | `examind_session` | |
 | `SESSION_TTL_HOURS` | backend | `168` | Hạn phiên (giờ) |
@@ -84,18 +113,30 @@ ssh -i ./backend-key.pem ubuntu@<host> 'ADMIN_EMAIL=<email-admin> bash -s' < dep
 
 Nếu `ADMIN_PASSWORD` dưới 12 ký tự hoặc sai định dạng, `db-init` thoát mã 2, backend không khởi động và deploy quay về commit trước. Email đã thuộc một tài khoản student thì chỉ cảnh báo trong log, không làm deploy fail. Cách thêm admin khác và cứu hộ: [backend-auth.md](../architecture/backend-auth.md#cấp-tài-khoản-admin).
 
+## Worker học sinh
+
+Compose khởi động `student-worker` sau khi `db-init` chạy xong migration. Worker giữ một luồng kiểm credit và một luồng nhắc email độc lập. `daily-credit` cộng tối đa 100 khi sang ngày Việt Nam, trần 500. `study-reminders` dùng cùng cấu hình Gmail với backend và chỉ gửi đến email đã xác minh có lịch nhắc.
+
+Từ thư mục deploy trên VPS, kiểm tra trạng thái và log bằng cùng tham số Compose với quy trình deploy.
+
+```bash
+docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml ps student-worker
+docker compose --env-file /opt/examind/prod.env -f docker-compose.yml -f docker-compose.prod.yml logs --tail=60 student-worker
+```
+
+Để kiểm job, dùng cơ sở dữ liệu và hộp thư kiểm thử. Trạng thái `uncertain` nghĩa là chưa xác định được Gmail có nhận yêu cầu. Kiểm tra hộp thư gửi trước khi xử lý bằng tay. Xem [API realtime](../api/realtime-api.md) để kiểm tra WSS và origin.
+
 ## Socket và WSS
 
-Kênh Socket.IO của #20 chạy cùng container `backend` tại `/api/socket.io` ([realtime-api.md](../api/realtime-api.md)).
+Kênh Socket.IO (`app/api/realtime.py`) chạy cùng container `backend` tại `/api/socket.io`; #20 dùng nó cho room theo vai trò, ngắt socket khi khoá tài khoản và thống kê học sinh online ([realtime-api.md](../api/realtime-api.md)).
 
 | Mục | Hiện trạng | Ghi chú |
 | --- | --- | --- |
 | nginx | `location ^~ /api/socket.io/` trong `deploy/nginx/conf.d/locations.inc` cho cả cổng 80 và 443: `Upgrade`, `Connection $connection_upgrade`, timeout 1 h, `proxy_buffering off` | Đặt trước location `/api/`. CI kiểm bằng `nginx -t` |
-| Tiến trình | `uvicorn app.main:asgi_app --workers 1` (Dockerfile) | **Không tăng số worker**: presence và ticket nằm trong bộ nhớ. Nhiều worker cần Redis ([backend-realtime.md](../architecture/backend-realtime.md#ràng-buộc-một-worker)) |
+| Tiến trình | `uvicorn app.main:app --workers 1` (Dockerfile) | **Không tăng số worker**: presence và ticket nằm trong bộ nhớ. Nhiều worker cần Redis ([backend-realtime.md](../architecture/backend-realtime.md#ràng-buộc-một-worker)) |
 | HTTPS/WSS | nginx có khối 443 và chứng chỉ Let's Encrypt | Trang Vercel (HTTPS) chỉ nối được `wss://`. Ngày 2026-11-28 từ ngoài chưa vào được cổng 443 (TCP treo, HTTP cổng 80 vẫn trả 200): kiểm Security Group mở 443 và chứng chỉ đã cấp |
 | `CORS_ORIGINS` trong `prod.env` | Phải chứa origin của frontend, vd `https://examind-frontend.vercel.app` | Cũng là danh sách origin được nối socket. Thiếu thì trình duyệt bị từ chối khi nối |
-| `SOCKET_TICKET_TTL_SECONDS` | Mặc định 30 trong `docker-compose.prod.yml` | Không cần thêm vào `prod.env` trừ khi muốn đổi |
-| Frontend | `NEXT_PUBLIC_SOCKET_URL=https://examind.duckdns.org` trên Vercel | Không đi qua rewrites |
+| Frontend | `NEXT_PUBLIC_SOCKET_URL=https://examind.duckdns.org` trên Vercel | Socket không đi qua rewrites; API `/api/v1/*` thì có |
 
 Kiểm sau deploy, từ máy ngoài:
 

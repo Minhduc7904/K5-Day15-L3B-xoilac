@@ -7,16 +7,24 @@
 | Hiểu các thành phần và luồng dữ liệu của hệ thống | [Tổng quan hệ thống](architecture/system-overview.md) |
 | Viết tính năng mới trong backend | [Các lớp backend](architecture/backend-layers.md) |
 | Hiểu đăng nhập, phiên và phân quyền; kiểm quyền cho endpoint mới | [Xác thực và phân quyền backend](architecture/backend-auth.md) |
-| Gọi hoặc mock API đăng ký, đăng nhập, đăng xuất | [API xác thực](api/auth-api.md) |
-| Admin tìm, tạo, sửa, khoá tài khoản học sinh và admin; mock màn quản lý người dùng | [API quản lý người dùng](api/user-management-api.md) |
+| Gọi API đăng ký, đăng nhập, đăng xuất | [API xác thực](api/auth-api.md) |
+| Đọc và lưu hồ sơ, lịch nhắc học, xem credit học sinh | [API hồ sơ học sinh](api/student-profile-api.md) |
 | Nối Socket.IO bằng ticket, room theo vai trò, sự kiện `session:revoked`, thống kê học sinh online | [API realtime](api/realtime-api.md) |
 | Hiểu kênh realtime: ticket, presence, ràng buộc một worker, kế hoạch Redis | [Kiến trúc realtime](architecture/backend-realtime.md) |
+| Đọc số liệu dashboard: điểm, chuỗi ngày học, thống kê chương | [API dashboard học tập](api/study-dashboard-api.md) |
+| Liệt kê, đánh dấu đã đọc và nhận thông báo trong ứng dụng | [API thông báo](api/notifications-api.md) |
+| Admin tìm, tạo, sửa, khoá tài khoản học sinh và admin (thay `/admin/accounts`) | [API quản lý người dùng](api/user-management-api.md) |
 | Viết tính năng mới trong frontend | [Kiến trúc frontend](architecture/frontend-base.md) |
 | Dùng font, thang chữ và token màu chung của giao diện | [Design system frontend](architecture/frontend-design-system.md) |
-| Sửa trang đăng nhập, đăng ký, quên mật khẩu, OTP hoặc dùng mock auth | [Trang xác thực frontend](architecture/frontend-auth.md) |
+| Sửa trang đăng nhập, đăng ký, quên mật khẩu hoặc OTP | [Trang xác thực frontend](architecture/frontend-auth.md) |
+| Sửa dashboard, tạo đề với AI, làm bài, kết quả, hồ sơ học sinh; hiển thị công thức và hình trong câu hỏi | [Trang học sinh frontend](architecture/frontend-student-pages.md) |
 | Chạy frontend và deploy Vercel | [Runbook frontend](operations/deploy-frontend-vercel.md) |
 | Chạy PostgreSQL, MinIO và backend trên máy | [Chạy bộ khung local](operations/run-local-stack.md) |
 | Xem định dạng API và gọi thử endpoint mẫu | [API mẫu](api/sample-api.md) |
+| Nhập đề PDF và duyệt câu hỏi | [Pipeline nhập đề](ai/pdf-import/pipeline.md) · [API nhập đề](ai/pdf-import/api.md) |
+| Quản lý và tra cứu mẫu cấu trúc đề thi (#5) | [API mẫu cấu trúc đề](api/exam-templates-api.md) |
+| Chat tạo đề ôn, bản xem trước, đề nháp, sự kiện SSE (#4) | [API học sinh tạo đề ôn](api/user-exam-api.md) |
+| Làm đề online, lưu bài, nộp khi hết giờ và chấm theo thang 10 | [Kế hoạch làm bài online](architecture/online-exam-attempts.md) · [API làm bài online](api/online-exam-attempts-api.md) |
 | Kết nối EC2 và kiểm tra khả năng truy cập API | [Runbook EC2](operations/deploy-ec2.md) |
 | Deploy backend bằng GitHub Actions, sửa nginx | [Deploy backend CI/CD](operations/deploy-backend-ci-cd.md) |
 | Dựng và nạp dữ liệu nền (câu hỏi, đề, ảnh) | [Nạp dữ liệu nền](operations/seed-base-data.md) |

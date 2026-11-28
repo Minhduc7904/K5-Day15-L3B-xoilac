@@ -56,7 +56,7 @@ export function DesignSystemShowcase() {
         <Container className="pb-24">
           <header className="grid gap-3 py-12">
             <Badge tone="accent" icon={<Sparkles aria-hidden="true" />}>
-              Chỉ hiện ở dev / mock
+              Chỉ hiện ở môi trường dev
             </Badge>
             <h1 className="text-h1 text-foreground">Design system Examind</h1>
             <p className="max-w-2xl text-body-lg text-muted-foreground">

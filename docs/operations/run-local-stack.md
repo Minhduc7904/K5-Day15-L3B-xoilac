@@ -20,7 +20,7 @@ Dành cho thành viên nhóm cần dựng PostgreSQL, MinIO và backend trên m�
 
 Đổi cổng hoặc mật khẩu bằng biến môi trường (xem đầu `docker-compose.yml`). Backend đọc `backend/.env`, mẫu ở `backend/.env.example`. Giá trị trong `.env` phải khớp compose.
 
-Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). `CORS_ORIGINS` mặc định rỗng (cả trong `backend/.env.example`); chỉ đặt `http://localhost:3000` khi chạy frontend dev không qua rewrites. Trên prod, các biến này và `ADMIN_*` nằm trong `/opt/examind/prod.env`, xem [deploy-backend-ci-cd.md](deploy-backend-ci-cd.md#biến-trong-prodenv).
+Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `examind_session`), `COOKIE_SECURE` (local để `false` vì chạy HTTP), `SESSION_TTL_HOURS` (mặc định `168`). Đặt `CORS_ORIGINS=http://localhost:3000` để frontend nối Socket.IO trực tiếp, kể cả khi REST đi qua rewrite. Trên prod, các biến này và `ADMIN_*` nằm trong `/opt/examind/prod.env`, xem [deploy-backend-ci-cd.md](deploy-backend-ci-cd.md#biến-trong-prodenv).
 
 ## Các bước thực hiện
 
@@ -59,7 +59,7 @@ Biến của phiên đăng nhập (issue #8): `COOKIE_NAME` (mặc định `exam
 4. Chạy backend:
 
    ```bash
-   uvicorn app.main:asgi_app --reload --port 8000
+   uvicorn app.main:app --reload --port 8000
    ```
 
 5. Thêm admin khác: đăng nhập bằng admin gốc (tài khoản tạo từ `ADMIN_EMAIL`) rồi gọi `POST /api/v1/admin/users` với `"role": "admin"` ([user-management-api.md](../api/user-management-api.md)). Chỉ admin gốc tạo được admin. Đổi `ADMIN_PASSWORD` sau lần tạo đầu **không** đổi mật khẩu của admin đã có.
@@ -99,11 +99,24 @@ curl http://localhost:8000/api/v1/sample-files/<key trả về ở lệnh trên>
 - Tệp tải lên tải lại đúng nội dung (MinIO).
 - Đăng ký, đăng nhập và phân quyền: chạy luồng curl ở [auth-api.md](../api/auth-api.md#luồng-kiểm-thử).
 - Quản lý người dùng: luồng curl ở [user-management-api.md](../api/user-management-api.md#luồng-kiểm-thử).
-- Socket và thống kê online (#20): với backend đang chạy, trong `backend/` chạy `SMOKE_ADMIN_EMAIL=admin@example.com SMOKE_ADMIN_PASSWORD='...' python scripts/socket_smoke.py --base http://localhost:8000`. Mong đợi `Kết quả: 5/5 bước đạt` ([realtime-api.md](../api/realtime-api.md#luồng-kiểm-thử)). Frontend dev nối socket từ `http://localhost:3000` thì đặt `CORS_ORIGINS=http://localhost:3000` trong `backend/.env`.
+- Socket và thống kê online (#20): với backend đang chạy, trong `backend/` chạy `SMOKE_ADMIN_EMAIL=admin@example.com SMOKE_ADMIN_PASSWORD='...' python scripts/socket_smoke.py --base http://localhost:8000`. Mong đợi `Kết quả: 5/5 bước đạt` ([realtime-api.md](../api/realtime-api.md#lỗi-và-kiểm-thử)). Frontend dev nối socket từ `http://localhost:3000` thì đặt `CORS_ORIGINS=http://localhost:3000` trong `backend/.env`.
 
 Test tự động không cần Docker (dùng SQLite và MinIO giả): `cd backend && pytest`.
 
 Giới hạn xác minh: các bước trên đã chạy trên Windows 11 với Docker 29.3 ngày 2026-11-27; phần admin mặc định (bước 1–2, 5–6) chạy với Docker 28.4 ngày 2026-11-28. Chưa thử macOS/Linux.
+
+## Chạy worker học sinh
+
+Sau khi PostgreSQL đã chạy migration, mở terminal riêng trong `backend/` và kích hoạt venv như khi chạy API.
+
+```bash
+python -m app.worker
+python -m app.worker --once --job daily-credit
+python -m app.worker --once --job study-reminders
+python -m app.worker --once --job exam-expiry
+```
+
+`--once` chạy một lượt đến hạn rồi thoát. Khi chạy liên tục, `exam-expiry` quét lượt làm có thời lượng đã tới hạn mỗi 2 giây. Chạy migration `0015_exam_attempts` trước khi bật luồng làm bài online. Khi kiểm thử giao dịch đồng thời trên PostgreSQL, trỏ `EXAM_ATTEMPT_TEST_DATABASE_URL` vào cơ sở dữ liệu thử riêng đã chạy `python -m alembic upgrade head`, rồi chạy `python -m pytest -q tests/test_exam_attempts.py` trong `backend/`. `daily-credit` xử lý theo ngày Việt Nam. `study-reminders` chỉ chạy khi `EMAIL_PROVIDER=gmail`. Khi thử gửi thật, dùng tài khoản và hộp thư bạn kiểm soát, bật nhắc và chọn giờ đã đến trong ngày hiện tại. Chạy migration tới `0017_preview_cancelled` (`python -m alembic upgrade head`) để có bảng `notifications` (`0016`) cho chuông thông báo; `daily-credit` và `study-reminders` cũng sinh thông báo. UI luôn gọi API thật: đặt `NEXT_PUBLIC_SOCKET_URL=http://localhost:8000` để nhận thông báo và kết quả hết giờ theo thời gian thực.
 
 ## Xử lý lỗi
 
