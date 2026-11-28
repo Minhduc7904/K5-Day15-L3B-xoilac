@@ -58,6 +58,7 @@ docker compose exec postgres psql -U examind -d examind -c "select count(*) from
 ## Giới hạn
 
 - Schema `0002_base_content` phản chiếu hệ thống cũ làm nền; các issue #3, #4, #5 mở rộng bằng migration riêng.
+- Migration `0021_questions_archived_at` (#11) thêm cột `questions.archived_at` (NULL). Gói dữ liệu nền không có cột này nên mọi câu nạp vào đều chưa lưu trữ. Câu khả dụng cho đề mới là `visibility = 'PUBLISHED'` và `archived_at IS NULL`, xem [API quản lý ngân hàng câu hỏi](../api/admin-data-api.md).
 - Gói dữ liệu là bản chụp ngày dựng, không đồng bộ liên tục với hệ thống cũ.
 - Ảnh trên VPS chưa có URL công khai; truy cập qua backend (presigned URL) ở issue sau.
 
