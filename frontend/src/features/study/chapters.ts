@@ -37,5 +37,18 @@ export function chapterOf(code: string): Chapter {
   return { code, name: entry?.name ?? code, grade: (grade === 10 || grade === 11 ? grade : 12) as Chapter['grade'] };
 }
 
+const byCode = (a: string, b: string) => a.localeCompare(b, 'en', { numeric: true });
+
+/** Các chương cha (mục không có `parent_code`) trong danh mục. */
+export function parentChapters(): Chapter[] {
+  return Object.keys(catalog).filter((code) => !catalog[code].parent_code).sort(byCode).map(chapterOf);
+}
+
+/** Chương con của một chương cha; chương chưa có chương con thì coi chính nó là một dòng. */
+export function subchaptersOf(parent: string): Chapter[] {
+  const subs = Object.keys(catalog).filter((code) => catalog[code].parent_code === parent).sort(byCode).map(chapterOf);
+  return subs.length ? subs : [chapterOf(parent)];
+}
+
 /** Mã chương cha của một chương con. Chương cha hoặc mã chưa biết trả về chính nó. */
 export const parentOf = (code: string) => catalog[code]?.parent_code ?? code;

@@ -37,6 +37,9 @@ async def test_tool_dispatch_uses_function_schema(monkeypatch):
     options = call.call_args.kwargs
     assert options["tool_choice"] == "required"
     assert {tool["function"]["name"] for tool in options["tools"]} >= {"chapter", "template", "confirm", "replace"}
+    history = next(tool["function"] for tool in options["tools"] if tool["function"]["name"] == "history")
+    types = history["parameters"]["properties"]["type_counts"]["properties"]
+    assert set(types) == {"SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"}
 
 
 async def test_context_scope_shortage_and_free_replacement(live):
@@ -295,3 +298,20 @@ async def test_postgres_serializes_double_confirm_and_last_credit(live):
         assert updated.status_code == 200
         assert updated.json()["draft"]["draft_id"] == first_id
         assert (await client.get(CREDITS)).json()["balance"] == 0
+
+
+async def test_student_plan_reaches_the_model_context(live):
+    live.return_value = ChatAction(action="clarify", question="Em muốn ôn chương nào?")
+    plan = {"chapter_counts": {"12C1": 6, "12C4": 4}, "type_counts": {"SINGLE_CHOICE": 6, "TRUE_FALSE": 4},
+            "difficulty_counts": {"NB": 2, "TH": 4, "VD": 3, "VDC": 1}}
+    async with chat_client(real_auth=True) as client:
+        await login_as(client, "plan@example.com")
+        sid = await new_session(client, None)
+        await say(client, sid, "Ra đề tích phân")
+        assert "student_plan" not in live.call_args.args[0]
+        r = await client.post(f"{BASE}/sessions/{sid}/messages", json={"text": "Phân bổ lại theo tổng quan", "plan": plan})
+        assert r.status_code == 200
+        assert live.call_args.args[0]["student_plan"] == plan
+        bad = await client.post(f"{BASE}/sessions/{sid}/messages",
+                                json={"text": "x", "plan": {"chapter_counts": {"12C1": 99}}})
+        assert bad.status_code == 422

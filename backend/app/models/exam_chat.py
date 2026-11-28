@@ -27,6 +27,8 @@ class ExamChatSession(Base):
         nullable=True,
         index=True,
     )
+    title: Mapped[str | None] = mapped_column(String(80))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     context_summary: Mapped[str | None] = mapped_column(Text)
     summarized_through: Mapped[int | None]
     student_ref: Mapped[str] = mapped_column(String(64), index=True)

@@ -31,6 +31,8 @@ CHAPTER_COUNT = re.compile(r"(1[0-2]c\d+)\s*\((\d+)\s*cau\)")
 ONLY = re.compile(r"toan\s+(?:bo\s+)?(?:cau\s+)?" + DIFF_RE + r"\b")
 EXCLUDE = re.compile(r"(?:khong|bo|dung|tranh)\s+(?:lay\s+)?(?:cac\s+)?(?:cau\s+)?(?:muc\s+)?" + DIFF_RE + r"\b")
 MIX = re.compile(r"(\d+)\s*(?:cau\s*)?" + DIFF_RE + r"\b")
+NEXT_PRACTICE = re.compile(r"(?:tao|ra|lam) de on tiep(?:\s+(\d+)\s+cau(?:\s+" + DIFF_RE
+                           + r")?)?(?:\s+(?:nhe|cho em))?[.!?]*")
 GRADE = re.compile(r"\blop\s*(1[0-2])\b")
 YEAR = re.compile(r"\b(20\d\d)\b")
 
@@ -123,17 +125,30 @@ class Intent:
     asked_total: int | None = None
 
 
+def next_practice(t: str) -> Intent | None:
+    """Nhận yêu cầu ôn tiếp độc lập và số câu/mức độ nếu học sinh nêu."""
+    match = NEXT_PRACTICE.fullmatch(t.strip())
+    if match is None:
+        return None
+    return Intent("weak", edit=parse_edit(t), asked_total=int(match[1]) if match[1] else None)
+
+
 def read(text: str) -> Intent:
     t = norm(text)
     msg = refusal(t)
     if msg:
         return Intent("refuse", text=msg)
+    next_exam = next_practice(t)
+    if next_exam:
+        return next_exam
     raw_total = COUNT.search(t)
     edit = parse_edit(t)
     asked = int(raw_total.group(1)) if raw_total else None
     exam = exam_request(t)
     if exam is not None:
         return Intent("exam", exam=exam, edit=edit, asked_total=asked)
+    if re.search(r"\b(tao de|ra de|on)\b.{0,35}\b(on tiep|theo lich su|hay sai|vua lam)\b", t):
+        return Intent("weak", edit=edit, asked_total=asked)
     if CONFIRM.search(t):
         return Intent("confirm", edit=edit, asked_total=asked)
     if edit.chapter_codes or edit.chapter_counts:
