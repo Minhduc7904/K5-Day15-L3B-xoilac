@@ -174,10 +174,10 @@ flowchart LR
 - Kết quả: lượt 1 22/27 (81%) · lượt 2 25/27 (93%) — run ID: `run-1@20261128-090856` / `run-2@20261128-095729` (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; lượt 2: `tu_choi` 7/7, đạt chuẩn; cùng model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
-- Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
-- Chi phí / task thành công: __ (model __) · __ (model __)
-- Chi phí / tháng ở quy mô thật: thấp __ · cơ sở __ · cao __ → chi tiết `cost/cost-estimate.md`
-- So với impact / người / tháng (§2): đáng làm không, vì sao:
+- Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-1.csv` (50 phiên, seed 42, 0 phiên lỗi), tỉ lệ đạt 25/27 (93%) từ lượt 2
+- Chi phí / task thành công: $0.0012 (gpt-5.4-mini, model đã đo token) · $0.00010 (gpt-5-nano) · $0.0028 (gpt-6.2-sol); hai model sau chỉ nhân giá với token đo ở gpt-5.4-mini
+- Chi phí / tháng ở quy mô thật (gpt-5.4-mini): thấp $0.26 (100 người) · cơ sở $1.31 (500 người) · cao $5.24 (2.000 người); số người *(tự ước tính)* → chi tiết `cost/cost-estimate.md`
+- So với impact / người / tháng (§2): đáng làm về tiền model, vì chi phí cơ sở $0.0026 / người / tháng so với ≈ 23 phút tiết kiệm *(phút tự ước tính)*. Chưa tính hosting, giờ người duyệt, và luồng web dùng model nhiều token hơn bản CLI đã đo nên con số là cận dưới.
 
 ## §9. Rủi ro & an toàn
 - Dữ liệu: ngân hàng câu hỏi là dữ liệu thật của trung tâm dạy thêm do một thành viên nhóm quản lý, không kèm thông tin học sinh. Hồ sơ học sinh trong bản chạy thử là mã giả (HS01–HS04) và tự dựng; repo không chứa dữ liệu học sinh thật; không thu tên, liên hệ hay điểm thật. Không đưa dữ liệu cá nhân thật vào model gói miễn phí. Nếu sau này nhận PDF từ admin thì chỉ nhận đề có quyền dùng và không kèm thông tin học sinh.
@@ -198,6 +198,7 @@ flowchart LR
 | 28/11/2026 | Ghi cách quy đổi ngưỡng "đạt" sang 27 câu: ≥ 22/27 · tu_choi 7/7 · thuong ≥ 6/8 · kho ≥ 10/12 | Chuẩn §7 và `metric_spec.yaml` giữ nguyên chữ, chỉ giữ tỷ lệ % đã chốt ở CP2 (80%, 100%, 75%, 80%) và làm tròn lên cho bộ câu lớn hơn; chi tiết `eval/README.md` mục 3. |
 | 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
 | 28/11/2026 | Lượt 2: thêm ba mẫu chặn trước AI (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input` của `codebase/agent.py` | Lượt 1 trượt B25–B27 (`tu_choi` 4/7). Lượt 2 trên cùng bộ 27 câu: 25/27, `tu_choi` 7/7; chi tiết `eval/report.md` mục 3. |
+| 28/11/2026 | Điền §8 chi phí từ `simulate-1` (50 phiên, 3 mức model, tỉ lệ đạt 25/27 của lượt 2) và `cost/personas.yaml` | Nhóm chưa có số học sinh thật nên 3 mốc người dùng ghi *(tự ước tính)*; số phiên / tháng lấy từ khảo sát câu 8; chi phí chỉ đo bản CLI, chưa đo luồng web. |
 | 28/11/2026 | Điền §0 (luồng hiện tại từ khảo sát) và §3 (Azota, Khan Academy) | Cần §0–§7 đủ nội dung cho CP3; §3 lấy từ tài liệu chính thức của hai sản phẩm, phần không kiểm được ghi "chưa kiểm". |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
