@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     # Phiên đăng nhập (issue #8)
     cookie_name: str = "examind_session"
+    # Cookie riêng của admin: đăng nhập admin không đè phiên học sinh trong cùng trình duyệt.
+    admin_cookie_name: str = "examind_admin_session"
     cookie_secure: bool = False
     session_ttl_hours: int = Field(default=168, ge=1)
 

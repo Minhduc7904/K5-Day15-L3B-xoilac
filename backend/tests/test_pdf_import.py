@@ -165,6 +165,7 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
     assert (await register(client)).status_code == 201
     assert (await client.get(ROOT)).status_code == 403
     assert (await client.post(ROOT, files={"file": ("exam.pdf", data)})).status_code == 403
+    client.cookies.clear()  # phiên học sinh và admin dùng cookie riêng; bỏ phiên học sinh để request không kèm header dùng phiên admin
     assert (await login(client, email="admin@example.com")).status_code == 200
     upload = await client.post(ROOT, files={"file": ("exam.pdf", data, "application/pdf")})
     assert upload.status_code == 202, upload.text
@@ -186,10 +187,12 @@ async def test_upload_preview_approve_and_read(pdf_api, scanned):
         assert (await db.execute(select(questions))).all() == []
 
     review = f"{path}/drafts/{draft['id']}"
+    client.cookies.clear()
     assert (await login(client)).status_code == 200
     assert (await client.get(f"{path}/media/{media_id}/url")).status_code == 403
     assert (await client.patch(review, json={"difficulty": "TH"})).status_code == 403
     assert (await client.post(f"{review}/approve")).status_code == 403
+    client.cookies.clear()
     assert (await login(client, email="admin@example.com")).status_code == 200
     assert (await client.post(f"{review}/approve")).status_code == 422
     saved = await client.patch(review, json={

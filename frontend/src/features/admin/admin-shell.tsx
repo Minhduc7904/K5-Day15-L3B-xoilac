@@ -13,6 +13,7 @@ import { Container } from '@/components/layout/container';
 import { Button } from '@/components/ui/button';
 import { Alert, Skeleton } from '@/components/ui/feedback';
 import { cn } from '@/lib/cn';
+import { ADMIN_LOGIN_PATH } from '@/features/auth/route-guard';
 import { useAppSelector } from '@/store';
 
 export const ADMIN_LINKS = [
@@ -58,13 +59,13 @@ function AdminNav({ path }: { path: string }) {
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { user, status } = useAppSelector((s) => s.auth);
+  const { user, status } = useAppSelector((s) => s.adminAuth);
 
   let body: ReactNode;
   if (status === 'unknown') body = <Skeleton className="h-64 w-full" />;
   else if (!user)
     body = (
-      <Alert tone="info" title="Cần đăng nhập" action={<Button href="/login" size="sm">Đăng nhập</Button>}>
+      <Alert tone="info" title="Cần đăng nhập" action={<Button href={ADMIN_LOGIN_PATH} size="sm">Đăng nhập</Button>}>
         Đăng nhập bằng tài khoản quản trị để dùng trang này.
       </Alert>
     );

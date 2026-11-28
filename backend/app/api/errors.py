@@ -5,7 +5,7 @@ Lỗi 422 do FastAPI kiểm schema giữ định dạng mặc định (`detail` 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
-from app.api.cookies import clear_session_cookie
+from app.api.cookies import clear_session_cookie, session_cookie_name
 from app.core.config import get_settings
 from app.usecase.auth import (
     AccountDisabled,
@@ -96,5 +96,5 @@ async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     if exc.clear_cookie:
         # Handler nằm ngoài hệ dependency nên tự lấy settings, có tính override của test.
         settings = request.app.dependency_overrides.get(get_settings, get_settings)()
-        clear_session_cookie(response, settings)
+        clear_session_cookie(response, settings, session_cookie_name(request, settings))
     return response

@@ -11,7 +11,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <Container size="full" className="flex h-16 items-center gap-2">
           <Logo href="/admin" priority />
           <div className="ml-auto flex items-center gap-2">
-            <UserMenu />
+            <UserMenu scope="admin" />
           </div>
         </Container>
       </header>

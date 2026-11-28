@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.models import Base
 from tests.conftest import new_password
-from tests.test_auth import API, COOKIE, make_admin, register
+from tests.test_auth import ADMIN_COOKIE, API, COOKIE, make_admin, register
 
 VERSIONS = Path(__file__).resolve().parents[1] / "alembic/versions"
 
@@ -57,7 +57,7 @@ async def build_db():
 async def bearer(client, email: str, password: str) -> dict:
     r = await client.post(f"{API}/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200, r.text
-    token = client.cookies[COOKIE]
+    token = client.cookies.get(ADMIN_COOKIE) or client.cookies[COOKIE]
     client.cookies.clear()
     return {"Authorization": f"Bearer {token}"}
 

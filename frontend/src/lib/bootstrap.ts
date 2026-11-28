@@ -4,7 +4,8 @@
  * Mỗi bước có giới hạn thời gian để splash không bao giờ treo.
  */
 import { authApi } from '@/features/auth/api';
-import { sessionChecked } from '@/features/auth/auth-slice';
+import { sessionCheckedOf } from '@/features/auth/auth-slice';
+import type { AuthScope } from '@/lib/auth-scope';
 import type { AppDispatch } from '@/store';
 
 export interface BootstrapContext {
@@ -68,13 +69,18 @@ export const bootstrapSteps: BootstrapStep[] = [
   {
     id: 'session',
     label: 'Kiểm tra phiên đăng nhập',
-    // Gọi GET /auth/me qua lớp API của feature auth.
+    // Gọi GET /auth/me qua lớp API của feature auth, cho cả hai phiên (học sinh và admin) song song.
     run: async ({ dispatch }) => {
-      try {
-        dispatch(sessionChecked(await authApi.me()));
-      } catch {
-        dispatch(sessionChecked(null));
-      }
+      const scopes: AuthScope[] = ['student', 'admin'];
+      await Promise.all(
+        scopes.map(async (scope) => {
+          try {
+            dispatch(sessionCheckedOf(scope, await authApi.me(scope)));
+          } catch {
+            dispatch(sessionCheckedOf(scope, null));
+          }
+        }),
+      );
     },
   },
 ];

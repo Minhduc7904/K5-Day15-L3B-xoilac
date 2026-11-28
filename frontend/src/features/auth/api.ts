@@ -3,6 +3,7 @@
  */
 import { isAxiosError } from 'axios';
 import { apiClient } from '@/lib/api-client';
+import { SCOPE_HEADER, type AuthScope } from '@/lib/auth-scope';
 import { AuthError, type AuthErrorCode, type LoginInput, type OtpPurpose, type PendingOtp, type RegisterInput, type User } from './types';
 
 const FIELD_MESSAGES: Record<string, string> = {
@@ -49,8 +50,11 @@ const httpAuthApi = {
   googleStart: (challenge: string) => call<{ url: string }>(() => apiClient.post('/auth/google/start', { challenge })),
   googleExchange: (ticket: string, verifier: string) =>
     call<User | PendingOtp>(() => apiClient.post('/auth/google/exchange', { ticket, verifier }, mailTimeout)),
-  logout: () => call<void>(() => apiClient.post('/auth/logout', undefined, withCookie)),
-  me: () => call<User>(() => apiClient.get('/auth/me', withCookie)),
+  logout: (scope: AuthScope = 'student') =>
+    call<void>(() => apiClient.post('/auth/logout', undefined, { ...withCookie, headers: { [SCOPE_HEADER]: scope } })),
+  /** Kiểm phiên của một phạm vi (admin hoặc học sinh). Hai phiên độc lập nên bootstrap gọi cả hai. */
+  me: (scope: AuthScope = 'student') =>
+    call<User>(() => apiClient.get('/auth/me', { ...withCookie, headers: { [SCOPE_HEADER]: scope } })),
   forgotPassword: (email: string) => call<void>(() => apiClient.post('/auth/password/forgot', { email }, mailTimeout)),
   verifyOtp: (email: string, otp: string) =>
     call<{ reset_token: string }>(() => apiClient.post('/auth/password/verify-otp', { email, otp })),

@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api.cookies import cookie_name_for, request_scope
 from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session, get_sessionmaker
@@ -38,7 +39,7 @@ from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
 from app.usecase.admin_chapters import AdminChapterUseCase
 from app.usecase.admin_questions import AdminQuestionUseCase
-from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
+from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, SessionMissing, ensure_role
 from app.usecase.exam_chat import ExamChatUseCase, Requester
 from app.usecase.live_exam_chat import LiveExamChat
 from app.service.exam_chat_model import ExamChatModel
@@ -194,22 +195,34 @@ def get_session_token(
     settings: SettingsDep,
     bearer: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> str | None:
-    """Lấy token: cookie trước, không có thì header Authorization: Bearer."""
-    cookie = request.cookies.get(settings.cookie_name)
-    if cookie:
-        return cookie
+    """Lấy token: cookie trước, không có thì header Authorization: Bearer.
+
+    Cookie tách theo vai trò (xem `app.api.cookies`): header `X-Auth-Scope` chọn cookie admin hay học sinh.
+    Không có header thì ưu tiên cookie học sinh rồi tới cookie admin.
+    """
+    scope = request_scope(request)
+    for candidate in [scope] if scope else ["student", "admin"]:
+        cookie = request.cookies.get(cookie_name_for(candidate, settings))
+        if cookie:
+            return cookie
     if bearer is not None and bearer.credentials:
         return bearer.credentials
     return None
 
 
 async def get_current_user(
+    request: Request,
     usecase: AuthUseCaseDep,
     token: Annotated[str | None, Depends(get_session_token)],
 ) -> CurrentUser:
     """Phụ thuộc cho mọi endpoint cần đăng nhập. 401 khi thiếu/hết hạn/thu hồi phiên, 403 khi tài khoản bị khóa."""
     try:
-        return await usecase.get_current_user(token)
+        current = await usecase.get_current_user(token)
+        scope = request_scope(request)
+        # Phiên phải đúng phạm vi frontend yêu cầu: cookie học sinh cũ chứa phiên admin không dùng được ở trang học sinh.
+        if scope is not None and (current.role == "admin") != (scope == "admin"):
+            raise SessionMissing()
+        return current
     except AuthError as e:
         raise to_api_error(e, in_session_check=True) from None
 

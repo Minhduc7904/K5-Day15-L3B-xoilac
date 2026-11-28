@@ -2,8 +2,10 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { signedOut } from '@/features/auth/auth-slice';
+import { usePathname } from 'next/navigation';
+import { authOf, signedOutOf } from '@/features/auth/auth-slice';
 import { apiClient } from '@/lib/api-client';
+import { SCOPE_HEADER, scopeForPath, type AuthScope } from '@/lib/auth-scope';
 import { useAppDispatch, useAppSelector } from '@/store';
 
 const socketOrigin = process.env.NEXT_PUBLIC_SOCKET_URL
@@ -26,13 +28,18 @@ export function useRealtimeSocket() {
   return useSyncExternalStore(subscribe, () => currentSocket, () => null);
 }
 
-async function requestTicket(signal: AbortSignal) {
-  const { data } = await apiClient.post<{ ticket: string }>('/auth/socket-ticket', undefined, { signal });
+async function requestTicket(signal: AbortSignal, scope: AuthScope) {
+  const { data } = await apiClient.post<{ ticket: string }>('/auth/socket-ticket', undefined, {
+    signal,
+    headers: { [SCOPE_HEADER]: scope },
+  });
   return data.ticket;
 }
 
 export function RealtimeConnection() {
-  const userId = useAppSelector((state) => state.auth.user?.user_id);
+  // Trang /admin kết nối bằng phiên admin, các trang còn lại bằng phiên học sinh.
+  const scope = scopeForPath(usePathname());
+  const userId = useAppSelector((state) => authOf(state, scope).user?.user_id);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -60,7 +67,7 @@ export function RealtimeConnection() {
 
     async function connect() {
       try {
-        const ticket = await requestTicket(lifetime.signal);
+        const ticket = await requestTicket(lifetime.signal, scope);
         if (lifetime.signal.aborted) return;
         socket.auth = { ticket };
         socket.connect();
@@ -75,7 +82,7 @@ export function RealtimeConnection() {
     });
     socket.on('connect_error', scheduleReconnect);
     socket.on('disconnect', scheduleReconnect);
-    socket.on('session:revoked', () => dispatch(signedOut('session-expired')));
+    socket.on('session:revoked', () => dispatch(signedOutOf(scope, 'session-expired')));
     publishSocket(socket);
     void connect();
 
@@ -86,7 +93,7 @@ export function RealtimeConnection() {
       socket.disconnect();
       if (currentSocket === socket) publishSocket(null);
     };
-  }, [dispatch, userId]);
+  }, [dispatch, scope, userId]);
 
   return null;
 }

@@ -15,7 +15,7 @@ import type { Principal } from '../permissions';
 import { UserManagement } from './user-management';
 
 export function UsersPage() {
-  const user = useAppSelector((s) => s.auth.user);
+  const user = useAppSelector((s) => s.adminAuth.user);
   const [actor, setActor] = useState<Principal | null>(null);
   const [error, setError] = useState<string | null>(null);
 

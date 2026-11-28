@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Provider } from 'react-redux';
 import { SplashScreen } from '@/components/splash/splash-screen';
 import { ToastProvider } from '@/components/ui/toast';
-import { signedOut } from '@/features/auth/auth-slice';
+import { authOf, signedOutOf } from '@/features/auth/auth-slice';
 import { AuthGuard } from '@/features/auth/route-guard';
 import { RealtimeConnection } from '@/features/realtime/realtime-connection';
 import { StudentAccountProvider } from '@/features/study/profile/student-account-provider';
@@ -18,8 +18,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // API nào báo mất phiên (hết hạn, bị thu hồi, tài khoản bị khoá) thì đăng xuất phía client.
   useEffect(
     () =>
-      onSessionLost(() => {
-        if (store.getState().auth.user) store.dispatch(signedOut('session-expired'));
+      onSessionLost((scope) => {
+        if (authOf(store.getState(), scope).user) store.dispatch(signedOutOf(scope, 'session-expired'));
       }),
     [store],
   );

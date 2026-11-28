@@ -11,7 +11,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { useToast } from '@/components/ui/toast';
 import { useAppDispatch } from '@/store';
 import { authApi } from '../api';
-import { signedIn } from '../auth-slice';
+import { signedInAs } from '../auth-slice';
 import { homeFor } from '../route-guard';
 import { AuthHeader, AuthSwitch, TextLink } from '../components/auth-shell';
 import { GoogleSignIn } from '../components/google-sign-in';
@@ -53,7 +53,9 @@ const errorAlerts: Partial<Record<AuthErrorCode, { tone: 'danger' | 'warning'; t
   },
 };
 
-export function LoginForm({ reason }: { reason?: LoginReason }) {
+/** `admin`: trang /login/admin cho quản trị viên, không có Google, đăng ký và quên mật khẩu (chỉ dành cho học sinh). */
+export function LoginForm({ reason, variant = 'student' }: { reason?: LoginReason; variant?: 'student' | 'admin' }) {
+  const isAdmin = variant === 'admin';
   const router = useRouter();
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -68,7 +70,7 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
     setFailure(null);
     try {
       const user = await authApi.login({ email: normalizeEmail(email), password });
-      dispatch(signedIn(user));
+      dispatch(signedInAs(user));
       toast({ tone: 'success', title: `Chào ${user.display_name ?? 'bạn'}!`, description: 'Đăng nhập thành công.' });
       router.replace(homeFor(user));
     } catch (error) {
@@ -88,8 +90,12 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
       <AuthHeader
         icon={<LogIn />}
         mascot="welcome"
-        title="Đăng nhập"
-        description="Chào bạn quay lại! Đăng nhập để tiếp tục ôn tập."
+        title={isAdmin ? 'Đăng nhập quản trị' : 'Đăng nhập'}
+        description={
+          isAdmin
+            ? 'Dành cho quản trị viên. Phiên này tách riêng với tài khoản học sinh của bạn.'
+            : 'Chào bạn quay lại! Đăng nhập để tiếp tục ôn tập.'
+        }
       />
 
       {alert && (
@@ -139,9 +145,11 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
               />
             )}
           </FormField>
-          <div className="flex justify-end">
-            <TextLink href="/forgot-password">Quên mật khẩu?</TextLink>
-          </div>
+          {!isAdmin && (
+            <div className="flex justify-end">
+              <TextLink href="/forgot-password">Quên mật khẩu?</TextLink>
+            </div>
+          )}
         </div>
 
         <Button type="submit" size="lg" fullWidth loading={form.submitting}>
@@ -149,9 +157,14 @@ export function LoginForm({ reason }: { reason?: LoginReason }) {
         </Button>
       </form>
 
-      <GoogleSignIn />
-
-      <AuthSwitch question="Chưa có tài khoản?" href="/register" label="Tạo tài khoản" />
+      {isAdmin ? (
+        <AuthSwitch question="Không phải quản trị viên?" href="/login" label="Đăng nhập học sinh" />
+      ) : (
+        <>
+          <GoogleSignIn />
+          <AuthSwitch question="Chưa có tài khoản?" href="/register" label="Tạo tài khoản" />
+        </>
+      )}
     </div>
   );
 }
