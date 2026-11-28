@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
-import { mockMode } from '@/lib/config';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { studentDisplayNameChanged } from '@/features/auth/auth-slice';
 import { ErrorState } from '../components/page-states';
@@ -31,7 +30,7 @@ function isStudentArea(path: string) {
 
 export function StudentAccountProvider({ children }: { children: ReactNode }) {
   const user = useAppSelector((state) => state.auth.user);
-  if (mockMode || user?.role !== 'student') return children;
+  if (user?.role !== 'student') return children;
 
   return <StudentAccountSession key={user.user_id} userId={user.user_id}>{children}</StudentAccountSession>;
 }

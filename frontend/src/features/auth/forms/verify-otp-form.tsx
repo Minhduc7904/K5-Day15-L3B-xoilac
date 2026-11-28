@@ -7,10 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Alert, Skeleton } from '@/components/ui/feedback';
 import { OtpInput } from '@/components/ui/otp-input';
 import { useToast } from '@/components/ui/toast';
-import { mockMode } from '@/lib/config';
 import { authApi } from '../api';
-import { AuthHeader, MockNote, TextLink } from '../components/auth-shell';
-import { MOCK_OTP, MOCK_OTP_EXPIRED } from '../mock';
+import { AuthHeader, TextLink } from '../components/auth-shell';
 import { readResetFlow, writeResetFlow, type ResetFlow } from '../reset-flow';
 import { toAuthError } from '../types';
 import { maskEmail } from '../validation';
@@ -88,7 +86,7 @@ export function VerifyOtpForm() {
       toast({
         tone: 'success',
         title: 'Đã gửi mã mới',
-        description: mockMode ? `Mock: mã của bạn là ${MOCK_OTP}.` : `Mã mới đã gửi tới ${maskEmail(flow.email)}.`,
+        description: `Mã mới đã gửi tới ${maskEmail(flow.email)}.`,
       });
     } catch (error) {
       const authError = toAuthError(error);
@@ -218,10 +216,6 @@ export function VerifyOtpForm() {
         )}
         <TextLink href="/forgot-password">Đổi email khác</TextLink>
       </div>
-
-      <MockNote>
-        Mã đúng: <code>{MOCK_OTP}</code>. Mã <code>{MOCK_OTP_EXPIRED}</code> giả lập hết hạn. Sai 5 lần sẽ bị khoá mã.
-      </MockNote>
     </div>
   );
 }

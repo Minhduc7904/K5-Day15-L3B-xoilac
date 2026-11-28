@@ -6,8 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
-import { typeColor } from '../create/structure-preview';
-import { chapterOf, typeLabels } from '../fixtures/chapters';
+import { typeColor, typeLabels } from '../labels';
+import { chapterOf } from '../chapters';
 import { examDuration, relativeDay, scoreTone } from '../format';
 import { formatScore } from '../grading';
 import type { ExamSummary } from '../types';
@@ -132,10 +132,10 @@ export function NextExamCard({ pick, onStructure }: { pick: NonNullable<ReturnTy
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
           <Link
-            href={exam.remote ? `/exams/${exam.id}` : `/exams/${exam.id}/take`}
+            href={`/exams/${exam.id}`}
             className="group inline-flex h-11 items-center gap-2 rounded-xl bg-flame-strong px-5 text-label font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-danger-hover active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <Play className="size-4" aria-hidden="true" /> {exam.remote ? 'Xem đề' : pick.cta}
+            <Play className="size-4" aria-hidden="true" /> Xem đề
           </Link>
           <button
             type="button"

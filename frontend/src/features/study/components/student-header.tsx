@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, ChevronDown, Coins, Menu, X } from 'lucide-react';
+import { ChevronDown, Coins, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -8,10 +8,11 @@ import { Container } from '@/components/layout/container';
 import { Logo } from '@/components/layout/logo';
 import { IconButton } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
+import { NotificationBell, NotificationList } from '@/features/notifications/notification-panel';
+import { useNotifications } from '@/features/notifications/use-notifications';
 import { useLogout } from '@/features/auth/use-logout';
 import { useTour } from '@/features/onboarding/tour-provider';
 import { cn } from '@/lib/cn';
-import { mockMode } from '@/lib/config';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useAppSelector } from '@/store';
 import { useStudentAccount } from '../profile/student-account-provider';
@@ -133,6 +134,7 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
   const { start: startTour } = useTour();
   const { leaving, logout } = useLogout();
   const router = useRouter();
+  const notifications = useNotifications();
   const [open, setOpen] = useState<'notifications' | 'account' | null>(null);
   const actions = useRef<HTMLDivElement>(null);
   const bell = useRef<HTMLButtonElement>(null);
@@ -167,24 +169,19 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
     >
       <CreditPill />
       <div className="sm:relative">
-        <IconButton
-          ref={bell}
-          label="Thông báo"
-          className="aria-expanded:bg-surface-muted aria-expanded:text-primary"
-          aria-expanded={open === 'notifications'}
-          aria-controls="student-notifications"
+        <NotificationBell
+          buttonRef={bell}
+          unread={notifications.unread}
+          expanded={open === 'notifications'}
           onClick={() => setOpen(open === 'notifications' ? null : 'notifications')}
-        >
-          <Bell strokeWidth={1.75} aria-hidden="true" />
-        </IconButton>
+        />
         <section
           hidden={open !== 'notifications'}
           id="student-notifications"
           aria-labelledby="student-notifications-title"
-          className={cn(panelStyle, 'right-3 w-[min(19rem,calc(100vw-1.5rem))] sm:right-0')}
+          className={cn(panelStyle, 'right-3 w-[min(21rem,calc(100vw-1.5rem))] sm:right-0')}
         >
-          <h2 id="student-notifications-title" className="border-b border-border px-4 py-3 text-label font-semibold text-foreground">Thông báo</h2>
-          <p className="px-4 py-4 text-caption text-muted-foreground">Bạn chưa có thông báo.</p>
+          <NotificationList data={notifications} onNavigate={() => setOpen(null)} />
         </section>
       </div>
       <span className="hidden h-6 w-px bg-border lg:block" aria-hidden="true" />
@@ -216,7 +213,7 @@ function HeaderActions({ profileActive }: { profileActive: boolean }) {
             <div className="border-b border-border px-4 py-3">
               <p className="truncate text-label font-bold text-foreground">{name}</p>
               {user && name !== user.email && <p className="truncate text-caption text-muted-foreground">{user.email}</p>}
-              {mockMode && <p className="mt-1 text-caption text-muted-foreground">Điểm luyện tập từ dữ liệu mẫu</p>}
+              <p className="mt-1 text-caption text-muted-foreground">Điểm luyện tập không chính thức</p>
             </div>
             <div className="grid gap-1 p-2">
               <Link href="/profile" aria-current={profileActive ? 'page' : undefined} onClick={() => setOpen(null)} className={cn(panelLink, 'text-foreground')}>

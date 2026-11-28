@@ -23,7 +23,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
 import { cn } from '@/lib/cn';
-import { mockMode } from '@/lib/config';
 import { studyApi } from '../api';
 import { Flame } from '../components/flame';
 import { ErrorState, PageContainer } from '../components/page-states';
@@ -49,15 +48,6 @@ export function ProfilePage() {
   const account = useStudentAccount();
   const res = useResource(() => studyApi.getDashboard(), 'profile-dashboard');
   const profile = account?.status?.profile;
-  if (mockMode) {
-    return (
-      <PageContainer className="grid gap-5 pt-6">
-        <h1 className="text-h1">Hồ sơ</h1>
-        <p className="text-body text-muted-foreground">Dùng chế độ kết nối API để xem hồ sơ và credit.</p>
-        <ResetMock />
-      </PageContainer>
-    );
-  }
 
   return (
     <div className="min-h-[calc(100dvh-var(--student-header-height))] bg-surface">
@@ -499,38 +489,5 @@ function Meter({ ratio, label, className, thick, low }: { ratio: number; label: 
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       />
     </div>
-  );
-}
-
-function ResetMock() {
-  const [asking, setAsking] = useState(false);
-  return (
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-border p-5">
-      <div className="grid gap-0.5">
-        <h2 className="text-label font-semibold text-foreground">Dữ liệu mẫu (chế độ mock)</h2>
-        <p className="text-caption text-muted-foreground">Xoá các đề và lượt làm bài bạn tạo thêm, quay về dữ liệu ban đầu để demo lại.</p>
-      </div>
-      {asking ? (
-        <div className="flex gap-2">
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => {
-              studyApi.resetMockData();
-              window.location.assign('/dashboard');
-            }}
-          >
-            Xoá và khôi phục
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setAsking(false)}>
-            Huỷ
-          </Button>
-        </div>
-      ) : (
-        <Button variant="outline" size="sm" leftIcon={<RotateCcw aria-hidden="true" />} onClick={() => setAsking(true)}>
-          Khôi phục dữ liệu mẫu
-        </Button>
-      )}
-    </section>
   );
 }

@@ -55,7 +55,6 @@ export interface Exam {
   id: string;
   title: string;
   source: ExamSource;
-  remote?: boolean;
   /** Lời nhắn đã dùng để tạo đề với agent (nếu có). */
   prompt?: string;
   reason?: string;
@@ -84,6 +83,8 @@ export interface Attempt {
   score: number;
   correct: number;
   total: number;
+  /** Số câu có trả lời. Có ở lượt trong dashboard, nơi không tải toàn bộ đáp án. */
+  answered?: number;
 }
 
 export interface ExamSummary extends Exam {

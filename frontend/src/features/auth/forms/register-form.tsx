@@ -9,7 +9,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { authApi } from '../api';
-import { AuthHeader, AuthSwitch, MockNote } from '../components/auth-shell';
+import { AuthHeader, AuthSwitch } from '../components/auth-shell';
 import { GoogleSignIn } from '../components/google-sign-in';
 import { PasswordStrength } from '../components/password-strength';
 import { toAuthError, type PendingOtp } from '../types';
@@ -183,11 +183,6 @@ export function RegisterForm() {
       <GoogleSignIn />
 
       <AuthSwitch question="Đã có tài khoản?" href="/login" label="Đăng nhập" />
-
-      <MockNote>
-        Email <code>hs01@example.com</code> đã có sẵn để thử lỗi trùng email. <code>loimang@example.com</code> giả lập
-        mất mạng.
-      </MockNote>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   chatAttachmentUrl, defaultPointWeights, draftLink, examChatApi, examChatError, type PointWeights, type ServerDraft, type ServerMessage,
   type ServerPreview, type ServerSession,
 } from '../exam-chat-api';
-import { difficultyLabels, typeLabels } from '../fixtures/chapters';
+import { difficultyLabels, typeLabels } from '../labels';
 import { useStudentAccount } from '../profile/student-account-provider';
 import type { StructureRow } from '../types';
 import { addImages, Composer, EXAM_CHAT_IMAGES, type Attachment } from './composer';

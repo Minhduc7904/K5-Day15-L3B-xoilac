@@ -8,10 +8,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
 import { cn } from '@/lib/cn';
+import { DEMO_RESULT_ID } from '../../onboarding/demo-result';
 import { studyApi } from '../api';
 import { ErrorState, PageContainer } from '../components/page-states';
 import { QuestionContent } from '../components/question-content';
-import { chapterOf, difficultyLabels, typeLabels } from '../fixtures/chapters';
+import { chapterOf } from '../chapters';
+import { difficultyLabels, typeLabels } from '../labels';
 import { accuracyTone, formatDuration, longDate, percent, scoreTone } from '../format';
 import { formatScore, type QuestionResult } from '../grading';
 import { useResource } from '../use-resource';
@@ -33,7 +35,7 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
       {res.status === 'error' && (
         <ErrorState title={res.error.name === 'NotFoundError' ? 'Không tìm thấy kết quả này' : undefined} onRetry={res.error.name === 'NotFoundError' ? undefined : res.reload} />
       )}
-      {res.status === 'ready' && <Result data={res.data} />}
+      {res.status === 'ready' && <Result data={res.data} demo={attemptId === DEMO_RESULT_ID} />}
     </PageContainer>
     </div>
   );
@@ -74,7 +76,7 @@ function headline(score: number) {
 
 type FilterId = (typeof FILTERS)[number]['id'];
 
-function Result({ data }: { data: Data }) {
+function Result({ data, demo }: { data: Data; demo: boolean }) {
   const { attempt, exam, graded, previous } = data;
   const reduce = useReducedMotion();
   const [filter, setFilter] = useState<FilterId>('all');
@@ -112,6 +114,9 @@ function Result({ data }: { data: Data }) {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-5 sm:gap-6">
+      {demo && <p role="status" className="rounded-xl bg-accent-subtle p-4 text-label text-accent-strong">
+        Kết quả minh hoạ, không phải bài của bạn. Bài làm thật của bạn sẽ hiện ở đây sau khi bạn nộp bài.
+      </p>}
       {attempt.reason === 'timeout' && <p role="status" className="rounded-xl bg-warning-subtle p-4 text-label text-warning">
         Hết giờ làm bài. Bài đã được tự động nộp và chấm.
       </p>}
@@ -124,9 +129,11 @@ function Result({ data }: { data: Data }) {
           </div>
           <div className="grid gap-3 text-center md:text-left">
             <p className="text-label font-semibold text-primary-foreground/70">
-              <Link href={`/exams/${exam.id}`} className="rounded-sm underline-offset-4 hover:text-primary-foreground hover:underline focus-visible:outline-2 focus-visible:outline-accent">
-                {exam.title}
-              </Link>
+              {demo ? exam.title : (
+                <Link href={`/exams/${exam.id}`} className="rounded-sm underline-offset-4 hover:text-primary-foreground hover:underline focus-visible:outline-2 focus-visible:outline-accent">
+                  {exam.title}
+                </Link>
+              )}
             </p>
             <h1 id="result-title" className="text-h1">{h.title}</h1>
             <div className="flex flex-wrap justify-center gap-2 md:justify-start">
@@ -200,7 +207,7 @@ function Result({ data }: { data: Data }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-primary-foreground/12 px-5 py-4 sm:px-8">
-          {weakest && (
+          {weakest && !demo && (
             <Link
               href={`/exams/new?q=${encodeURIComponent(`Ôn chương ${weakest}`)}`}
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-flame-strong px-5 text-label font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-danger-hover active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -208,13 +215,19 @@ function Result({ data }: { data: Data }) {
               <Sparkles className="size-4" aria-hidden="true" /> Tạo đề ôn phần sai
             </Link>
           )}
-          <Button variant="inverse" href={`/exams/${exam.id}/take`} leftIcon={<RotateCcw aria-hidden="true" />}>
-            Làm lại đề này
-          </Button>
+          {demo ? (
+            <Button variant="inverse" href="/exams/new" leftIcon={<Sparkles aria-hidden="true" />}>
+              Tạo đề đầu tiên
+            </Button>
+          ) : (
+            <Button variant="inverse" href={`/exams/${exam.id}/take`} leftIcon={<RotateCcw aria-hidden="true" />}>
+              Làm lại đề này
+            </Button>
+          )}
           <Button variant="inverse" href="/dashboard" leftIcon={<LayoutDashboard aria-hidden="true" />} className="border-transparent">
             Về tổng quan
           </Button>
-          <p className="w-full text-caption text-primary-foreground/60 lg:ml-auto lg:w-auto">Nộp lúc {longDate(attempt.submittedAt)} · điểm luyện tập, không phải điểm chính thức</p>
+          <p className="w-full text-caption text-primary-foreground/60 lg:ml-auto lg:w-auto">{demo ? 'Dữ liệu minh hoạ' : `Nộp lúc ${longDate(attempt.submittedAt)}`} · điểm luyện tập, không phải điểm chính thức</p>
         </div>
       </section>
 

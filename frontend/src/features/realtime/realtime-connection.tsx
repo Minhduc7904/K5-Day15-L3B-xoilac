@@ -4,7 +4,6 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { signedOut } from '@/features/auth/auth-slice';
 import { apiClient } from '@/lib/api-client';
-import { mockMode } from '@/lib/config';
 import { useAppDispatch, useAppSelector } from '@/store';
 
 const socketOrigin = process.env.NEXT_PUBLIC_SOCKET_URL
@@ -37,7 +36,7 @@ export function RealtimeConnection() {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    if (mockMode || userId == null || !socketOrigin) return;
+    if (userId == null || !socketOrigin) return;
 
     const socket = io(socketOrigin, {
       path: '/api/socket.io',

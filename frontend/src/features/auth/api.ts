@@ -1,11 +1,8 @@
 /**
  * Lớp gọi API của feature auth. Mọi trang auth chỉ gọi qua `authApi`.
- * Dùng mock khi bật NEXT_PUBLIC_MOCK_MODE.
  */
 import { isAxiosError } from 'axios';
 import { apiClient } from '@/lib/api-client';
-import { mockMode } from '@/lib/config';
-import { mockAuthApi } from './mock';
 import { AuthError, type AuthErrorCode, type LoginInput, type OtpPurpose, type PendingOtp, type RegisterInput, type User } from './types';
 
 const FIELD_MESSAGES: Record<string, string> = {
@@ -61,4 +58,4 @@ const httpAuthApi = {
     call<void>(() => apiClient.post('/auth/password/reset', { reset_token: resetToken, password })),
 };
 
-export const authApi: typeof httpAuthApi = mockMode ? { ...httpAuthApi, ...mockAuthApi } : httpAuthApi;
+export const authApi = httpAuthApi;

@@ -4,7 +4,8 @@ import { Gauge, Hourglass, Sigma, Timer, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 import { cn } from '@/lib/cn';
-import { chapterOf, difficultyLabels, typeLabels } from '../fixtures/chapters';
+import { chapterOf } from '../chapters';
+import { difficultyLabels, typeLabels } from '../labels';
 import type { QuestionResult } from '../grading';
 import type { Attempt, Exam } from '../types';
 

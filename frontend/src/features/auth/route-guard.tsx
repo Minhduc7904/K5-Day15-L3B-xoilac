@@ -11,7 +11,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppSelector } from '@/store';
-import { mockMode } from '@/lib/config';
 import type { AuthState } from './auth-slice';
 import type { User } from './types';
 
@@ -26,7 +25,7 @@ export const homeFor = (user: Pick<User, 'role'>) => (user.role === 'admin' ? '/
 const isAuthPage = (path: string) => AUTH_PATHS.some((base) => under(path, base));
 /**
  * Khách chỉ xem được trang chủ (để biết Examind là gì) và các trang auth. Các trang học sinh
- * (`/dashboard`, `/exams`, `/results`, `/profile`) luôn yêu cầu đăng nhập, kể cả khi dữ liệu là mock.
+ * (`/dashboard`, `/exams`, `/results`, `/profile`) luôn yêu cầu đăng nhập.
  */
 const isPublicPage = (path: string) => isAuthPage(path) || path === '/';
 
@@ -40,7 +39,7 @@ export function guardRedirect(path: string, auth: AuthState): string | null | un
   if (SHARED_PATHS.some((base) => under(path, base))) return null;
   const inAdmin = under(path, '/admin');
   if (user.role === 'admin' && !inAdmin) return '/admin';
-  if (user.role === 'student' && (inAdmin || (mockMode && path === '/profile/setup'))) return homeFor(user);
+  if (user.role === 'student' && inAdmin) return homeFor(user);
   return null;
 }
 
