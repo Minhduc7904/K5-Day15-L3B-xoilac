@@ -22,6 +22,8 @@ PDF tối đa 60 trang và 20 MiB. Với tệp trên 30 trang, OCR chạy theo l
 1. Lưu PDF gốc và tạo phiên `queued`. Tác vụ nền dùng session DB riêng, đặt trạng thái `processing` rồi cập nhật bước đang chạy.
 2. Lưu Markdown từng trang để đối chiếu. Lưu ảnh với quan hệ đến PDF gốc và gắn mã `media:ID` ổn định vào Markdown. Ảnh thiếu hoặc lỗi lưu được báo để admin kiểm tra. Bản nháp có ảnh trong thân câu, lựa chọn hoặc lời giải cần admin xác nhận đã xem ảnh trước khi duyệt.
 3. Tách câu và đáp án theo phần và số in trên đề. Giữ thứ tự, LaTeX, trang nguồn, ảnh và lời giải có trong PDF. Gắn cờ đáp án thiếu, mâu thuẫn hoặc ghép không duy nhất. Giá trị chưa rõ của mệnh đề là `null`.
+
+Khi nhận diện duy nhất khối câu hỏi theo phần và số câu, backend dùng lại Markdown OCR để khôi phục ảnh và cấu trúc lựa chọn. Khối lựa chọn chỉ được khôi phục nếu tìm thấy đủ bốn nhãn theo thứ tự. Với lời giải đã xác định, backend giữ cả khối một dòng và đọc các kết luận in rõ như “Chọn B”, nhãn đúng/sai, hoặc “Đáp số” dạng số. Đáp án trích từ bảng riêng vẫn được đối chiếu để phát hiện mâu thuẫn.
 4. So sánh embedding của thân câu và các mệnh đề với một mẫu câu Toán đã xuất bản, có nhãn hợp lệ. Lưu mã câu gần và điểm tương đồng. Để trống nhãn thiếu căn cứ.
 5. Trả `ready_for_review` khi có bản nháp hoặc `failed` kèm bước lỗi. Admin sửa, duyệt hoặc bỏ từng câu. Khi duyệt, ghi câu và các liên kết vào kho chung với `visibility=PUBLISHED`. Bản đọc cho học sinh chỉ gồm nội dung, mệnh đề có thứ tự và ảnh được phép đọc.
 

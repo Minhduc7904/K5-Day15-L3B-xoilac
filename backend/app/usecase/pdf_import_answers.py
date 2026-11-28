@@ -1,13 +1,25 @@
 import re
 
 from app.schemas.pdf_import import AnswerEvidence, ExtractedQuestion, Extraction
-from app.usecase.pdf_import_solutions import solution_excerpt_page, solution_key, worked_solutions
+from app.usecase.pdf_import_question_source import question_source_blocks, restore_source_question
+from app.usecase.pdf_import_solutions import WorkedSolution, solution_excerpt_page, solution_key, worked_solutions
 
 CHOICE_TYPES = {"SINGLE_CHOICE", "MULTIPLE_CHOICE"}
 STATEMENT_TYPES = CHOICE_TYPES | {"TRUE_FALSE"}
 MEDIA_ID = re.compile(r"media:(\d+)")
 MISSING_MEDIA = re.compile(r"media-missing:p\d+-\d+")
 LETTERED_OPTION = re.compile(r"^\s*(?:\*\*)?([A-D])[.)](?:\*\*)?\s+(.+)$", re.DOTALL)
+PRINTED_CHOICE = re.compile(
+    r"\b(?:chọn\s+|đáp án\s*(?:là|:)\s*)\$?([A-D])\$?(?=[.!\s]|$)", re.IGNORECASE,
+)
+PRINTED_TRUE_FALSE = re.compile(
+    r"^[ \t]*(?:\*\*|__)?([a-d])[.)](?:\*\*|__)?[ \t]*(?:\*\*|__)?(đúng|sai)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+PRINTED_NUMBER = re.compile(
+    r"\bđáp số\s*:\s*\$?([+−-]?\d+(?:[.,][ \t]*\d+)?)\$?(?=[.!]?(?:\s*$|\s*\n))",
+    re.IGNORECASE,
+)
 
 
 def media_ids(*values: str | None) -> set[int]:
@@ -36,6 +48,39 @@ def comparable_answer(value: str) -> str:
     if re.fullmatch(r"-?\d+(?:[.,]\d+)?", stripped):
         return stripped.replace(",", ".")
     return value
+
+
+def printed_solution_answers(question: ExtractedQuestion, source: WorkedSolution) -> list[AnswerEvidence]:
+    evidence = []
+    for page, markdown in source.chunks:
+        if question.type == "SINGLE_CHOICE":
+            # A choice letter must be the conclusion, not a reference inside the derivation.
+            match = next((item for item in PRINTED_CHOICE.finditer(markdown)
+                          if not markdown[item.end():].strip(" .!\t\n*_")), None)
+            matches = [match] if match else []
+        elif question.type == "TRUE_FALSE" and len(question.statements) <= 4:
+            matches = PRINTED_TRUE_FALSE.finditer(markdown)
+        elif question.type == "SHORT_ANSWER":
+            matches = PRINTED_NUMBER.finditer(markdown)
+        else:
+            continue
+        for match in matches:
+            choices, truth_values, answer = None, None, None
+            if question.type == "SINGLE_CHOICE":
+                choices = ["ABCD".index(match[1].upper()) + 1]
+            elif question.type == "TRUE_FALSE":
+                index = "abcd".index(match[1].lower())
+                if index >= len(question.statements):
+                    continue
+                truth_values = [None] * len(question.statements)
+                truth_values[index] = match[2].lower() == "đúng"
+            else:
+                answer = re.sub(r"\s+", "", match[1]).replace("−", "-")
+            evidence.append(AnswerEvidence(
+                section=question.section, number=question.number, page=page, source="solution",
+                excerpt=match[0].strip(), choices=choices, truth_values=truth_values, answer=answer, solution=None,
+            ))
+    return evidence
 
 
 def normalize_extracted_question(question: ExtractedQuestion, source: str) -> ExtractedQuestion:
@@ -96,6 +141,7 @@ def anchor_evidence(
 def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
     page_map = {page["page"]: page["normalized"] for page in pages}
     has_worked_heading, source_solutions = worked_solutions(page_map)
+    source_questions = question_source_blocks(page_map)
     normalized_pages = {number: " ".join(markdown.split()) for number, markdown in page_map.items()}
     table_pages: dict[tuple[str, ...], set[int]] = {}
     for number, markdown in page_map.items():
@@ -119,22 +165,35 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
     for extracted in extraction.questions:
         if not extracted.pages or not set(extracted.pages) <= page_map.keys():
             raise ValueError("Câu hỏi thiếu trang nguồn hợp lệ.")
-        source = "\n".join(page_map[page] for page in sorted(set(extracted.pages)))
-        question = normalize_extracted_question(extracted, source)
+        key = solution_key(extracted.section, extracted.number)
+        question = restore_source_question(extracted, source_questions.get(key))
+        source = "\n".join(page_map[page] for page in sorted(set(question.pages)))
+        question = normalize_extracted_question(question, source)
+        source_solution = source_solutions.get(key)
+        printed = printed_solution_answers(question, source_solution) if source_solution else []
+        printed_complete = bool(printed) and (
+            question.type != "TRUE_FALSE"
+            or all(any(item.truth_values[index] is not None for item in printed)
+                   for index in range(len(question.statements)))
+        )
         matching = []
         source_excerpts = []
         ambiguous = False
         for item in answers:
             if item.number != question.number or item.section not in (None, question.section):
                 continue
-            source_excerpts.append(item)
             if item.section is None and sum(number == item.number for _, number in keys) != 1:
                 ambiguous = True
+                source_excerpts.append(item)
                 continue
+            if printed_complete and item.source == "solution":
+                continue
+            source_excerpts.append(item)
             matching.append(item)
+        matching.extend(printed)
+        source_excerpts.extend(printed)
         values = [answer_value(question, item) for item in matching]
         known = [value for value in values if value is not None]
-        source_solution = source_solutions.get(solution_key(question.section, question.number))
         if source_solution:
             solution = source_solution.markdown
             solution_pages = source_solution.pages

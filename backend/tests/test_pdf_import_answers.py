@@ -161,6 +161,43 @@ def test_solution_without_an_explicit_section_is_flagged():
                for draft in build_drafts(data, pages))
 
 
+def test_restores_omitted_question_images_and_reads_explicit_worked_answers():
+    crop = "![media:80](media:80)"
+    option_crop = "![media:81](media:81)"
+    pages = [
+        {"page": 1, "normalized": f"PHẦN I.\n**Câu 1:** Có một vật thể.\n{crop}\n"
+         f"Chọn hình tương ứng.\nA. Hình tròn B. {option_crop} C. Hình vuông D. Hình thoi\n"
+         "Câu 2. Một câu khác.\nA. 1 B. 2 C. 3 D. 4\nLOGO\nTrang 1\n"},
+        {"page": 2, "normalized": "PHẦN II.\nCâu 1. Xét bốn mệnh đề.\n"
+         "a) Một.\nb) Hai.\nc) Ba.\nd) Bốn.\nPHẦN III.\nCâu 1. Tìm độ dài.\n"
+         "LOGO\nTrang 2\n"},
+        {"page": 3, "normalized": "# ĐÁP ÁN VÀ LỜI GIẢI THAM KHẢO\n"
+         "PHẦN I.\n**Câu 1.** Hai hình giống nhau. Chọn B.\nCâu 2. Chọn C.\n"
+         "PHẦN II.\n**Câu 1.**\na) Đúng.\nb) Sai.\nc) Đúng.\nd) Sai.\n"
+         "PHẦN III.\n**Câu 1.** Có kết quả đã làm tròn. Đáp số: 13,9.\n--- HẾT ---"},
+    ]
+    questions = [
+        question("I", "SINGLE_CHOICE", ["a", "b", "c", "d", "$"]),
+        question("I", "SINGLE_CHOICE", ["1", "2", "3", "4"], number="2"),
+        question("II", "TRUE_FALSE", ["Một.", "Hai.", "Ba.", "Bốn."]),
+        question("III", "SHORT_ANSWER"),
+    ]
+    questions = [item.model_copy(update={"content": "Bản model thiếu dữ kiện", "image_dependent": False})
+                 for item in questions]
+    choice, other, true_false, short = build_drafts(Extraction(questions=questions, answers=[]), pages)
+    assert choice["content"] == f"Có một vật thể.\n{crop}\nChọn hình tương ứng."
+    assert choice["sourcePages"] == [1] and choice["solutionPages"] == [3]
+    assert [option["content"] for option in choice["statements"]] == [
+        "Hình tròn", option_crop, "Hình vuông", "Hình thoi",
+    ]
+    assert [option["isCorrect"] for option in choice["statements"]] == [False, True, False, False]
+    assert choice["imageDependent"] and choice["flags"] == ["image_review"]
+    assert "media:" not in other["content"] and other["answerState"] == "resolved"
+    assert [option["isCorrect"] for option in true_false["statements"]] == [True, False, True, False]
+    assert short["answerState"] == "resolved" and short["correctAnswer"] == "13,9"
+    assert short["evidence"][0]["excerpt"] == "Đáp số: 13,9"
+
+
 @pytest.mark.parametrize("repeated", [False, True])
 def test_reanchors_key_row_only_if_one_page_matches(repeated):
     key = evidence("III", "key", "|1|2,41|", answer="2,41").model_copy(update={"page": 12})

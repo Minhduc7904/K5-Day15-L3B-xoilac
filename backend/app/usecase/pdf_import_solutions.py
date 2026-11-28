@@ -8,6 +8,10 @@ WORKED_HEADING = re.compile(
 )
 SECTION_HEADING = re.compile(r"phần\s+([IVXLCDM]+|\d+)(?=$|[.\s:\-–])", re.IGNORECASE)
 QUESTION_HEADING = re.compile(r"câu\s+(\d+)[.):](?:\s|$)", re.IGNORECASE)
+RAW_QUESTION_HEADING = re.compile(
+    r"^\s*(?:#{1,6}\s*)?(?:\*\*|__)?câu\s+\d+[.):](?:\*\*|__)?(?=\s|$)",
+    re.IGNORECASE,
+)
 END_HEADING = re.compile(r"[-–—\s]*hết[-–—.\s]*", re.IGNORECASE)
 
 
@@ -70,7 +74,9 @@ def worked_solutions(pages: dict[int, str]) -> tuple[bool, dict[tuple[str, str],
         if len(candidates) != 1:
             continue
         lines = candidates[0]
-        if not any(line.strip() for _, line in lines[1:]):
+        if not QUESTION_HEADING.sub("", heading_text(lines[0][1]), count=1).strip() and not any(
+            line.strip() for _, line in lines[1:]
+        ):
             continue
         chunks = tuple(
             (page, chunk)

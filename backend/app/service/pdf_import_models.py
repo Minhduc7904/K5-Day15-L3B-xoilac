@@ -286,7 +286,9 @@ Keep a question with A–D options in the single-answer section as SINGLE_CHOICE
 source explicitly permits multiple correct options.
 Answer tables and worked solutions are evidence, not additional questions. Return separate
 evidence for both sources when both are printed, including worked solutions for short-answer
-questions. A key excerpt is the exact printed Markdown table row. For each worked solution,
+questions. A key excerpt is the exact printed Markdown table row. A concluding "Chọn A",
+"Đáp số" or labeled true/false result inside a worked solution belongs to the solution, not the key.
+For each worked solution,
 choose a short, distinct verbatim excerpt (a few words or a printed answer line) from its
 source page, rather than the full solution as the excerpt. Put the full printed solution
 in the solution field, preserving the original content across page breaks.
