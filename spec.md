@@ -125,7 +125,8 @@ flowchart LR
   | Chỉ dùng căn cứ đã duyệt | Khối "Chặn rủi ro sau AI" kiểm mã câu thuộc ngân hàng (B02, B07, B08) |
   | Chặn trước khi tới AI | Khối "Chặn rủi ro trước AI" lọc tấn công và ngoài phạm vi (B10–B13) |
 
-- Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật:
+- **Luồng web CP3 (#41).** Agent lấy lượt đã chấm của tài khoản đăng nhập qua nguồn lịch sử #40. Code tính số câu đúng, sai và bỏ qua theo chương cha trong tối đa năm lượt gần nhất trong 30 ngày. Từ năm câu đã làm và tỷ lệ sai từ 50%, chương được ưu tiên củng cố. Model đề xuất phân bổ và lý do dựa trên thống kê và kho đã duyệt. Server kiểm ma trận rồi dùng luồng xem trước, chỉnh, xác nhận và dựng đề #4. Xem [hợp đồng và ca kiểm thử web](docs/api/user-exam-api.md#ôn-theo-lịch-sử-đã-chấm).
+- **Dữ liệu và model của bản CLI dùng cho bộ câu thử CP2.**
   - Model đang ở chế độ giả (`MODEL_PROVIDER` để trống), chưa gọi model thật; token đang là 0.
   - `agent.py` là workflow cố định bằng quy tắc (nhận diện yêu cầu, chọn nhánh, dựng cấu trúc, kiểm đầu ra), chưa dùng model để quyết định. Model chỉ dùng để diễn đạt lại tin nhắn không chứa câu hỏi khi đã nối model thật; ở chế độ giả agent trả thẳng bản dựng bằng code. Chưa có lần chạy nào với model thật.
   - `get_exam_template` luôn trả "chưa có" vì chưa có cấu trúc kỳ thi nào được xác thực nguồn.
@@ -185,7 +186,7 @@ flowchart LR
 
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
-|  |  |  |
+| 28/11/2026 | Nối lịch sử đã chấm và đề xuất AI với luồng xem trước của web (#41) | Kiểm hai tài khoản cùng khối, ca thiếu căn cứ, kho thiếu, cập nhật sau lượt mới và luồng xác nhận. Giữ bộ câu thử và tiêu chí CP2 tại §7. |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 

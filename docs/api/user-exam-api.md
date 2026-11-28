@@ -13,6 +13,15 @@ Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`.
 - `GET /exam-chat/sessions` liệt kê phiên của tài khoản. `GET /exam-chat/sessions/{id}/transcript` nhận
   `before` là mã tin nhắn và `limit` là số tin để tải lịch sử cũ hơn. `GET /exam-chat/chapters` trả danh mục
   theo mã với tên và `parent_code`.
+- `PATCH /exam-chat/sessions/{id}` đổi tên đoạn chat (`{"title": "..."}`, 1–80 ký tự, không để trống), trả phần tử như
+  `GET /exam-chat/sessions`. `DELETE /exam-chat/sessions/{id}` trả `204` và ẩn phiên khỏi danh sách; dữ liệu và
+  đề nháp đã dựng vẫn còn nên "Đề của tôi" và lượt làm bài không đổi. Người khác nhận `404`, như phiên không tồn tại.
+  Tên do học sinh đặt ưu tiên hơn tên lấy từ tin nhắn đầu.
+- `edit.title` (tối đa 120 ký tự) đặt tên đề cho bản xem trước theo chương hoặc theo mẫu. Khi dựng, tên này thành
+  tên đề nháp; không đặt thì server tự đặt "Đề ôn luyện ngày …". Đổi tên không làm đổi cấu trúc nên không đặt lại ma trận.
+- `plan` trong body tin nhắn (tuỳ chọn) là tổng quan học sinh vừa chỉnh: `chapter_counts`, `type_counts` (mỗi số 1–50) và
+  `difficulty_counts` (0–50). Server đưa nó vào ngữ cảnh của agent để phân bổ lại thành ma trận chi tiết theo chương con;
+  kết quả vẫn qua cùng bước kiểm tra như mọi chỉnh sửa khác.
 - `PATCH /exam-chat/sessions/{id}/preview` chấp nhận `edit.rows` gồm `chapter`, `difficulty`, `type`, `count`
   cho đề tự chọn. Bản xem trước có thể kèm `operation` đổi câu hoặc dựng lại bộ câu. Sự kiện SSE
   `preview` mang `null` khi học sinh bỏ bản xem trước chưa dựng.
@@ -22,7 +31,42 @@ Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`.
   Hết credit trả `402 INSUFFICIENT_CREDITS` và giữ preview.
 - `GET /exam-chat/drafts` liệt kê đề hiện hành của tài khoản. `GET /exam-chat/drafts/{id}` đọc nội dung đề và
   `GET /exam-chat/drafts/{id}/media/{media_id}` đọc ảnh trong đề. Chủ đề và kết quả làm bài cũ không được
-  suy ra từ dữ liệu thử. Đợt này hỗ trợ xem và in đề. Chưa triển khai làm bài trực tuyến.
+  suy ra từ dữ liệu thử. Đề hỗ trợ xem, in và làm trực tuyến qua [API lượt làm bài](online-exam-attempts-api.md).
+
+### Ôn theo lịch sử đã chấm
+
+Gửi “Tạo đề ôn tiếp” qua endpoint tin nhắn đang dùng. Agent lấy khối trong hồ sơ hoặc phạm vi học sinh chọn và chỉ đọc lượt của tài khoản đăng nhập. Mỗi lần yêu cầu mới đọc lại tối đa năm lượt đã chấm trong 30 ngày, xếp theo thời điểm chấm rồi mã lượt. Phản hồi tóm tắt bài vừa làm và các lượt trước trong khoảng này.
+
+| Số câu đã làm theo chương cha | Cách diễn giải |
+| --- | --- |
+| 0 | Chưa luyện trong khoảng đang xét |
+| 1–4 | Ít dữ liệu, kể cả sai 1/1 |
+| Ít nhất 5 và sai từ 50% | Chương yếu cần củng cố |
+| Ít nhất 5 và sai dưới 50% | Có đủ dữ liệu để ôn cân bằng |
+
+Chỉ trạng thái `correct` tính đúng. `wrong` và `partial` tính sai. Câu bỏ qua được đếm riêng và không tính vào mẫu số. Server gộp theo chương cha và loại mục thiếu kết quả hoặc nhãn chương rõ ràng. Lượt thiếu căn cứ hoặc có kết quả trái nhau trong cùng lượt dẫn tới câu hỏi chọn chương hoặc gợi ý làm bài ngắn. Các ngưỡng nằm trong `backend/app/service/exam_chat_sources.py`.
+
+Model nhận thống kê tổng hợp, phạm vi, ràng buộc và số câu đã duyệt theo ô. Kết quả là các nhóm chương, độ khó, dạng câu, số lượng, mã căn cứ và mục đích luyện. Server kiểm số liệu và ghép thử câu phân biệt trước khi gửi `preview`. Kho thiếu thì tin nhắn nêu phần thiếu để học sinh sửa. Nếu kho thay đổi sau khi xem trước, dùng cơ chế `offer` và xác nhận số câu rút gọn đang có. Bước dựng và định dạng sự kiện SSE dùng hợp đồng hiện có.
+
+#### Kiểm chứng CP3 #41
+
+Ca live ngày 28/11/2026 dùng hai tài khoản lớp 12 tự tạo và nộp bài qua API thật trong cơ sở dữ liệu kiểm thử.
+
+| Ca | Kết quả |
+| --- | --- |
+| Cùng yêu cầu “Tạo đề ôn tiếp 1 câu thông hiểu” | Tài khoản A nhận `12C11` vì sai 6/6 câu ở chương cha `12C1`. Tài khoản B nhận `12C4` vì sai 6/6 câu ở chương đó. |
+| Có lượt chấm mới trong phiên chat của A | Sau khi A làm đúng một lượt ở `12C1` và nộp hai lượt ở `12C4`, đề xuất chuyển sang `12C4`. |
+| Xem trước, chỉnh và xác nhận | A chỉnh từ một thành hai câu rồi xác nhận. Đề nháp chứa hai câu đã duyệt và ẩn dữ liệu đáp án. |
+
+Ba lời gọi đề xuất dùng `gpt-5.4-mini-2026-03-17`. API ghi lần lượt 830, 830 và 843 token vào, cùng 52 token ra mỗi lần. Các ca lịch sử rỗng, 1/1, chưa luyện, mâu thuẫn, kho thiếu, đổi phiên bản, chặn truy cập chéo và chỉnh qua chat chạy trong bộ test thường.
+
+Chạy lại ca live từ thư mục `backend/` bằng PowerShell với khóa model đã cấu hình.
+
+```powershell
+$env:EXAMIND_CP3_LIVE = '1'
+..\.venv\Scripts\python.exe -m pytest -q tests/test_personalization_chat.py -k configured_provider --log-cli-level=INFO
+$env:EXAMIND_CP3_LIVE = $null
+```
 
 ### Ảnh trong chat
 
@@ -97,6 +141,8 @@ Số câu mỗi mức của từng chương được chia từ `count` theo `dif
 | Method | Path | Việc |
 | --- | --- | --- |
 | POST | `/exam-chat/sessions` | Tạo phiên |
+| PATCH | `/exam-chat/sessions/{id}` | Đổi tên phiên |
+| DELETE | `/exam-chat/sessions/{id}` | Ẩn phiên khỏi danh sách |
 | GET | `/exam-chat/sessions/{id}` | Đọc phiên: tin nhắn, bản xem trước, đề nháp mới nhất |
 | POST | `/exam-chat/sessions/{id}/messages` | Gửi tin nhắn, nhận SSE |
 | GET | `/exam-chat/sessions/{id}/preview` | Đọc bản xem trước |
@@ -116,7 +162,7 @@ Số câu mỗi mức của từng chương được chia từ `count` theo `dif
 
 ### POST /exam-chat/sessions/{id}/messages (SSE)
 
-Body `{"text": "..."}` (1–2000 ký tự). Phản hồi `200`, `Content-Type: text/event-stream`. Mỗi sự kiện có dạng:
+Body `{"text": "...", "version": 2, "plan": {...}}` (`text` 1–2000 ký tự; `version` và `plan` tuỳ chọn). Phản hồi `200`, `Content-Type: text/event-stream`. Mỗi sự kiện có dạng:
 
 ```
 event: <tên>

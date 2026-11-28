@@ -175,3 +175,14 @@ async def test_not_found_and_validation(chat):
     await say(chat, sid, "Ra đề ôn chương em hay sai.")
     bad = await chat.patch(f"{BASE}/sessions/{sid}/preview", json={"version": 1, "edit": {"chapter_codes": ["12C9"]}})
     assert bad.status_code == 422 and "12C9" in bad.json()["detail"]["errors"][0]
+
+
+async def test_edited_title_becomes_draft_title(chat):
+    sid = await new_session(chat)
+    _, preview, _ = await say(chat, sid, "Đổi sang chương 12C4, 3 câu")
+    ok = await chat.patch(f"{BASE}/sessions/{sid}/preview",
+                          json={"version": preview["version"], "edit": {"title": "Đề tích phân của tôi"}})
+    assert ok.status_code == 200 and ok.json()["structure"]["title"] == "Đề tích phân của tôi"
+    assert ok.json()["structure"]["chapters"] == preview["structure"]["chapters"]   # đổi tên không làm đổi cấu trúc
+    built = await chat.post(f"{BASE}/sessions/{sid}/preview/confirm", json={"version": ok.json()["version"]})
+    assert built.status_code == 200 and built.json()["draft"]["title"] == "Đề tích phân của tôi"

@@ -72,3 +72,29 @@ async def test_without_login_student_ref_is_required(ctx):
     r = await chat.post(f"{BASE}/sessions", json={})
     assert r.status_code == 422
     assert (await chat.post(f"{BASE}/sessions", json={"student_ref": "HS01"})).status_code == 201
+
+
+async def test_rename_and_delete_session_owner_only_and_keeps_draft(ctx):
+    chat, who = ctx
+    who.value = ALICE
+    sid = await new_session(chat, student=None)
+    _, _, draft = await say(chat, sid, "Xác nhận cấu trúc: chương 12C1, 5 câu (3 thông hiểu, 2 vận dụng). Tạo đề nháp.")
+    assert draft is not None
+
+    renamed = await chat.patch(f"{BASE}/sessions/{sid}", json={"title": "  Ôn đạo hàm  "})
+    assert renamed.status_code == 200 and renamed.json()["title"] == "Ôn đạo hàm"
+    listed = (await chat.get(f"{BASE}/sessions")).json()
+    assert [item["title"] for item in listed if item["session_id"] == sid] == ["Ôn đạo hàm"]
+    assert (await chat.patch(f"{BASE}/sessions/{sid}", json={"title": "   "})).status_code == 422
+
+    who.value = BOB                                                 # người khác không đổi tên, không xoá được
+    assert (await chat.patch(f"{BASE}/sessions/{sid}", json={"title": "x"})).status_code == 404
+    assert (await chat.delete(f"{BASE}/sessions/{sid}")).status_code == 404
+
+    who.value = ALICE
+    assert (await chat.delete(f"{BASE}/sessions/{sid}")).status_code == 204
+    assert sid not in [item["session_id"] for item in (await chat.get(f"{BASE}/sessions")).json()]
+    assert (await chat.get(f"{BASE}/sessions/{sid}")).status_code == 404
+    assert (await chat.delete(f"{BASE}/sessions/{sid}")).status_code == 404
+    # Đề đã dựng vẫn còn trong "Đề của tôi".
+    assert draft["draft_id"] in [d["draft_id"] for d in (await chat.get(f"{BASE}/drafts")).json()]

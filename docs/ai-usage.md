@@ -15,5 +15,6 @@ README của nhóm có mục "Dùng AI vào việc gì" (2–3 dòng, bắt bu�
 | Chấm cột `pass` bằng LLM (nếu có) | | | Kiểm tra thủ công __ câu thử, khớp __/__ | |
 | Slide, văn bản | | | | |
 | Cấu hình production (#13) | Codex | Rà cấu hình backend, thêm ánh xạ khóa AI trong Compose, cập nhật runbook EC2 và kiểm thử local. | Huy duyệt kế hoạch và phối hợp xác minh trên EC2. | Vũ Quang Huy |
+| Cá nhân hóa đề ôn (#41) | Codex | Đọc luồng #40, triển khai thống kê từ lượt đã chấm, nối đề xuất AI với bản xem trước và viết ca kiểm thử. | Huy duyệt phạm vi và ngưỡng thống kê. Đối chiếu số liệu và bản xem trước khi duyệt PR. | Vũ Quang Huy |
 
 **Không dùng AI để:** tạo người được phỏng vấn, trích dẫn, câu trả lời khảo sát; sửa kết quả các lượt đã chạy (`eval/run-*.csv`, `cost/simulate-*.csv`, `traces/`).

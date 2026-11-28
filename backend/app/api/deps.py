@@ -249,7 +249,7 @@ PdfImportRunnerDep = Annotated[Callable[[int], Awaitable[None]], Depends(get_pdf
 def get_requester(current: StudentDep) -> Requester:
     """Học sinh đang đăng nhập. Mọi route /exam-chat cần vai trò học sinh và chỉ thấy phiên của chính mình (kể cả SSE).
 
-    student_ref là mã dùng tra lịch sử làm bài; khi có bảng kết quả làm bài thật, đổi cho khớp khoá của bảng đó.
+    student_ref tra lịch sử được tạo từ user_id của phiên đã xác thực.
     """
     return Requester(user_id=current.user_id, student_ref=f"U{current.user_id}")
 

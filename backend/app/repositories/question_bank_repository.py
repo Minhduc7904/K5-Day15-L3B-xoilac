@@ -146,6 +146,36 @@ class QuestionBankRepository:
         return await self._pick(n, chapter_codes=[chapter_code], difficulty=difficulty, question_type=None,
                                 grade=None, exclude=exclude)
 
+    async def practice_capacity(
+        self, chapter_codes: Sequence[str], difficulties: Sequence[str], types: Sequence[str],
+    ) -> tuple[list[dict], int]:
+        """Đếm theo ô của ma trận và đếm số câu phân biệt trên toàn phạm vi."""
+        if not chapter_codes:
+            return [], 0
+        approved = self._pool(chapter_codes=chapter_codes, difficulty=None, question_type=None,
+                              grade=None, exclude=()).subquery()
+        parent = chapters.alias("practice_parent")
+        query = (
+            select(chapters.c.code, parent.c.code, questions.c.difficulty, questions.c.type, questions.c.question_id)
+            .select_from(questions.join(approved, approved.c.question_id == questions.c.question_id)
+                         .join(questions_chapters, questions_chapters.c.question_id == questions.c.question_id)
+                         .join(chapters, chapters.c.chapter_id == questions_chapters.c.chapter_id)
+                         .outerjoin(parent, parent.c.chapter_id == chapters.c.parent_chapter_id))
+            .where(or_(chapters.c.code.in_(chapter_codes), parent.c.code.in_(chapter_codes)),
+                   questions.c.difficulty.in_(difficulties), questions.c.type.in_(types))
+        )
+        cells: dict[tuple[str, str, str], set[int]] = {}
+        scope = set(chapter_codes)
+        ids = set()
+        for code, parent_code, difficulty, kind, question_id in (await self._session.execute(query)).all():
+            for match in {code, parent_code} & scope:
+                cells.setdefault((match, difficulty, kind), set()).add(question_id)
+            ids.add(question_id)
+        return [
+            {"chapter_code": code, "difficulty": difficulty, "type": kind, "available": len(available)}
+            for (code, difficulty, kind), available in sorted(cells.items())
+        ], len(ids)
+
     async def pick_for_section(
         self,
         *,

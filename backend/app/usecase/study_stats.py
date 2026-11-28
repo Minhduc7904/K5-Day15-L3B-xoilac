@@ -4,11 +4,13 @@ Toàn bộ là hàm thuần trên dữ liệu đã nạp, để dashboard và ng
 và để kiểm thử không cần cơ sở dữ liệu.
 """
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
 from app.core.study_time import STUDY_TZ, study_date
 from app.repositories.question_bank_repository import grade_of
+from app.service.exam_chat_sources import ChapterResult, StudentHistory
 
 DAYS = 84
 RECENT = 5
@@ -28,6 +30,8 @@ class GradedAttempt:
     statuses: dict[str, str] = field(default_factory=dict)
     answers: dict[str, dict] = field(default_factory=dict)
     time_ms: dict[str, int] = field(default_factory=dict)
+    graded_at: datetime | None = None
+    conflicts: set[str] = field(default_factory=set)
 
     @property
     def total(self) -> int:
@@ -81,6 +85,61 @@ def chapter_totals(attempts: list[GradedAttempt], catalog: dict[str, dict]) -> d
             entry[1] += 1
             entry[0] += attempt.statuses.get(item["code"]) == "correct"
     return dict(totals)
+
+
+def attempt_review(
+    attempts: list[GradedAttempt], catalog: dict[str, dict], grade: int | None,
+    chapter_codes: Sequence[str],
+) -> StudentHistory:
+    # Các lượt đầu vào đã xếp mới nhất trước. Mỗi câu chỉ đóng góp vào một chương cha.
+    selected = set(chapter_codes)
+    roots = {
+        code for code, entry in catalog.items()
+        if not entry["parent_code"] and (grade is None or entry["grade"] == grade)
+    }
+    if selected:
+        roots &= {catalog[code]["parent_code"] or code for code in selected if code in catalog}
+    total = {code: ChapterResult(code, 0, 0) for code in sorted(roots)}
+    latest = {code: ChapterResult(code, 0, 0) for code in total}
+    earlier = {code: ChapterResult(code, 0, 0) for code in total}
+    history = StudentHistory(
+        chapters=list(total.values()), latest=list(latest.values()), earlier=list(earlier.values()),
+        attempt_count=len(attempts),
+    )
+    for index, attempt in enumerate(attempts):
+        seen = set()
+        for item in attempt.items:
+            code = item.get("code")
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            tags = set(item.get("chapter_codes") or []) | set(item.get("subchapter_codes") or [])
+            assigned = item.get("chapter")
+            if assigned in catalog and (not tags or assigned in tags):
+                candidates = {catalog[assigned]["parent_code"] or assigned}
+                tags.add(assigned)
+            else:
+                candidates = {catalog[tag]["parent_code"] or tag for tag in tags if tag in catalog}
+            if len(candidates) != 1:
+                history.incomplete += 1
+                continue
+            [root] = candidates
+            if root not in roots or selected and not selected.intersection(tags | {root}):
+                continue
+            if code in attempt.conflicts:
+                history.conflicting_items += 1
+                continue
+            status = attempt.statuses.get(code)
+            if status not in {"correct", "wrong", "partial", "skipped"}:
+                history.incomplete += 1
+                continue
+            cohort = latest if index == 0 else earlier
+            for row in (total[root], cohort[root]):
+                row.total += status != "skipped"
+                row.correct += status == "correct"
+                row.skipped += status == "skipped"
+        history.incomplete += len(attempt.statuses.keys() - seen)
+    return history
 
 
 def streak(attempts: list[GradedAttempt], today: date) -> dict:
