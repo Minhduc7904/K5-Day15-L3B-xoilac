@@ -112,9 +112,10 @@ Sau khi PostgreSQL đã chạy migration, mở terminal riêng trong `backend/` 
 python -m app.worker
 python -m app.worker --once --job daily-credit
 python -m app.worker --once --job study-reminders
+python -m app.worker --once --job exam-expiry
 ```
 
-`--once` chạy một lượt đến hạn rồi thoát. `daily-credit` xử lý theo ngày Việt Nam. `study-reminders` chỉ chạy khi `EMAIL_PROVIDER=gmail`. Khi thử gửi thật, dùng tài khoản và hộp thư bạn kiểm soát, bật nhắc và chọn giờ đã đến trong ngày hiện tại. Nếu chạy UI thật, giữ `NEXT_PUBLIC_MOCK_MODE=false` và đặt `NEXT_PUBLIC_SOCKET_URL=http://localhost:8000`.
+`--once` chạy một lượt đến hạn rồi thoát. Khi chạy liên tục, `exam-expiry` quét lượt làm có thời lượng đã tới hạn mỗi 2 giây. Chạy migration `0015_exam_attempts` trước khi bật luồng làm bài online. Khi kiểm thử giao dịch đồng thời trên PostgreSQL, trỏ `EXAM_ATTEMPT_TEST_DATABASE_URL` vào cơ sở dữ liệu thử riêng đã chạy `python -m alembic upgrade head`, rồi chạy `python -m pytest -q tests/test_exam_attempts.py` trong `backend/`. `daily-credit` xử lý theo ngày Việt Nam. `study-reminders` chỉ chạy khi `EMAIL_PROVIDER=gmail`. Khi thử gửi thật, dùng tài khoản và hộp thư bạn kiểm soát, bật nhắc và chọn giờ đã đến trong ngày hiện tại. Nếu chạy UI thật, giữ `NEXT_PUBLIC_MOCK_MODE=false` và đặt `NEXT_PUBLIC_SOCKET_URL=http://localhost:8000`.
 
 ## Xử lý lỗi
 

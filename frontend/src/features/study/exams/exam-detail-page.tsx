@@ -57,7 +57,7 @@ export function ExamDetailPage({ id }: { id: string }) {
   );
 }
 
-function Detail({ exam, questions, attempts }: Data) {
+function Detail({ exam, questions, attempts, activeAttempt }: Data) {
   const [paper, setPaper] = useState(false);
   const byId = new Map(questions.map((q) => [q.id, q]));
   const sections = exam.sections
@@ -66,7 +66,7 @@ function Detail({ exam, questions, attempts }: Data) {
 
   return (
     <>
-      <Hero exam={exam} total={questions.length} attempts={attempts} onPaper={() => setPaper(true)} />
+      <Hero exam={exam} total={questions.length} attempts={attempts} activeAttempt={activeAttempt} onPaper={() => setPaper(true)} />
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Questions sections={sections} />
@@ -83,7 +83,9 @@ function Detail({ exam, questions, attempts }: Data) {
 
 /* ---------------- Đầu trang ---------------- */
 
-function Hero({ exam, total, attempts, onPaper }: { exam: Data['exam']; total: number; attempts: Data['attempts']; onPaper: () => void }) {
+function Hero({ exam, total, attempts, activeAttempt, onPaper }: {
+  exam: Data['exam']; total: number; attempts: Data['attempts']; activeAttempt: Data['activeAttempt']; onPaper: () => void;
+}) {
   const reduce = useReducedMotion();
   const say = exam.reason ?? `Đề ${total} câu, ${examDuration(exam.durationMinutes).toLowerCase()}. Đọc lướt câu hỏi bên dưới rồi bắt đầu khi bạn sẵn sàng nhé!`;
 
@@ -110,13 +112,13 @@ function Hero({ exam, total, attempts, onPaper }: { exam: Data['exam']; total: n
             ))}
           </dl>
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            {!exam.remote && <Link
+            <Link
               href={`/exams/${exam.id}/take`}
               className="inline-flex h-12 items-center gap-2 rounded-xl bg-flame-strong px-6 text-body font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-danger-hover active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Play className="size-5" aria-hidden="true" />
-              {attempts.length ? 'Làm lại đề này' : 'Bắt đầu làm bài'}
-            </Link>}
+              {activeAttempt?.status === 'in_progress' ? 'Làm tiếp' : attempts.length ? 'Làm lại đề này' : 'Bắt đầu làm bài'}
+            </Link>
             <button
               type="button"
               onClick={onPaper}

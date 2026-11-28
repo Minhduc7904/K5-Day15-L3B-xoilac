@@ -24,6 +24,7 @@ from app.usecase.exam_preview_rules import (
     DEFAULT_TOTAL, MAX_TOTAL, PreviewEdit, PreviewRuleError, PreviewStructure, allocate,
     apply_edit, ensure_valid, matrix_plan, new_structure,
 )
+from app.usecase.exam_scoring import allocate_points
 from app.usecase.exam_template_plan import TemplateConflict, TemplatePreviewStructure, apply_template_edit, from_template
 
 
@@ -389,6 +390,7 @@ class LiveExamChat(ExamChatUseCase):
                        "các câu còn thiếu phương án thay thế sẽ được giữ nguyên.")
             return ChatTurn(message + f" Em xác nhận dùng đề {len(items)} câu này nhé.",
                             preview=preview, preview_changed=True)
+        items = allocate_points(items, structure.model_dump(mode="json"))
         if not previous:
             await CreditRepository(self.db).charge_exam(requester.user_id, sid, study_date(datetime.now(timezone.utc)))
         draft = previous or ExamDraft(session_id=sid)

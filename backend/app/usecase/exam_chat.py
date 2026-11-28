@@ -39,6 +39,7 @@ from app.usecase.exam_preview_rules import (
     matrix_plan,
     new_structure,
 )
+from app.usecase.exam_scoring import allocate_points
 from app.usecase.exam_template_plan import (
     EXAM_NAME,
     TYPE_NAME,
@@ -472,6 +473,7 @@ class ExamChatUseCase:
             preview = await self._repo.save_preview(sid, {"status": "EDITED"})
             return preview, None, ("Ngân hàng chưa có câu nào phù hợp cấu trúc này, nên mình không tạo đề và không bịa "
                                    "câu. Em thử đổi chương hoặc độ khó nhé.")
+        items = allocate_points(items, structure.model_dump(mode="json"))
         draft = await self._repo.add_draft({
             "session_id": sid,
             "preview_version": confirmed.version,

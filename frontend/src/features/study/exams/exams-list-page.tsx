@@ -148,7 +148,7 @@ const scoreText = { success: 'text-success', primary: 'text-primary', warning: '
  * Bấm tên đề mở trang đề; nút "Cấu trúc" mở popup tổng quan.
  */
 function ExamCard({ exam, onStructure }: { exam: ExamSummary; onStructure: () => void }) {
-  const isNew = exam.attempts === 0;
+  const isNew = exam.attempts === 0 && !exam.hasActiveAttempt;
   const parts = exam.sections.map((s) => ({ type: s.type, n: s.questionIds.length })).filter((p) => p.n > 0);
   const chapterNames = exam.chapters.map((c) => chapterOf(c).name);
 
@@ -182,7 +182,7 @@ function ExamCard({ exam, onStructure }: { exam: ExamSummary; onStructure: () =>
               <span className="mt-1 text-[0.6875rem] whitespace-nowrap text-muted-foreground">điểm cao nhất</span>
             </p>
           ) : (
-            <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-caption font-semibold whitespace-nowrap text-accent-strong">Chưa làm</span>
+            <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-caption font-semibold whitespace-nowrap text-accent-strong">{exam.hasActiveAttempt ? 'Đang làm' : 'Chưa làm'}</span>
           )}
         </div>
 
@@ -206,8 +206,8 @@ function ExamCard({ exam, onStructure }: { exam: ExamSummary; onStructure: () =>
           >
             <ListTree className="size-4" aria-hidden="true" /> Cấu trúc
           </button>
-          <Button size="sm" variant={isNew ? 'primary' : 'secondary'} href={exam.remote ? `/exams/${exam.id}` : `/exams/${exam.id}/take`} leftIcon={<Play aria-hidden="true" />}>
-            {exam.remote ? 'Xem đề' : isNew ? 'Làm bài' : 'Làm lại'}
+          <Button size="sm" variant={isNew || exam.hasActiveAttempt ? 'primary' : 'secondary'} href={`/exams/${exam.id}/take`} leftIcon={<Play aria-hidden="true" />}>
+            {exam.hasActiveAttempt ? 'Làm tiếp' : isNew ? 'Làm bài' : 'Làm lại'}
           </Button>
         </div>
       </div>

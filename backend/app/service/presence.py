@@ -20,6 +20,9 @@ class PresenceRegistry:
     def remove(self, sid: str) -> None:
         self._connections.pop(sid, None)
 
+    def get(self, sid: str) -> SocketConnection | None:
+        return self._connections.get(sid)
+
     def for_session(self, session_id: int) -> list[str]:
         return [sid for sid, record in self._connections.items() if record.session_id == session_id]
 

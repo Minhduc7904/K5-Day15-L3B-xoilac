@@ -1,5 +1,6 @@
 from app.models.auth_challenge import EmailChallenge, GoogleHandoff
 from app.models.base import Base
+from app.models.exam_attempt import ExamAttempt, ExamAttemptMutation
 from app.models.exam_chat import ExamChatMessage, ExamChatSession, ExamDraft, ExamPreview
 from app.models.exam_template import ExamTemplate
 from app.models.pdf_import import PdfDraft, PdfImport, PdfReferenceVector
@@ -13,6 +14,8 @@ __all__ = [
     "CreditAccount",
     "CreditLedger",
     "EmailChallenge",
+    "ExamAttempt",
+    "ExamAttemptMutation",
     "ExamChatMessage",
     "ExamChatSession",
     "ExamDraft",

@@ -35,6 +35,8 @@ questions = Table(
     Column("difficulty", String(4)),
     Column("grade", Integer),
     Column("visibility", String(10)),
+    Column("correct_answer", Text),
+    Column("solution", Text),
 )
 questions_chapters = Table(
     "questions_chapters",
@@ -182,10 +184,25 @@ class QuestionBankRepository:
             if parent_code and leaf_code and leaf_code not in items[qid]["subchapter_codes"]:
                 items[qid]["subchapter_codes"].append(leaf_code)
         st = await self._session.execute(
-            select(statements.c.question_id, statements.c.content, statements.c.order)
+            select(statements.c.question_id, statements.c.content, statements.c.order, statements.c.statement_id)
             .where(statements.c.question_id.in_(list(items)))
             .order_by(statements.c.question_id, statements.c.order, statements.c.statement_id)
         )
-        for qid, content, order in st.all():
-            items[qid]["statements"].append({"order": order, "content": content})
+        for qid, content, order, statement_id in st.all():
+            items[qid]["statements"].append({"order": order, "content": content, "statement_id": statement_id})
         return items
+
+    async def load_grading_keys(self, ids: list[int]) -> dict:
+        rows = await self._session.execute(
+            select(questions.c.question_id, questions.c.correct_answer, questions.c.solution)
+            .where(questions.c.question_id.in_(ids), questions.c.visibility == APPROVED_VISIBILITY)
+        )
+        keys = {qid: {"answer": answer, "solution": solution, "options": {}} for qid, answer, solution in rows}
+        options = await self._session.execute(
+            select(statements.c.question_id, statements.c.statement_id, statements.c.content, statements.c.is_correct)
+            .where(statements.c.question_id.in_(keys))
+            .order_by(statements.c.order, statements.c.statement_id)
+        )
+        for qid, option_id, content, correct in options:
+            keys[qid]["options"][option_id] = (content, correct)
+        return keys

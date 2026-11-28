@@ -27,6 +27,9 @@ class ChapterCount(BaseModel):
 
 
 QUESTION_TYPES = ("SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "MULTIPLE_CHOICE", "ESSAY")
+ScoredType = Literal["SINGLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"]
+PointWeights = dict[ScoredType, Annotated[int, Field(ge=1, le=100)]]
+DEFAULT_POINT_WEIGHTS: PointWeights = {"SINGLE_CHOICE": 30, "TRUE_FALSE": 40, "SHORT_ANSWER": 30}
 
 
 class MatrixCell(BaseModel):
@@ -45,6 +48,7 @@ class PreviewStructure(BaseModel):
     excluded_difficulties: list[Difficulty] = Field(default_factory=list)
     duration_minutes: int | None = Field(None, ge=0, le=300)
     type_counts: dict[str, int] | None = None
+    type_point_weights: PointWeights = Field(default_factory=lambda: dict(DEFAULT_POINT_WEIGHTS))
     rows: list[MatrixCell] | None = None
 
     @property
@@ -66,6 +70,7 @@ class PreviewEdit(BaseModel):
     difficulty_counts: dict[Difficulty, int] | None = None
     duration_minutes: int | None = Field(None, ge=0, le=300)
     type_counts: dict[str, int] | None = None
+    type_point_weights: PointWeights | None = None
     rows: list[MatrixCell] | None = Field(None, min_length=1, max_length=50)
 
     def is_empty(self) -> bool:
@@ -121,6 +126,8 @@ def check_structure(structure: PreviewStructure, known_chapters: set[str] | None
         errors.append("Trọng số độ khó không được âm.")
     if not structure.effective_weights():
         errors.append("Không còn mức độ khó nào để chọn câu (đã loại hết).")
+    if set(structure.type_point_weights) != set(DEFAULT_POINT_WEIGHTS):
+        errors.append("Cần trọng số điểm cho cả ba loại câu chấm tự động.")
     if structure.type_counts is not None and (
         any(k not in QUESTION_TYPES or v < 1 for k, v in structure.type_counts.items())
         or sum(structure.type_counts.values()) != structure.total
@@ -170,6 +177,8 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
                                          key=DIFFICULTIES.index)
     if edit.duration_minutes is not None:
         s.duration_minutes = edit.duration_minutes
+    if edit.type_point_weights is not None:
+        s.type_point_weights = edit.type_point_weights
     if edit.rows is not None:
         cells = [(row.chapter, row.difficulty, row.type) for row in edit.rows]
         if len(set(cells)) != len(cells):
@@ -191,7 +200,7 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
         s.difficulty_weights = diffs
         s.excluded_difficulties = []
         s.rows = edit.rows
-    elif any(v is not None for k, v in edit.model_dump().items() if k != "duration_minutes"):
+    elif any(v is not None for k, v in edit.model_dump().items() if k not in {"duration_minutes", "type_point_weights"}):
         s.rows = None
         if edit.type_counts is not None:
             s.type_counts = edit.type_counts

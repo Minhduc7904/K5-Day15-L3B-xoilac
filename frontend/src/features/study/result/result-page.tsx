@@ -112,6 +112,9 @@ function Result({ data }: { data: Data }) {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-5 sm:gap-6">
+      {attempt.reason === 'timeout' && <p role="status" className="rounded-xl bg-warning-subtle p-4 text-label text-warning">
+        Hết giờ làm bài. Bài đã được tự động nộp và chấm.
+      </p>}
       {/* Điểm */}
       <section aria-labelledby="result-title" className="relative isolate overflow-hidden rounded-3xl bg-primary text-primary-foreground shadow-lift">
         <div aria-hidden="true" className="bg-grid-inverse absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_95%)]" />
@@ -373,7 +376,7 @@ function ReviewCard({ result, index, seconds }: { result: QuestionResult; index:
         </span>
       </header>
 
-      <QuestionContent source={q.content} />
+      <QuestionContent source={q.content} attemptId={q.remoteAttemptId} />
 
       {q.type === 'SINGLE_CHOICE' && (
         <ul className="grid gap-2 sm:grid-cols-2">
@@ -391,7 +394,7 @@ function ReviewCard({ result, index, seconds }: { result: QuestionResult; index:
                   {st.correct ? <Check className="size-4" aria-hidden="true" /> : picked ? <X className="size-4" aria-hidden="true" /> : st.label}
                 </span>
                 <span className="min-w-0 flex-1 text-body text-foreground">
-                  <QuestionContent source={st.content} inline />
+                  <QuestionContent source={st.content} attemptId={q.remoteAttemptId} inline />
                 </span>
                 {picked && <span className="shrink-0 text-caption font-semibold text-muted-foreground">Bạn chọn</span>}
                 <span className="sr-only">{st.correct ? '(đáp án đúng)' : ''}</span>
@@ -420,7 +423,7 @@ function ReviewCard({ result, index, seconds }: { result: QuestionResult; index:
                     <td className="px-3 py-2.5">
                       <span className="flex gap-2">
                         <b className="text-primary">{st.label})</b>
-                        <QuestionContent source={st.content} inline />
+                        <QuestionContent source={st.content} attemptId={q.remoteAttemptId} inline />
                       </span>
                     </td>
                     <td className={cn('px-3 py-2.5 font-semibold', pick === null || pick === undefined ? 'text-muted-foreground' : ok ? 'text-success' : 'text-danger')}>
@@ -467,7 +470,7 @@ function ReviewCard({ result, index, seconds }: { result: QuestionResult; index:
             {open && (
               <motion.div id={panelId} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                 <div className="border-t border-border px-4 py-4">
-                  <QuestionContent source={q.solution} className="text-body" />
+                  <QuestionContent source={q.solution} attemptId={q.remoteAttemptId} className="text-body" />
                 </div>
               </motion.div>
             )}

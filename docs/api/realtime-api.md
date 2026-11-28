@@ -13,6 +13,7 @@ Frontend gọi API ticket cùng origin qua Next.js rewrite và dùng cookie phi�
 | `role:student` | Các kết nối của học sinh |
 | `role:admin` | Các kết nối của admin |
 | `user:{id}` | Các kết nối của tài khoản đó |
+| `attempt:{id}` | Các tab đã xác minh thuộc học sinh sở hữu lượt làm. Xem [API làm bài online](online-exam-attempts-api.md#room-socketio). |
 
 Server quyết định room từ dữ liệu phiên. Frontend mở một kết nối mỗi tab sau khi đăng nhập hoặc khôi phục phiên. Chuyển giữa hoàn tất hồ sơ và onboarding tour giữ kết nối đang mở.
 
