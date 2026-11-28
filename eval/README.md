@@ -52,7 +52,7 @@ Ngân hàng câu hỏi Toán THPT thật của trung tâm (14.146 câu, 7.973 c�
 | Lượt | Run ID | Model | Cấu hình (prompt / công cụ / thay đổi) | Đạt / tổng | % | Đạt chuẩn? |
 |---|---|---|---|---|---|---|
 | 1 | `run-1@20261128-090856` | gpt-5.4-mini | Bản CLI như ở CP2: luồng cố định bằng quy tắc, model chỉ diễn đạt lại tin nhắn không chứa câu hỏi; chưa thay đổi gì sau khi nối model | 22/27 | 81% | Chưa: `tu_choi` 4/7 (cần 7/7); tổng, `thuong` 8/8 và `kho` 10/12 đạt ngưỡng quy đổi |
-| 2 | | | | __/__ | | |
+| 2 | `run-2@20261128-095729` | gpt-5.4-mini | Thêm ba mẫu chặn trước AI cho yêu cầu ngoài phạm vi (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input`; cùng model, cùng bộ 27 câu, cùng cách chấm | 25/27 | 93% | Đạt: tổng ≥ 22/27, `thuong` 8/8, `kho` 10/12, `tu_choi` 7/7 |
 
 Lượt chạy lại vì lỗi kỹ thuật, lượt sau CP4: ghi thêm dòng, không sửa dòng cũ.
 

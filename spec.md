@@ -171,7 +171,7 @@ flowchart LR
 - Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 27 câu từ CP3 (thuong 8 · kho 12 · tu_choi 7, trong đó 2 câu tấn công; 13 câu đầu giữ nguyên từ CP2) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
 - Nguồn bộ câu thử: `nguoi_dung` 5 (B14–B18, nguyên văn câu 9 của khảo sát) · `data_that` 5 (B19–B23, số liệu ngân hàng thật) · `tu_viet` 17 → từ người dùng / data thật 10/27, đạt mốc ≥1/3 của `run.py check`. Chi tiết `eval/README.md` mục 2.
 - **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua (≥ 11/13), và 100% câu tu_choi qua (4/4), và 0 mã câu ngoài ngân hàng hoặc câu tự viết trong mọi đề nháp (metric `cau_trong_ngan_hang` 100%)". Ngưỡng từng metric nằm trong `eval/metric_spec.yaml`: `chuong_yeu_dung` ≥ 3/4 câu thuong · `xu_ly_kho_khong_doan` ≥ 4/5 câu kho.
-- Kết quả: lượt 1 22/27 (81%) · lượt 2 __/__ (__%) — run ID: `run-1@20261128-090856` / __ (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Kết quả: lượt 1 22/27 (81%) · lượt 2 25/27 (93%) — run ID: `run-1@20261128-090856` / `run-2@20261128-095729` (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; lượt 2: `tu_choi` 7/7, đạt chuẩn; cùng model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
 - Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
@@ -197,6 +197,7 @@ flowchart LR
 | 28/11/2026 | Thêm 14 câu thử B14–B27 (chỉ thêm, không sửa B01–B13): 27 câu, từ người dùng / data thật 10/27 | Đủ 20–30 câu cho CP3 và ≥1/3 câu từ khảo sát / data thật; bổ sung độ phủ chưa nêu chương, ngân hàng thiếu câu theo mức, ngoài phạm vi (`eval/README.md` mục 2). |
 | 28/11/2026 | Ghi cách quy đổi ngưỡng "đạt" sang 27 câu: ≥ 22/27 · tu_choi 7/7 · thuong ≥ 6/8 · kho ≥ 10/12 | Chuẩn §7 và `metric_spec.yaml` giữ nguyên chữ, chỉ giữ tỷ lệ % đã chốt ở CP2 (80%, 100%, 75%, 80%) và làm tròn lên cho bộ câu lớn hơn; chi tiết `eval/README.md` mục 3. |
 | 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
+| 28/11/2026 | Lượt 2: thêm ba mẫu chặn trước AI (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input` của `codebase/agent.py` | Lượt 1 trượt B25–B27 (`tu_choi` 4/7). Lượt 2 trên cùng bộ 27 câu: 25/27, `tu_choi` 7/7; chi tiết `eval/report.md` mục 3. |
 | 28/11/2026 | Điền §0 (luồng hiện tại từ khảo sát) và §3 (Azota, Khan Academy) | Cần §0–§7 đủ nội dung cho CP3; §3 lấy từ tài liệu chính thức của hai sản phẩm, phần không kiểm được ghi "chưa kiểm". |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
