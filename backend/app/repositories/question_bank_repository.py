@@ -3,14 +3,17 @@
 Các bảng nội dung chưa có model ORM chung, nên ở đây khai báo bảng bằng SQLAlchemy Core với MetaData riêng
 (không đưa vào Base.metadata để Alembic không coi là bảng mới). Chỉ khai các cột cần dùng.
 
-Giả định cần nhóm xác nhận (#3, #11): "câu đã duyệt, dùng được" = questions.visibility = 'PUBLISHED'.
-Đổi ở một chỗ: APPROVED_VISIBILITY.
+"Câu khả dụng" (#3, #11): questions.visibility = 'PUBLISHED' và chưa lưu trữ (questions.archived_at IS NULL,
+migration 0021). Mọi truy vấn chọn câu cho đề mới dùng chung `available_questions()`; đổi định nghĩa ở một chỗ.
+Đọc lại câu đã nằm trong đề (load_items, load_grading_keys) không lọc archived để đề và lịch sử cũ vẫn đọc được.
 """
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, MetaData, String, Table, Text, and_, func, or_, select
+from sqlalchemy import (
+    Boolean, Column, DateTime, ForeignKey, Integer, MetaData, String, Table, Text, and_, func, or_, select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -26,6 +29,9 @@ chapters = Table(
     Column("name", String(191)),
     Column("parent_chapter_id", Integer, ForeignKey("chapters.chapter_id")),
     Column("level", Integer),
+    Column("slug", String(191)),
+    Column("subject_id", Integer),
+    Column("order_in_parent", Integer),
 )
 questions = Table(
     "questions",
@@ -38,6 +44,12 @@ questions = Table(
     Column("visibility", String(10)),
     Column("correct_answer", Text),
     Column("solution", Text),
+    Column("searchable_content", Text),
+    Column("slug", String(255)),
+    Column("subject_id", Integer),
+    Column("archived_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
 )
 questions_chapters = Table(
     "questions_chapters",
@@ -54,6 +66,27 @@ statements = Table(
     Column("is_correct", Boolean),
     Column("order", Integer),
 )
+questions_exams = Table(
+    "questions_exams",
+    content_metadata,
+    Column("question_id", Integer, ForeignKey("questions.question_id"), primary_key=True),
+    Column("exam_id", Integer, primary_key=True),
+    Column("order", Integer),
+)
+subjects = Table(
+    "subjects",
+    content_metadata,
+    Column("subject_id", Integer, primary_key=True),
+    Column("name", String(191)),
+    Column("code", String(191)),
+)
+
+
+def available_questions():
+    """Điều kiện SQL "câu khả dụng để dựng đề mới": đã đăng (PUBLISHED) và chưa lưu trữ.
+
+    Dùng chung cho pipeline #4 (`_pool`) và bộ lọc trạng thái của API admin #11."""
+    return and_(questions.c.visibility == APPROVED_VISIBILITY, questions.c.archived_at.is_(None))
 
 
 _GRADE_PREFIX = re.compile(r"^(\d{1,2})C")
@@ -103,7 +136,7 @@ class QuestionBankRepository:
         exclude: Sequence[int],
     ):
         """Truy vấn mã các câu đã duyệt thoả điều kiện. Điều kiện None là không lọc theo điều kiện đó."""
-        stmt = select(questions.c.question_id).where(questions.c.visibility == APPROVED_VISIBILITY)
+        stmt = select(questions.c.question_id).where(available_questions())
         if chapter_codes:
             parent = aliased(chapters)
             codes = list(chapter_codes)
