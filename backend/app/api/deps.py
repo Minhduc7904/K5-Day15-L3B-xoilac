@@ -12,6 +12,7 @@ from app.core.database import get_session, get_sessionmaker
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
 from app.repositories.credits import CreditRepository
 from app.repositories.student_profiles import StudentProfileRepository
+from app.repositories.exam_attempts import ExamAttemptRepository
 from app.repositories.exam_chat_repository import ExamChatRepository
 from app.repositories.exam_template_repository import ExamTemplateRepository
 from app.repositories.pdf_imports import PdfImportRepository
@@ -21,7 +22,6 @@ from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
 from app.service.exam_chat_sources import (
     ExamTemplateSource,
-    NoHistory,
     PlainReplyWriter,
     ReplyWriter,
     StudentHistorySource,
@@ -45,6 +45,7 @@ from app.usecase.sample_files import SampleFileUseCase
 from app.usecase.sample_items import SampleItemUseCase
 from app.usecase.student_auth import StudentAuthUseCase
 from app.usecase.student_profile import StudentProfileUseCase
+from app.usecase.study_dashboard import AttemptHistory, StudyDashboard
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -244,9 +245,16 @@ def get_requester(current: StudentDep) -> Requester:
     return Requester(user_id=current.user_id, student_ref=f"U{current.user_id}")
 
 
-def get_student_history() -> StudentHistorySource:
-    """Chưa có bảng kết quả làm bài: agent nói chưa có lịch sử và hỏi chương, không đoán."""
-    return NoHistory()
+def get_study_dashboard(session: SessionDep) -> StudyDashboard:
+    return StudyDashboard(ExamAttemptRepository(session), QuestionBankRepository(session))
+
+
+StudentDashboardDep = Annotated[StudyDashboard, Depends(get_study_dashboard)]
+
+
+def get_student_history(dashboard: StudentDashboardDep) -> StudentHistorySource:
+    """Lịch sử làm bài thật từ các lượt đã chấm. Chưa có lượt nào thì agent nói chưa có lịch sử và hỏi chương."""
+    return AttemptHistory(dashboard)
 
 
 def get_exam_template_source(templates: ExamTemplateUseCaseDep) -> ExamTemplateSource:

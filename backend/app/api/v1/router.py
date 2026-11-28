@@ -13,6 +13,7 @@ from app.api.v1 import (
     sample_files,
     sample_items,
     student_profile,
+    study_dashboard,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -28,3 +29,4 @@ api_router.include_router(admin_import.router)
 api_router.include_router(exam_templates.router)
 api_router.include_router(exam_chat.router)
 api_router.include_router(exam_attempts.router)
+api_router.include_router(study_dashboard.router)
