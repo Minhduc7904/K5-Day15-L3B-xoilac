@@ -9,8 +9,10 @@ from pydantic import SecretStr
 from app.api.deps import get_pdf_import_models, get_storage
 from app.core.config import Settings, get_settings
 from app.main import app
-from app.service.exam_chat_model import ChatAction, ExamChatModel
-from app.service.exam_chat_ocr import MAX_CHAT_IMAGE_BYTES
+from app.repositories.question_bank_repository import QuestionBankRepository
+from app.service.exam_chat_model import ChatAction, ExamChatModel, ExamChatModelError
+from app.service.exam_chat_ocr import MAX_CHAT_IMAGE_BYTES, plain_math
+from app.service.exam_chat_topics import chapter_hints, clear_winner
 from app.service.pdf_import_models import PdfImportModels
 from tests.exam_chat_support import BASE, chat_client, login_as, new_session
 
@@ -230,3 +232,72 @@ async def test_unknown_image_purpose_is_rejected(image_client):
     assert (await send(client, sid, PNG, purpose="solve")).status_code == 422
     provider.assert_not_awaited()
     assert not storage.objects
+
+
+OXYZ_LATEX = (
+    r"**Câu 3:** Trong không gian $O x y z$, cho tam giác $A B C$ có $A(3 ; 0 ; 0)$, $C(0 ; 4 ; 2)$. "
+    r"a) Trọng tâm có toạ độ $\left(0 ; \frac{4}{3} ; 1\right)$. c) $M$ di động trên mặt phẳng $(O x y)$. "
+    r"d) Vectơ $\overrightarrow{A B}$ cùng hướng với vectơ $\vec{i}=(1 ; 0 ; 0)$. "
+    r"**Câu 4:** Cho hình lập phương $A B C D . A^{\prime} B^{\prime} C^{\prime} D^{\prime}$. "
+    r"a) $\overrightarrow{A B}+\overrightarrow{A D}$ và $\overrightarrow{A C^{\prime}}$ cùng hướng. "
+    r"c) $\overrightarrow{A B}+\overrightarrow{A D}+\overrightarrow{A A^{\prime}}=\overrightarrow{A C^{\prime}}$."
+)
+CATALOG = {
+    code: {"name": name, "parent_code": parent, "grade": int(code[:2])}
+    for code, name, parent in [
+        ("10C4", "VECTƠ", None), ("10C42", "Tổng và hiệu của hai vectơ", "10C4"),
+        ("10C7", "PHƯƠNG PHÁP TOẠ ĐỘ TRONG MẶT PHẲNG", None), ("10C72", "Đường thẳng trong mặt phẳng toạ độ", "10C7"),
+        ("12C2", "VECTƠ VÀ HỆ TRỤC TOẠ ĐỘ TRONG KHÔNG GIAN", None), ("12C21", "Vectơ trong không gian", "12C2"),
+        ("12C22", "Hệ trục toạ độ trong không gian", "12C2"), ("12C23", "Biểu thức toạ độ của các phép toán vectơ", "12C2"),
+        ("12C4", "NGUYÊN HÀM VÀ TÍCH PHÂN", None), ("12C42", "Tích phân", "12C4"),
+        ("12C5", "PHƯƠNG PHÁP TOẠ ĐỘ TRONG KHÔNG GIAN", None), ("12C51", "Phương trình mặt phẳng", "12C5"),
+    ]
+}
+
+
+def test_plain_math_flattens_latex_from_ocr():
+    text = plain_math(OXYZ_LATEX)
+    assert "\\" not in text and "$" not in text and "{" not in text
+    assert "vectơ A B" in text and "(0 ; (4)/(3) ; 1)" in text
+
+
+def test_oxyz_exercise_image_points_at_vectors_in_space_chapter():
+    hints = chapter_hints(plain_math(OXYZ_LATEX), CATALOG)
+    assert hints[0]["code"] == "12C2" and {"12C21", "12C22"} <= set(hints[0]["leaves"])
+    assert clear_winner(hints)["code"] == "12C2"
+    assert chapter_hints("Tính tích phân từ 0 đến 1", CATALOG)[0]["code"] == "12C4"
+    assert chapter_hints("hello", CATALOG) == []
+
+
+async def test_ocr_check_accepts_respaced_math_and_keeps_verified_math_without_matching_quotes(monkeypatch):
+    model = ExamChatModel(Settings())
+    text = "Cho vectơ A B và vectơ A D cùng hướng"
+    response = {"content": json.dumps({"images": [
+        {"image": 1, "verdict": "math", "excerpts": ["Cho vectơ AB và vectơ AD cùng hướng"]},
+        {"image": 2, "verdict": "math", "excerpts": ["đoạn model viết lại"]},
+        {"image": 3, "verdict": "matrix", "excerpts": ["Chương bịa: 9 câu"]},
+    ]})}
+    monkeypatch.setattr(model, "_call", AsyncMock(return_value=response))
+    evidence = await model.screen_ocr([text, text, "Nguyên hàm 4 câu"])
+    assert evidence == [{"image": 1, "kind": "topic", "text": "Cho vectơ AB và vectơ AD cùng hướng"},
+                        {"image": 2, "kind": "topic", "text": text}]
+
+
+@pytest.mark.parametrize("model_says", [ChatAction(action="clarify", question="Em muốn ôn chương nào?"),
+                                        ChatAction(action="unsupported"), ExamChatModelError("down")])
+async def test_exercise_image_still_resolves_chapter_when_model_hesitates(image_client, monkeypatch, model_says):
+    client, sid, _, _, provider, scope, router = image_client
+    monkeypatch.setattr(QuestionBankRepository, "chapter_catalog", AsyncMock(return_value=CATALOG))
+    provider.return_value = OXYZ_LATEX
+    scope.return_value = [{"image": 1, "kind": "topic", "text": "Cho vectơ A B"}]
+    if isinstance(model_says, Exception):
+        router.side_effect = model_says
+    else:
+        router.return_value = model_says
+    response = await send(client, sid, PNG, purpose="topic")
+    assert response.status_code == 200 and "VECTƠ VÀ HỆ TRỤC TOẠ ĐỘ TRONG KHÔNG GIAN" in response.text
+    context = router.call_args.args[0]
+    assert context["chapter_hints"][0]["code"] == "12C2" and "\\" not in str(context["ocr_evidence"])
+    state = (await client.get(f"{BASE}/sessions/{sid}")).json()
+    assert state["preview"]["structure"]["chapters"] and state["draft"] is None
+    assert (await client.get(CREDITS)).json()["balance"] == 500
