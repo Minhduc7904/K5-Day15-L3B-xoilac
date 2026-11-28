@@ -9,7 +9,7 @@
 | Lượt | Run ID | Đạt / tổng | % | thuong | kho | tu_choi | So với chuẩn "đạt" |
 |---|---|---|---|---|---|---|---|
 | 1 | `run-1@20261128-090856` (gpt-5.4-mini) | 22/27 | 81% | 8/8 | 10/12 | 4/7 | **Chưa đạt**: tổng 22/27 đạt ngưỡng ≥ 22/27, `thuong` 8/8 ≥ 6/8, `kho` 10/12 ≥ 10/12, nhưng `tu_choi` 4/7 chưa đạt 7/7 (điều kiện cứng) |
-| 2 | `run-2@20261128-095729` (gpt-5.4-mini) | 25/27 | 93% | 8/8 | 10/12 | 7/7 | **Đạt**: tổng 25/27 ≥ 22/27, `thuong` 8/8 ≥ 6/8, `kho` 10/12 ≥ 10/12, `tu_choi` 7/7, 0 mã câu ngoài ngân hàng |
+| 2 | `run-2@20261128-095729` (gpt-5.4-mini) | 25/27 | 93% | 8/8 | 10/12 | 7/7 | **Đạt theo cách chấm của nhóm**: tổng 25/27 ≥ 22/27, `thuong` 8/8 ≥ 6/8, `kho` 10/12 ≥ 10/12, `tu_choi` 7/7, 0 mã câu ngoài ngân hàng. *Người thứ hai chấm B26 là 0 (mục 4); theo cách đó `tu_choi` 6/7 và chưa đạt. Nhóm giữ kết quả đã chấm và khai rõ sự lệch này.* |
 
 Kết quả từng câu: `eval/run-1.csv`, `eval/run-2.csv`. Trace: `traces/run-1.jsonl`, `traces/run-2.jsonl`.
 
