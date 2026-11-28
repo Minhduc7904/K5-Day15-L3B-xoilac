@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.api.errors import to_api_error
 from app.core.config import Settings, get_settings
 from app.core.database import get_session, get_sessionmaker
+from app.repositories.admin_chapter_repository import AdminChapterRepository
 from app.repositories.admin_question_repository import AdminQuestionRepository
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
 from app.repositories.credits import CreditRepository
@@ -35,6 +36,7 @@ from app.service.password_service import PasswordService
 from app.service.pdf_import_models import PdfImportModels
 from app.service.storage_service import StorageService
 from app.service.token_service import TokenService
+from app.usecase.admin_chapters import AdminChapterUseCase
 from app.usecase.admin_questions import AdminQuestionUseCase
 from app.usecase.auth import AuthError, AuthUseCase, CurrentUser, ensure_role
 from app.usecase.exam_chat import ExamChatUseCase, Requester
@@ -175,7 +177,13 @@ def get_admin_question_usecase(session: SessionDep, storage: StorageDep, setting
     return AdminQuestionUseCase(AdminQuestionRepository(session), storage, settings.s3_bucket)
 
 
+def get_admin_chapter_usecase(session: SessionDep) -> AdminChapterUseCase:
+    """#11: danh mục chương cho admin."""
+    return AdminChapterUseCase(AdminChapterRepository(session))
+
+
 AdminQuestionUseCaseDep = Annotated[AdminQuestionUseCase, Depends(get_admin_question_usecase)]
+AdminChapterUseCaseDep = Annotated[AdminChapterUseCase, Depends(get_admin_chapter_usecase)]
 
 # auto_error=False: thiếu header không báo lỗi ở đây; cookie vẫn được xét. Hiện nút Authorize trong Swagger.
 _bearer = HTTPBearer(auto_error=False, description="Token phiên (dùng cho curl/Swagger). Cookie được ưu tiên.")

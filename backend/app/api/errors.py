@@ -21,6 +21,7 @@ from app.usecase.auth import (
     SessionRevoked,
 )
 from app.usecase.user_management import CannotModifyRoot, CannotModifySelf, UserNotFound
+from app.usecase.admin_chapters import ChapterCodeTaken, ChapterCycle, ChapterInUse, ChapterNotFound, InvalidChapter
 from app.usecase.admin_questions import InvalidMedia, InvalidQuestion, MediaNotFound, QuestionNotFound
 
 from app.usecase.student_auth import (
@@ -56,6 +57,11 @@ _STATUS: dict[type[AuthError], int] = {
     InvalidQuestion: 422,
     MediaNotFound: status.HTTP_404_NOT_FOUND,
     InvalidMedia: 422,
+    ChapterNotFound: status.HTTP_404_NOT_FOUND,
+    ChapterCodeTaken: status.HTTP_409_CONFLICT,
+    ChapterInUse: status.HTTP_409_CONFLICT,
+    ChapterCycle: 422,
+    InvalidChapter: 422,
 }
 
 # Phiên trong cookie không còn dùng được: xoá cookie để trình duyệt khỏi gửi lại.
