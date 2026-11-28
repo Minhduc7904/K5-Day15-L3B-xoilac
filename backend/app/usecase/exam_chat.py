@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.models.exam_chat import ExamChatSession, ExamDraft, ExamPreview
 from app.repositories.exam_chat_repository import ExamChatRepository
-from app.repositories.question_bank_repository import QuestionBankRepository
+from app.repositories.question_bank_repository import QuestionBankRepository, grade_of
 from app.service.exam_chat_sources import MIN_ANSWERED, ExamTemplateSource, StudentHistorySource
 from app.service.media_image import load_media_image
 from app.usecase import exam_chat_intent as chat_intent
@@ -57,6 +57,20 @@ CHAPTER_PHRASE = re.compile(r"chuong\s+([a-z0-9 ]+?)(?:\s+cho\b|\s+\d|[,.;:!?(]|
 SWITCH_TO_CHAPTER = re.compile(r"(theo chuong|chuyen sang on chuong|bo mau|khong theo mau)")
 
 Structure = PreviewStructure | TemplatePreviewStructure
+
+
+DIFFICULTY_ORDER = ("NB", "TH", "VD", "VDC")
+
+
+@dataclass
+class _Slot:
+    """Một ô của ma trận: câu khớp chính xác, số câu cần, nhãn gắn vào câu và điều kiện để bù khi thiếu."""
+    ids: list[int]
+    wanted: int
+    meta: dict
+    fill: dict
+    shortage: dict
+    outside: set[int] = field(default_factory=set)
 
 
 class SessionNotFound(Exception):
@@ -499,50 +513,103 @@ class ExamChatUseCase:
         return preview, draft, self._draft_text(draft, structure)
 
     async def _pick_chapters(self, structure: PreviewStructure):
-        chosen: list[int] = []
-        meta: dict[int, dict] = {}
-        shortages: list[dict] = []
+        slots: list[_Slot] = []
+        scope = [item.code for item in structure.chapters]
+        allowed = [d for d in DIFFICULTY_ORDER if d in structure.effective_weights()] or None
         if structure.rows or structure.type_counts:
             for cell in matrix_plan(structure):
                 result = await self._bank.pick_for_section(
                     question_type=cell.type, n=cell.count, chapter_codes=[cell.chapter],
-                    difficulty=cell.difficulty, exclude=chosen,
+                    difficulty=cell.difficulty, exclude=[i for slot in slots for i in slot.ids],
                 )
-                chosen.extend(result.question_ids)
-                meta.update({qid: {"chapter": cell.chapter} for qid in result.question_ids})
-                if len(result.question_ids) < cell.count:
-                    shortages.append({"chapter": cell.chapter, "difficulty": cell.difficulty, "requested": cell.count,
-                                      "available": len(result.question_ids), "question_type": cell.type})
-            return chosen, meta, shortages
+                slots.append(_Slot(
+                    result.question_ids, cell.count, {"chapter": cell.chapter},
+                    dict(question_type=cell.type, chapters=[cell.chapter], difficulty=cell.difficulty,
+                         grade=grade_of(cell.chapter), scope=scope, allowed=allowed),
+                    {"chapter": cell.chapter, "difficulty": cell.difficulty, "question_type": cell.type},
+                ))
+            return await self._settle(slots)
         for code, mix in difficulty_plan(structure).items():
             for diff, k in mix.items():
-                res = await self._bank.pick(code, diff, k, exclude=chosen)
-                chosen += res.question_ids
-                meta.update({q: {"chapter": code} for q in res.question_ids})
-                if len(res.question_ids) < k:
-                    shortages.append({"chapter": code, "difficulty": diff, "requested": k,
-                                      "available": len(res.question_ids)})
-        return chosen, meta, shortages
+                res = await self._bank.pick(code, diff, k, exclude=[i for slot in slots for i in slot.ids])
+                slots.append(_Slot(
+                    res.question_ids, k, {"chapter": code},
+                    dict(question_type=None, chapters=[code], difficulty=diff, grade=grade_of(code), scope=scope,
+                         allowed=allowed),
+                    {"chapter": code, "difficulty": diff},
+                ))
+        return await self._settle(slots)
 
     async def _pick_template(self, structure: TemplatePreviewStructure, *, prefer_subchapters: bool = False):
-        chosen: list[int] = []
-        meta: dict[int, dict] = {}
-        shortages: list[dict] = []
+        slots: list[_Slot] = []
         for sec in structure.sections:
             chapters = sec.effective_chapters()
             for diff, k in sec.difficulty_plan().items():
                 res = await self._bank.pick_for_section(question_type=sec.question_type, n=k, chapter_codes=chapters,
-                                                        difficulty=diff, grade=structure.grade, exclude=chosen,
+                                                        difficulty=diff, grade=structure.grade,
+                                                        exclude=[i for slot in slots for i in slot.ids],
                                                         prefer_subchapters=prefer_subchapters)
-                chosen += res.question_ids
-                meta.update({q: {"section_order": sec.order, "section_title": sec.title,
-                                 "points": sec.points_per_question} for q in res.question_ids})
-                if len(res.question_ids) < k:
-                    shortages.append({"section_order": sec.order, "section_title": sec.title,
-                                      "question_type": sec.question_type,
-                                      "chapter": ", ".join(chapters) if chapters else None,
-                                      "difficulty": diff, "requested": k, "available": len(res.question_ids)})
+                slots.append(_Slot(
+                    res.question_ids, k,
+                    {"section_order": sec.order, "section_title": sec.title, "points": sec.points_per_question},
+                    dict(question_type=sec.question_type, chapters=chapters, difficulty=diff, grade=structure.grade,
+                         scope=sec.allowed_chapters, prefer_subchapters=prefer_subchapters),
+                    {"section_order": sec.order, "section_title": sec.title, "question_type": sec.question_type,
+                     "chapter": ", ".join(chapters) if chapters else None, "difficulty": diff},
+                ))
+        return await self._settle(slots)
+
+    async def _settle(self, slots: list["_Slot"]):
+        """Bù ô thiếu bằng câu thay thế, giữ nguyên thứ tự ô. Chỉ còn báo thiếu khi kho hết câu cùng loại."""
+        for slot in slots:
+            missing = slot.wanted - len(slot.ids)
+            if missing > 0:
+                taken = await self._fill_gap(exclude=[i for other in slots for i in other.ids], n=missing, **slot.fill)
+                slot.ids += [qid for qid, _ in taken]
+                slot.outside.update(qid for qid, same_chapter in taken if not same_chapter)
+        chosen: list[int] = []
+        meta: dict[int, dict] = {}
+        shortages: list[dict] = []
+        for slot in slots:
+            chosen += slot.ids
+            for qid in slot.ids:
+                # Câu bù từ chương khác: bỏ nhãn chương của ô để đề hiện đúng chương thật của câu.
+                meta[qid] = {k: v for k, v in slot.meta.items() if k != "chapter" or qid not in slot.outside}
+            if len(slot.ids) < slot.wanted:
+                shortages.append({**slot.shortage, "requested": slot.wanted, "available": len(slot.ids)})
         return chosen, meta, shortages
+
+    async def _fill_gap(
+        self, *, exclude: list[int], n: int, question_type: str | None, chapters: list[str] | None,
+        difficulty: str | None, grade: int | None, scope: list[str] | None = None, prefer_subchapters: bool = False,
+        allowed: list[str] | None = None,
+    ) -> list[tuple[int, bool]]:
+        """Bù n câu cho ô thiếu theo thứ tự ưu tiên, luôn giữ đúng loại câu: cùng chương (mức khó gần nhất trước),
+        rồi cùng mức khó ở chương khác (chương trong phạm vi đề trước), cuối cùng bất kỳ câu cùng loại trong khối.
+        `allowed` là các mức khó học sinh còn cho phép (không lấy mức đã loại). Trả về (mã câu, câu có thuộc chương của ô hay không)."""
+        taken: list[tuple[int, bool]] = []
+
+        async def take(same_chapter: bool, **where) -> None:
+            need = n - len(taken)
+            if need <= 0:
+                return
+            found = await self._bank.pick_for_section(
+                question_type=question_type, n=need, exclude=[*exclude, *(qid for qid, _ in taken)],
+                prefer_subchapters=prefer_subchapters, **where,
+            )
+            taken.extend((qid, same_chapter) for qid in found.question_ids)
+
+        if chapters and difficulty in DIFFICULTY_ORDER:
+            rank = DIFFICULTY_ORDER.index(difficulty)
+            near = (d for d in DIFFICULTY_ORDER if d != difficulty and (allowed is None or d in allowed))
+            for other in sorted(near, key=lambda d: abs(DIFFICULTY_ORDER.index(d) - rank)):
+                await take(True, chapter_codes=chapters, difficulty=other)
+        anywhere = None if allowed is None else sorted({*allowed, *([difficulty] if difficulty else [])})
+        for level in ([difficulty, None] if difficulty else [None]):
+            if scope:
+                await take(False, chapter_codes=scope, difficulty=level, grade=grade, difficulties=anywhere)
+            await take(False, chapter_codes=None, difficulty=level, grade=grade, difficulties=anywhere)
+        return taken
 
     @staticmethod
     def _draft_text(draft: ExamDraft, structure: Structure) -> str:

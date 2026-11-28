@@ -146,7 +146,19 @@ def behaviour(text: str) -> dict:
     return {"loại": "hỏi lại"}
 
 
-@pytest.mark.parametrize("case", _cases(), ids=lambda c: c["id"])
+# Backend bù câu thiếu bằng câu thật cùng chương khác mức, hoặc cùng mức khác chương, thay vì chỉ báo thiếu như bản
+# chạy thử. Ba câu thử đo đúng ca "ngân hàng thiếu câu" nên lệch có chủ đích; đưa bản chạy thử về cùng hành vi là
+# quyết định của nhóm (đụng chuẩn đạt ở eval/benchmark.csv). strict=True: khi hai bên khớp lại, test báo để gỡ dòng này.
+BACKFILL_DIVERGENCE = {"B08", "B19", "B22"}
+
+
+def _params():
+    return [pytest.param(c, id=c["id"], marks=pytest.mark.xfail(
+        c["id"] in BACKFILL_DIVERGENCE, strict=True, reason="backend bù câu thiếu, bản chạy thử báo thiếu"))
+        for c in _cases()]
+
+
+@pytest.mark.parametrize("case", _params())
 async def test_backend_matches_codebase_agent(agent, case):
     text = case["input"]
     expected = behaviour(agent.answer(text)["output"])

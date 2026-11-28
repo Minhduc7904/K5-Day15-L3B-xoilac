@@ -187,10 +187,11 @@ async def test_narrowing_via_api_is_used_by_next_chat_confirm(chat):
 
     _, _, draft = await say(chat, sid, "xác nhận")
     first = [i for i in draft["items"] if i["section_title"] == "Phần I. Trắc nghiệm"]
-    assert {i["chapter"] for i in first} == {"12C4"}
-    assert [i["code"] for i in first] == ["Q00020", "Q00021", "Q00022", "Q00023"]   # 12C4: 3 TH + 1 VD
-    assert {(s["section_title"], s["difficulty"]) for s in draft["shortages"]} >= {("Phần I. Trắc nghiệm", "TH"),
-                                                                                   ("Phần I. Trắc nghiệm", "VD")}
+    # 12C4 chỉ có 3 TH + 1 VD + 1 NB. Ô thiếu bù cùng chương trước (Q00024), hết mới sang chương khác cùng mức (Q00005).
+    assert [(i["code"], i["chapter"], i["difficulty"]) for i in first] == [
+        ("Q00020", "12C4", "TH"), ("Q00021", "12C4", "TH"), ("Q00022", "12C4", "TH"),
+        ("Q00024", "12C4", "NB"), ("Q00023", "12C4", "VD"), ("Q00005", "12C1", "VD")]
+    assert all(s["section_title"] != "Phần I. Trắc nghiệm" for s in draft["shortages"])
 
 
 async def test_confirm_via_api_in_template_mode(chat):

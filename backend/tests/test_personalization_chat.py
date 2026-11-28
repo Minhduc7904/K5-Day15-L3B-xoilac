@@ -178,10 +178,11 @@ async def test_history_preview_edits_and_rechecks_bank_at_confirm(live, recommen
             await session.execute(update(questions).where(questions.c.question_id.in_([3, 4]))
                                   .values(visibility="DRAFT"))
             await session.commit()
-        offer = (await confirm(client, sid, result.json()["version"])).json()
-        assert offer["draft"] is None and offer["preview"]["offer"]["count"] == 2
-        built = (await confirm(client, sid, offer["preview"]["version"], count=2)).json()["draft"]
-        assert {q["code"] for q in built["items"]} == {"Q00001", "Q00002"}
+        rebuilt = (await confirm(client, sid, result.json()["version"])).json()
+        built = rebuilt["draft"]
+        # Kho mất 2 câu 12C11 mức TH: câu thiếu được bù bằng câu TH của chương khác, không đưa phương án rút gọn.
+        assert rebuilt["preview"]["offer"] is None and built["shortages"] == []
+        assert [q["code"] for q in built["items"]] == ["Q00001", "Q00002", "Q00020"]
         no_answers(built)
 
 

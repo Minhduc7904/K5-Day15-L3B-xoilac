@@ -134,6 +134,7 @@ class QuestionBankRepository:
         question_type: str | None,
         grade: int | None,
         exclude: Sequence[int],
+        difficulties: Sequence[str] | None = None,
     ):
         """Truy vấn mã các câu đã duyệt thoả điều kiện. Điều kiện None là không lọc theo điều kiện đó."""
         stmt = select(questions.c.question_id).where(available_questions())
@@ -148,6 +149,8 @@ class QuestionBankRepository:
             )
         if difficulty is not None:
             stmt = stmt.where(questions.c.difficulty == difficulty)
+        if difficulties:
+            stmt = stmt.where(questions.c.difficulty.in_(list(difficulties)))
         if question_type is not None:
             stmt = stmt.where(questions.c.type == question_type)
         if grade is not None:
@@ -219,12 +222,15 @@ class QuestionBankRepository:
         grade: int | None = None,
         exclude: Sequence[int] = (),
         prefer_subchapters: bool = False,
+        difficulties: Sequence[str] | None = None,
     ) -> PickResult:
         """Chọn câu cho một phần của mẫu kỳ thi: đúng loại câu, trong các chương cho phép, đúng mức độ khó.
 
-        Mẫu không giới hạn chương thì lọc theo khối (questions.grade) nếu mẫu có khối."""
+        Mẫu không giới hạn chương thì lọc theo khối (questions.grade) nếu mẫu có khối. `difficulties` giới hạn thêm
+        trong tập mức khó cho phép khi không chọn một mức cụ thể (dùng để bù câu thiếu)."""
         return await self._pick(n, chapter_codes=chapter_codes, difficulty=difficulty, question_type=question_type,
-                                grade=None if chapter_codes else grade, exclude=exclude, prefer_subchapters=prefer_subchapters)
+                                grade=None if chapter_codes else grade, exclude=exclude,
+                                prefer_subchapters=prefer_subchapters, difficulties=difficulties)
 
     async def load_items(self, question_ids: Sequence[int]) -> dict[int, dict]:
         """Nội dung câu và lựa chọn để hiển thị. KHÔNG đọc đáp án, lời giải hay cờ đúng/sai."""

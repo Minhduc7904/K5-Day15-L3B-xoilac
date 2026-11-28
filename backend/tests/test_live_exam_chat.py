@@ -44,7 +44,7 @@ async def test_tool_dispatch_uses_function_schema(monkeypatch):
 
 async def test_context_scope_shortage_and_free_replacement(live):
     live.side_effect = [
-        ChatAction(action="chapter", chapters=["12C1"], total=5, difficulty_counts={"TH": 5}),
+        ChatAction(action="chapter", chapters=["12C1"], total=8, difficulty_counts={"TH": 8}),
         ChatAction(action="edit", total=3, difficulty_counts={"TH": 3}),
         ChatAction(action="replace", question_orders=[2]),
         ChatAction(action="history"),
@@ -59,23 +59,23 @@ async def test_context_scope_shortage_and_free_replacement(live):
         sid = await new_session(client, None)
         _, preview, draft = await say(client, sid, "Ôn chương ứng dụng đạo hàm")
         assert not draft
-        assert preview["structure"]["chapters"] == [{"code": "12C11", "count": 5}]
+        assert preview["structure"]["chapters"] == [{"code": "12C11", "count": 8}]
         context = live.call_args.args[0]
         assert context["student"] == {"grade": 11, "target_score": 8, "exam_type": "CK1"}
         assert context["catalog"]["12C11"]["parent_code"] == "12C1"
         assert "school_name" not in context["student"]
         first = (await confirm(client, sid, preview["version"])).json()
-        assert first["draft"] is None and first["preview"]["offer"]["count"] == 4
+        assert first["draft"] is None and first["preview"]["offer"]["count"] == 7   # 4 câu 12C11 + 3 câu TH bù từ chương khác
         assert "ids" not in first["preview"]["offer"]
         assert (await client.get(CREDITS)).json()["balance"] == 500
         offer_version = first["preview"]["version"]
-        rejected = (await confirm(client, sid, offer_version, 3)).json()
+        rejected = (await confirm(client, sid, offer_version, 6)).json()
         assert rejected["draft"] is None
-        accepted = (await confirm(client, sid, offer_version, 4)).json()
+        accepted = (await confirm(client, sid, offer_version, 7)).json()
         first_draft = accepted["draft"]
-        assert len(first_draft["items"]) == 4 and first_draft["shortages"]
+        assert len(first_draft["items"]) == 7 and first_draft["shortages"]
         no_answers(first_draft)
-        retry = (await confirm(client, sid, offer_version, 4)).json()
+        retry = (await confirm(client, sid, offer_version, 7)).json()
         assert retry["draft"]["draft_id"] == first_draft["draft_id"]
         notices = (await client.get("/api/v1/student/me/notifications")).json()
         assert [(n["kind"], n["link"]) for n in notices["items"]] == [("draft_ready", f"/exams/draft-{first_draft['draft_id']}")]
@@ -186,9 +186,13 @@ async def test_template_defaults_from_profile_and_rejects_over_fifty(live):
         conflict = await client.patch(f"{BASE}/sessions/{sid}/preview",
                                       json={"version": preview["version"], "edit": {"total": 40}})
         assert conflict.status_code == 422 and conflict.json()["detail"]["code"] == "TEMPLATE_CONFLICT"
-        offer = (await confirm(client, sid, preview["version"])).json()["preview"]
-        result = (await confirm(client, sid, offer["version"], offer["offer"]["count"])).json()["draft"]
-        assert all(item["chapter"] == "12C11" and item["subchapter_codes"] == ["12C11"] for item in result["items"])
+        built = (await confirm(client, sid, preview["version"])).json()
+        result = built["draft"]
+        assert result is not None and built["preview"]["offer"] is None   # ô thiếu được bù, không đưa phương án rút gọn
+        assert result["items"][0]["chapter"] == "12C11" and result["items"][0]["subchapter_codes"] == ["12C11"]
+        assert [i["code"] for i in result["items"]] == ["Q00001", "Q00002", "Q00003", "Q00004", "Q00005", "Q00006",
+                                                         "Q00040", "Q00041"]
+        assert result["shortages"] == []
 
 
 async def test_cancel_does_not_reuse_preview_versions(live):

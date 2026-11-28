@@ -6,7 +6,7 @@ Dành cho người phát triển các trang học sinh. Hồ sơ, lịch nhắc 
 
 Issue #9 yêu cầu bộ trang học sinh. Các ràng buộc từ [đặc tả](../../spec.md) §4 được giữ ở bản chạy:
 
-- Agent chỉ chọn câu đã duyệt trong ngân hàng. Agent không tự viết câu hỏi hay đáp án mới. Nếu ngân hàng thiếu câu, agent báo rõ số câu còn thiếu.
+- Agent chỉ chọn câu đã duyệt trong ngân hàng. Agent không tự viết câu hỏi hay đáp án mới. Ô thiếu câu được bù bằng câu thật cùng chương khác mức khó, rồi cùng mức khó khác chương; chỉ khi kho hết câu cùng loại, agent mới báo rõ số câu còn thiếu.
 - Đề do AI dựng luôn là bản nháp. Học sinh xem cấu trúc và bấm "Dựng đề" thì đề mới được tạo.
 - Điểm làm online là điểm luyện tập không chính thức. Không xếp hạng và không so sánh học sinh với nhau.
 - Agent từ chối yêu cầu ngoài môn Toán và yêu cầu giải hộ bài thi đang diễn ra.

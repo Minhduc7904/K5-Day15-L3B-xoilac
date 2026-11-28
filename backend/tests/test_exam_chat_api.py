@@ -85,13 +85,12 @@ async def test_weak_chapter_flow_with_chat_and_api_edits(chat):
     reply, preview, draft = await say(chat, sid, "Em xác nhận, tạo đề nháp")
     assert preview["status"] == "BUILT"
     assert draft["title"].startswith("Đề ôn luyện ngày")
-    assert [i["code"] for i in draft["items"]] == ["Q00020", "Q00021", "Q00022"]
-    assert {i["chapter"] for i in draft["items"]} == {"12C4"}
-    [shortage] = draft["shortages"]
-    assert {k: shortage[k] for k in ("chapter", "difficulty", "requested", "available")} == \
-        {"chapter": "12C4", "difficulty": "TH", "requested": 4, "available": 3}
-    assert shortage["section_title"] is None                    # chỉ đề theo mẫu mới có phần
-    assert "BẢN NHÁP" in reply and "không tự bịa" in reply
+    # 12C4 chỉ có 3 câu TH: câu thứ 4 được bù bằng câu cùng mức TH ở chương khác, không báo thiếu.
+    assert [i["code"] for i in draft["items"]] == ["Q00020", "Q00021", "Q00022", "Q00001"]
+    assert {i["difficulty"] for i in draft["items"]} == {"TH"}
+    assert [i["chapter"] for i in draft["items"]] == ["12C4", "12C4", "12C4", "12C1"]
+    assert draft["shortages"] == []
+    assert "BẢN NHÁP" in reply and "Lưu ý" not in reply and "không tự bịa" not in reply
     no_answers(draft)
 
     state = (await chat.get(f"{BASE}/sessions/{sid}")).json()
@@ -122,8 +121,9 @@ async def test_confirm_via_api_and_state_rules(chat):
     assert r.status_code == 200
     body = r.json()
     assert body["preview"]["status"] == "BUILT"
-    assert len(body["draft"]["items"]) == 5 and body["draft"]["shortages"]
-    assert "Lưu ý" in body["message"]
+    assert len(body["draft"]["items"]) == 6 and body["draft"]["shortages"] == []   # câu thiếu được bù, không báo thiếu
+    assert "Lưu ý" not in body["message"]
+    assert "VDC" not in {item["difficulty"] for item in body["draft"]["items"]}
 
     again = await chat.post(f"{BASE}/sessions/{sid}/preview/confirm", json={"version": body["preview"]["version"]})
     assert again.status_code == 409

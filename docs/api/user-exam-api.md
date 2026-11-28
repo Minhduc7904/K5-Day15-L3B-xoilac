@@ -26,7 +26,10 @@ Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`.
   cho đề tự chọn. Bản xem trước có thể kèm `operation` đổi câu hoặc dựng lại bộ câu. Sự kiện SSE
   `preview` mang `null` khi học sinh bỏ bản xem trước chưa dựng.
 - Xác nhận lần đầu tốn 100 credit khi lưu thành công. Dùng lại `draft_id` cho các lần chỉnh hoặc dựng lại.
-  Nếu thiếu câu, phản hồi có `preview.offer` chứa `requested`, `count` và `shortages`, chưa lưu đề hay
+  Ô thiếu câu được bù tự động, không báo học sinh, theo thứ tự: cùng chương khác mức khó (mức gần nhất trước) →
+  cùng mức khó ở chương khác (chương trong phạm vi đề trước, cùng khối) → câu cùng loại bất kỳ trong khối. Luôn giữ
+  đúng loại câu, và không dùng mức khó học sinh đã loại hoặc chỉ định bỏ. Chỉ khi kho hết câu cùng loại mới còn thiếu:
+  khi đó phản hồi có `preview.offer` chứa `requested`, `count` và `shortages`, chưa lưu đề hay
   tính phí. Gửi lại phiên bản mới kèm `accepted_count` khi học sinh đồng ý đúng số đã báo.
   Hết credit trả `402 INSUFFICIENT_CREDITS` và giữ preview.
 - `GET /exam-chat/drafts` liệt kê đề hiện hành của tài khoản. `GET /exam-chat/drafts/{id}` đọc nội dung đề và
@@ -313,8 +316,8 @@ Ca trọn luồng tiêu biểu:
 1. HS01 nhắn "Ra đề ôn chương em hay sai" → SSE có `message`, `preview` (12C1, 10 câu, `PROPOSED`), `done`; chưa có mã câu.
 2. "giảm còn 4 câu" → `EDITED`, version 2.
 3. `PATCH` với version 1 → `409`; với version 2 đổi sang 12C4 chỉ TH → version 3.
-4. "Em xác nhận, tạo đề nháp" → dùng bản đã sửa qua API, đề nháp 3 câu 12C4 và `shortages` báo thiếu 1 câu; không có đáp án.
-5. "Em muốn ôn thi cuối kỳ 1 lớp 12" → bản xem trước theo mẫu (3 phần). "giảm còn 8 câu" bị từ chối, version giữ nguyên. "xác nhận" → đề nháp theo từng phần, đúng loại câu, báo thiếu ở phần trả lời ngắn.
+4. "Em xác nhận, tạo đề nháp" → dùng bản đã sửa qua API, đề nháp 4 câu TH: 3 câu 12C4 và 1 câu TH bù từ 12C1, `shortages` rỗng; không có đáp án.
+5. "Em muốn ôn thi cuối kỳ 1 lớp 12" → bản xem trước theo mẫu (3 phần). "giảm còn 8 câu" bị từ chối, version giữ nguyên. "xác nhận" → đề nháp theo từng phần, đúng loại câu, chỉ báo thiếu ở phần trả lời ngắn vì kho hết câu loại này.
 
 Chưa kiểm với PostgreSQL thật và dữ liệu nền. Đã kiểm SQL của migration bằng `alembic upgrade 0004:0006_exam_chat --sql` (chuỗi `0004 → 0005_student_auth → 0005_exam_templates → 0006_exam_chat`).
 
