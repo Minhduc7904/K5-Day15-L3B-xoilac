@@ -134,8 +134,8 @@ flowchart LR
 
 - **Luồng web CP3 (#41).** Agent lấy lượt đã chấm của tài khoản đăng nhập qua nguồn lịch sử #40. Code tính số câu đúng, sai và bỏ qua theo chương cha trong tối đa năm lượt gần nhất trong 30 ngày. Từ năm câu đã làm và tỷ lệ sai từ 50%, chương được ưu tiên củng cố. Model đề xuất phân bổ và lý do dựa trên thống kê và kho đã duyệt. Server kiểm ma trận rồi dùng luồng xem trước, chỉnh, xác nhận và dựng đề #4. Xem [hợp đồng và ca kiểm thử web](docs/api/user-exam-api.md#ôn-theo-lịch-sử-đã-chấm).
 - **Dữ liệu và model của bản CLI dùng cho bộ câu thử CP2.**
-  - Model đang ở chế độ giả (`MODEL_PROVIDER` để trống), chưa gọi model thật; token đang là 0.
-  - `agent.py` là workflow cố định bằng quy tắc (nhận diện yêu cầu, chọn nhánh, dựng cấu trúc, kiểm đầu ra), chưa dùng model để quyết định. Model chỉ dùng để diễn đạt lại tin nhắn không chứa câu hỏi khi đã nối model thật; ở chế độ giả agent trả thẳng bản dựng bằng code. Chưa có lần chạy nào với model thật.
+  - Từ 28/11/2026 `codebase/ai.py` gọi model thật (gpt-5.4-mini, OpenAI); token đọc từ `usage` của API. Lượt 1 và lượt 2 (`eval/run-1.csv`, `eval/run-2.csv`) và `simulate-1` chạy với model thật. Ở chế độ giả (`MODEL_PROVIDER` để trống) token là 0 và agent trả thẳng bản dựng bằng code.
+  - `agent.py` là workflow cố định bằng quy tắc (nhận diện yêu cầu, chọn nhánh, dựng cấu trúc, kiểm đầu ra), **chưa dùng model để quyết định** chương hay số câu. Model chỉ dùng để diễn đạt lại tin nhắn không chứa câu hỏi. Quyết định do AI đưa ra (chọn công cụ, đề xuất phân bổ và lý do) nằm ở luồng web backend (mục "Luồng web CP3 (#41)" trên); số đo `eval/` và `cost/` là của bản CLI, chưa đo luồng web.
   - `get_exam_template` luôn trả "chưa có" vì chưa có cấu trúc kỳ thi nào được xác thực nguồn.
   - Chọn câu hiện theo thứ tự mã câu (chưa có embedding hay xếp hạng theo độ tương tự).
   - Ngân hàng câu hỏi là dữ liệu thật của trung tâm; repo chỉ chứa mẫu 1.279 câu (`data/question_bank.csv`), bản đầy đủ để ngoài repo. Kết quả làm bài HS01–HS04 là dữ liệu **tự dựng** (`synthetic`, 256 dòng, `data/student_results.csv`, sinh bằng `data/make_student_results.py`); xem `data/DATA_CARD.md`.
@@ -207,6 +207,7 @@ flowchart LR
 | 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
 | 28/11/2026 | Lượt 2: thêm ba mẫu chặn trước AI (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input` của `codebase/agent.py` | Lượt 1 trượt B25–B27 (`tu_choi` 4/7). Lượt 2 trên cùng bộ 27 câu: 25/27, `tu_choi` 7/7; chi tiết `eval/report.md` mục 3. |
 | 28/11/2026 | Ghi kết quả người thứ hai chấm 5 output lượt 2: khớp 3/5, lệch B15 và B26 (`eval/second-grader-sheet.md`, `eval/README.md` mục 3, `eval/report.md` mục 4) | Chưa đạt mốc 4/5. Không sửa cột `pass` hay chuẩn "đạt" cho khớp; nếu B26 tính 0 thì `tu_choi` 6/7 ở lượt 2. |
+| 28/11/2026 | Cập nhật mô tả model của bản CLI ở §4 (đã nối model thật, token từ `usage`) | Câu cũ "chưa gọi model thật, token 0" không còn đúng sau lượt 1, lượt 2 và `simulate-1`. |
 | 28/11/2026 | Điền phân công theo từng chặng ở §10 | Bổ sung mục còn trống theo yêu cầu CP3–CP4; dòng CP4 của ba thành viên là đề xuất, chờ xác nhận. |
 | 28/11/2026 | Điền §8 chi phí từ `simulate-1` (50 phiên, 3 mức model, tỉ lệ đạt 25/27 của lượt 2) và `cost/personas.yaml` | Nhóm chưa có số học sinh thật nên 3 mốc người dùng ghi *(tự ước tính)*; số phiên / tháng lấy từ khảo sát câu 8; chi phí chỉ đo bản CLI, chưa đo luồng web. |
 | 28/11/2026 | Điền §0 (luồng hiện tại từ khảo sát) và §3 (Azota, Khan Academy) | Cần §0–§7 đủ nội dung cho CP3; §3 lấy từ tài liệu chính thức của hai sản phẩm, phần không kiểm được ghi "chưa kiểm". |
