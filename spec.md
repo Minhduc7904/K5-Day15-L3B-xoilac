@@ -15,13 +15,13 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): chưa ghi 
 - Việc họ cố làm xong: chọn và làm một đề Toán tiếp theo phù hợp với phần mình còn yếu sau khi chữa đề.
 - Cách hiện tại *(giả thuyết)*: xem điểm và đáp án, tự nhóm lỗi hoặc hỏi người hỗ trợ, rồi tìm bài tương tự. Điểm tổng có thể khó chuyển thành nội dung cần ôn, trong khi đề có sẵn dễ tiếp cận. Cần hỏi học sinh đã làm gì ở lần gần nhất.
 - Pain *(giả thuyết)*: học sinh đang tự ôn Toán khó xác định chương cần ưu tiên sau khi làm đề và mất thời gian tìm bài luyện tiếp. Giả thuyết phụ là học sinh khó tự đối chiếu đề ôn với kỳ thi/năm mình nhắm tới.
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __ *(chờ bằng chứng thật, gồm số người gặp, tần suất, thời gian và trích dẫn ẩn danh)*.
+- Bằng chứng khảo sát sơ bộ: **19/23 (82,6%)** phản hồi báo từng chữa đề mà chưa biết ôn gì tiếp trong 30 ngày qua. **8/23** biết câu sai hoặc biết một phần nhưng chưa xác định được chương, dạng bài hoặc thứ tự ưu tiên. **7/23** gặp khó khi tìm đề đúng nội dung hoặc dạng câu. Kết quả ủng hộ hướng đề ôn theo chương yếu trong mẫu khảo sát. Việc xác nhận các phiếu hợp lệ và số phút mất mỗi lần còn thiếu. Xem [tổng hợp và trích dẫn ẩn danh](evidence/summary.md).
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-| Đề ôn theo chương yếu | __ | __ | __ phút tìm phần cần ôn và bài tập | __ | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
+| Đề ôn theo chương yếu | 19/23 phiếu báo gặp (sơ bộ) | 8 phiếu: 1 lần, 6 phiếu: 2–3 lần, 5 phiếu: có gặp nhưng không nhớ số lần trong 30 ngày | Thời gian tìm phần cần ôn và bài tập, chưa đo số phút | Chưa đủ số để tính | Phạm vi gọn nếu có dữ liệu demo đã gắn nhãn | Chọn cho hackathon |
 | Đề theo ma trận từng kỳ thi/năm | __ | __ | __ phút tìm và kiểm tra cấu trúc | __ | Cần kho đủ dạng câu và nguồn đã xác thực theo kỳ thi/năm | Định hướng sản phẩm |
 | Báo cáo phần hay sai sau khi chữa đề | __ | __ | __ phút tự rà và nhóm lỗi | __ | Có thể thử với lịch sử làm bài giả lập đã gắn nhãn | Chưa chọn làm hướng riêng |
 
