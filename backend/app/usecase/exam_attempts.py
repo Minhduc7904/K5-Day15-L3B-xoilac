@@ -64,10 +64,11 @@ class ExamAttempts:
             raise AttemptError(422, "INVALID_EXAM", str(error)) from None
         source = await self.bank.load_grading_keys([item["question_id"] for item in items])
         private = {}
+        usable = []
         for item in items:
             entry = source.get(item["question_id"])
             if entry is None:
-                break
+                continue
             options = entry["options"]
             stored = item["statements"]
             ids = [option.get("statement_id") for option in stored]
@@ -77,7 +78,7 @@ class ExamAttempts:
                 option_id not in options or options[option_id][0] != option["content"]
                 for option_id, option in zip(ids, stored)
             ):
-                break
+                continue
             flags = [options[option_id][1] for option_id in ids]
             kind = item["type"]
             valid = (
@@ -87,10 +88,18 @@ class ExamAttempts:
                 or (kind == "SHORT_ANSWER" and bool((entry["answer"] or "").strip()))
             )
             if not valid:
-                break
+                continue
             private[item["code"]] = {"answer": entry["answer"], "solution": entry["solution"], "statements": flags}
-        if len(private) != len(items):
+            usable.append(item)
+        if not usable:
             raise AttemptError(422, "MISSING_GRADING_KEY", "Đề có câu chưa đủ đáp án để chấm tự động.")
+        if len(usable) != len(items):
+            # Đề cũ lẫn câu chưa có đáp án: bỏ các câu đó để vẫn làm và chấm được, chia lại điểm trên số câu còn lại.
+            try:
+                items = allocate_points([{**item, "order": number} for number, item in enumerate(usable, 1)],
+                                        draft.structure)
+            except PreviewRuleError as error:
+                raise AttemptError(422, "INVALID_EXAM", str(error)) from None
         public_items = [{**DraftItem.model_validate(item).model_dump(mode="json"),
                          "points_exact": item["points_exact"]} for item in items]
         snapshot = {

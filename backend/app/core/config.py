@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     mistral_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     exam_chat_live: bool = False
+    # Chỉ chọn câu có đủ đáp án để chấm tự động khi dựng đề; tắt chỉ để chạy test với kho mẫu không có đáp án.
+    exam_require_answer_key: bool = True
     exam_chat_model: str = "gpt-5.4-mini"
     ocr_provider: Literal["mistral"] = "mistral"
     ocr_model: str = "mistral-ocr-4-1"

@@ -60,7 +60,7 @@ Tiến trình API theo dõi các phiên bản đã commit của lượt có tab 
 | `409 ANSWER_CONFLICT` | Tab khác đã lưu câu này. Đọc lại phiên bản và cho học sinh chọn đáp án muốn giữ. |
 | `409 ATTEMPT_FINISHED` | Lượt đã nộp hoặc đã tới hạn. Các đáp án mới bị từ chối. |
 | `409 NOT_GRADED` | Lượt chưa nộp và chưa tới hạn. |
-| `422 INVALID_EXAM`, `MISSING_GRADING_KEY` | Đề chưa đủ dữ liệu để chấm. Lượt mới chưa được tạo. |
+| `422 INVALID_EXAM`, `MISSING_GRADING_KEY` | Đề chưa đủ dữ liệu để chấm: không câu nào có đáp án dùng được. Lượt mới chưa được tạo. Nếu chỉ một số câu thiếu đáp án (đề cũ), lượt làm bỏ các câu đó, đánh lại số thứ tự và chia lại điểm trên số câu còn lại. |
 
 Theo giờ server, cập nhật từ thời điểm `now >= deadline_at` bị từ chối. Worker tự hoàn tất lượt đến hạn trong tác vụ `exam-expiry`, kể cả khi không có tab nào mở. Đề vô hạn kết thúc sau khi học sinh nộp.
 
@@ -75,3 +75,7 @@ Theo giờ server, cập nhật từ thời điểm `now >= deadline_at` bị t�
 - [Kế hoạch làm bài online](../architecture/online-exam-attempts.md)
 - [Chạy worker học sinh](../operations/run-local-stack.md#chạy-worker-học-sinh)
 - [API học sinh tạo đề ôn](user-exam-api.md)
+
+## Câu phải có đáp án mới vào đề
+
+Khi dựng đề, backend chỉ chọn câu chấm tự động được (`exam_require_answer_key`, mặc định bật): trắc nghiệm có đúng một đáp án đúng, đúng sai đủ 4 ý có cờ đúng/sai, trả lời ngắn có đáp án không rỗng. Câu chưa gắn đáp án (vd duyệt nhập đề PDF khi chưa nhập đáp án) vẫn nằm trong ngân hàng nhưng không được chọn; ô thiếu câu được bù bằng câu khác theo luật bù câu.

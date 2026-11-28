@@ -89,6 +89,28 @@ def available_questions():
     return and_(questions.c.visibility == APPROVED_VISIBILITY, questions.c.archived_at.is_(None))
 
 
+def gradable_questions():
+    """Điều kiện SQL "câu có đủ đáp án để chấm tự động", cùng luật với ExamAttempts._snapshot.
+
+    Một đáp án đúng trong trắc nghiệm, đủ 4 ý có cờ đúng/sai ở đúng sai, đáp án không rỗng ở trả lời ngắn. Câu thiếu
+    đáp án mà lọt vào đề thì cả đề không bắt đầu làm bài online được (MISSING_GRADING_KEY)."""
+
+    def count(*conditions):
+        return (select(func.count()).select_from(statements)
+                .where(statements.c.question_id == questions.c.question_id, *conditions)
+                .correlate(questions).scalar_subquery())
+
+    total = count()
+    correct = count(statements.c.is_correct.is_(True))
+    unknown = count(statements.c.is_correct.is_(None))
+    return or_(
+        and_(questions.c.type == "SINGLE_CHOICE", total > 1, correct == 1, unknown == 0),
+        and_(questions.c.type == "TRUE_FALSE", total == 4, unknown == 0),
+        and_(questions.c.type == "SHORT_ANSWER",
+             func.length(func.trim(func.coalesce(questions.c.correct_answer, ""))) > 0),
+    )
+
+
 _GRADE_PREFIX = re.compile(r"^(\d{1,2})C")
 
 
@@ -110,8 +132,9 @@ class PickResult:
 
 
 class QuestionBankRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, gradable_only: bool = False) -> None:
         self._session = session
+        self._gradable_only = gradable_only
 
     async def chapter_names(self) -> dict[str, str]:
         rows = await self._session.execute(select(chapters.c.code, chapters.c.name).where(chapters.c.code.is_not(None)))
@@ -138,6 +161,8 @@ class QuestionBankRepository:
     ):
         """Truy vấn mã các câu đã duyệt thoả điều kiện. Điều kiện None là không lọc theo điều kiện đó."""
         stmt = select(questions.c.question_id).where(available_questions())
+        if self._gradable_only:
+            stmt = stmt.where(gradable_questions())
         if chapter_codes:
             parent = aliased(chapters)
             codes = list(chapter_codes)

@@ -18,6 +18,12 @@ TEST_SETTINGS = Settings(
 )
 
 
+@pytest.fixture(autouse=True)
+def _bank_without_answer_keys(monkeypatch):
+    """Kho mẫu của các test chat không có đáp án; test về đáp án tự bật lại cờ này."""
+    monkeypatch.setattr(get_settings(), "exam_require_answer_key", False)
+
+
 def new_password() -> str:
     """Mật khẩu ngẫu nhiên sinh lúc chạy test (19+ ký tự). Không viết cứng mật khẩu trong repo.
 

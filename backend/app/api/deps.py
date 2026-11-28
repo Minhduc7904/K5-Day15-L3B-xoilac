@@ -333,7 +333,7 @@ def get_reply_writer() -> ReplyWriter:
 
 
 def get_question_bank(session: SessionDep) -> QuestionBankRepository:
-    return QuestionBankRepository(session)
+    return QuestionBankRepository(session, gradable_only=get_settings().exam_require_answer_key)
 
 
 def get_exam_chat_usecase(
