@@ -191,9 +191,9 @@ flowchart LR
 
   | Chặng | Nguyễn Minh Đức | Đỗ Thị Thu Hằng | Phùng Văn Thanh Cao | Vũ Quang Huy |
   |---|---|---|---|---|
-  | CP1–CP2 | Canvas, giả thuyết khảo sát, `spec.md` §4–§7, bộ câu thử B01–B13, metric, data card, công cụ và luồng agent mẫu | Nền backend và frontend | API mẫu cấu trúc đề thi (#5), chat tạo đề ôn qua SSE (#4) | Nhập đề từ PDF (#3), cấu hình production (#13) |
+  | CP1–CP2 | Canvas, giả thuyết khảo sát, `spec.md` §4–§7, bộ câu thử B01–B13, metric, data card, công cụ và luồng agent mẫu | Đăng ký, đăng nhập, phiên và phân quyền (#8), admin mặc định `ensure_admin` trong db-init | API mẫu cấu trúc đề thi (#5), chat tạo đề ôn qua SSE (#4) | Nhập đề từ PDF (#3), cấu hình production (#13) |
   | CP3 | Khảo sát 23 phiếu và `evidence/`, nối model thật, bộ câu thử B14–B27, lượt 1, bảng impact, §0, §3 | Admin ngân hàng câu hỏi và danh mục chương (#11), users realtime (#20) | Gộp mẫu đề với phân quyền học sinh, test đối chiếu với `codebase/agent.py` (#4) | Cá nhân hóa đề ôn từ lượt đã chấm (#41) |
-  | CP4 | Lượt 2, mô phỏng chi phí, `eval/report.md`, slide, tài liệu spec | *(đề xuất)* chạy demo web, kiểm hiển thị ảnh và bảng câu hỏi, reflection | *(đề xuất)* kiểm luồng chat tạo đề và mẫu đề trên môi trường demo, người chấm thứ hai nếu được nhóm chọn, reflection | *(đề xuất)* xác minh môi trường EC2 cho demo, cá nhân hóa, reflection |
+  | CP4 | Lượt 2, mô phỏng chi phí, `eval/report.md`, slide, tài liệu spec | Chạy demo web, kiểm hiển thị ảnh và bảng câu hỏi, chấm độc lập 5 output lượt 2 (`eval/second-grader-sheet.md`), reflection, nói slide trang 1–2 | *(đề xuất)* kiểm luồng chat tạo đề và mẫu đề trên môi trường demo, người chấm thứ hai nếu được nhóm chọn, reflection | *(đề xuất)* xác minh môi trường EC2 cho demo, cá nhân hóa, reflection |
 - Dùng AI vào việc gì (2–3 dòng; chi tiết `docs/ai-usage.md`): Claude Code hỗ trợ soạn bản đầu `spec.md` §4–§7, `eval/benchmark.csv`, `eval/metric_spec.yaml` và `data/DATA_CARD.md` cho CP2; nhóm đọc và duyệt trước khi commit. Câu thử do AI soạn ghi nguồn `tu_viet`, không phải lời người dùng thật.
 - Nhật ký thay đổi — **mọi thay đổi sau CP2 19:30 Thứ Sáu 27/11 phải có dòng ở đây**:
 
@@ -216,4 +216,5 @@ flowchart LR
 
 | Thời điểm | Đổi gì | Vì sao |
 |---|---|---|
+| 28/11/2026 | §10 phân công: sửa ô CP1–CP2 của Hằng từ "Nền backend và frontend" thành auth và admin mặc định (#8); Hằng xác nhận dòng CP4 và thêm chấm độc lập lượt 2 | Nền backend (#1) và frontend (#9) do Đức làm; phần của Hằng ở CP1–CP2 là #8 theo lịch sử commit. Dòng CP4 cần từng người xác nhận. |
 | 28/11/2026 | Hồ sơ học sinh trước tour, Socket.IO theo phiên, credit và job nhắc học | Hoàn tất thiết lập một lần và lưu lịch ôn theo tài khoản. Xem [issue #36](https://github.com/Minhduc7904/K5-Day15-L3B-xoilac/issues/36). |
