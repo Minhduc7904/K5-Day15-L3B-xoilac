@@ -5,8 +5,7 @@ Học sinh chat với agent để nhận đề xuất cấu trúc đề (bản x
 ## Luồng chat thật
 
 Bật `EXAM_CHAT_LIVE=true` trên backend sau migration `0014_exam_chat_images`. Cấu hình
-`OPENAI_API_KEY` và tùy chọn `EXAM_CHAT_MODEL`. Bật `NEXT_PUBLIC_EXAM_CHAT_LIVE=true` và tắt mock
-trên frontend. Giao diện thật dùng tài khoản và hồ sơ #36.
+`OPENAI_API_KEY` và tùy chọn `EXAM_CHAT_MODEL`. Frontend luôn gọi luồng này, không còn cờ riêng. Giao diện dùng tài khoản và hồ sơ #36.
 
 - Model chọn công cụ từ hội thoại, khối lớp, kỳ thi và mục tiêu điểm. Server tự tra dữ liệu và kiểm tra thao tác.
   Khi chọn chương cha cho đề tự chọn, server phân bổ vào chương con. Nếu người dùng chọn một chương con,

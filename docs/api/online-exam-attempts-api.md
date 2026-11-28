@@ -5,7 +5,7 @@ Các màn hình **Đề của tôi**, **Làm bài** và **Kết quả** dùng AP
 ## Điều kiện gọi
 
 - Gọi HTTP qua `/api/v1` với cookie phiên học sinh. Server trả `404` khi ID đề hoặc ID lượt thuộc tài khoản khác.
-- Kết nối Socket.IO bằng vé dùng một lần theo [API realtime](realtime-api.md). UI bật luồng này với `NEXT_PUBLIC_MOCK_MODE=false` và `NEXT_PUBLIC_EXAM_CHAT_LIVE=true`.
+- Kết nối Socket.IO bằng vé dùng một lần theo [API realtime](realtime-api.md). UI luôn dùng luồng này, không còn cờ bật tắt.
 - ID giao diện `draft-42` và `online-15` tương ứng với `draft_id=42` và `attempt_id=15` ở backend.
 
 ## Endpoint và hợp đồng
