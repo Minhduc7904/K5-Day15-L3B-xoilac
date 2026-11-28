@@ -134,8 +134,8 @@ flowchart LR
 
 - **Luồng web CP3 (#41).** Agent lấy lượt đã chấm của tài khoản đăng nhập qua nguồn lịch sử #40. Code tính số câu đúng, sai và bỏ qua theo chương cha trong tối đa năm lượt gần nhất trong 30 ngày. Từ năm câu đã làm và tỷ lệ sai từ 50%, chương được ưu tiên củng cố. Model đề xuất phân bổ và lý do dựa trên thống kê và kho đã duyệt. Server kiểm ma trận rồi dùng luồng xem trước, chỉnh, xác nhận và dựng đề #4. Xem [hợp đồng và ca kiểm thử web](docs/api/user-exam-api.md#ôn-theo-lịch-sử-đã-chấm).
 - **Dữ liệu và model của bản CLI dùng cho bộ câu thử CP2.**
-  - Model đang ở chế độ giả (`MODEL_PROVIDER` để trống), chưa gọi model thật; token đang là 0.
-  - `agent.py` là workflow cố định bằng quy tắc (nhận diện yêu cầu, chọn nhánh, dựng cấu trúc, kiểm đầu ra), chưa dùng model để quyết định. Model chỉ dùng để diễn đạt lại tin nhắn không chứa câu hỏi khi đã nối model thật; ở chế độ giả agent trả thẳng bản dựng bằng code. Chưa có lần chạy nào với model thật.
+  - Từ 28/11/2026 `codebase/ai.py` gọi model thật (gpt-5.4-mini, OpenAI); token đọc từ `usage` của API. Lượt 1 và lượt 2 (`eval/run-1.csv`, `eval/run-2.csv`) và `simulate-1` chạy với model thật. Ở chế độ giả (`MODEL_PROVIDER` để trống) token là 0 và agent trả thẳng bản dựng bằng code.
+  - `agent.py` là workflow cố định bằng quy tắc (nhận diện yêu cầu, chọn nhánh, dựng cấu trúc, kiểm đầu ra), **chưa dùng model để quyết định** chương hay số câu. Model chỉ dùng để diễn đạt lại tin nhắn không chứa câu hỏi. Quyết định do AI đưa ra (chọn công cụ, đề xuất phân bổ và lý do) nằm ở luồng web backend (mục "Luồng web CP3 (#41)" trên); số đo `eval/` và `cost/` là của bản CLI, chưa đo luồng web.
   - `get_exam_template` luôn trả "chưa có" vì chưa có cấu trúc kỳ thi nào được xác thực nguồn.
   - Chọn câu hiện theo thứ tự mã câu (chưa có embedding hay xếp hạng theo độ tương tự).
   - Ngân hàng câu hỏi là dữ liệu thật của trung tâm; repo chỉ chứa mẫu 1.279 câu (`data/question_bank.csv`), bản đầy đủ để ngoài repo. Kết quả làm bài HS01–HS04 là dữ liệu **tự dựng** (`synthetic`, 256 dòng, `data/student_results.csv`, sinh bằng `data/make_student_results.py`); xem `data/DATA_CARD.md`.
@@ -171,13 +171,13 @@ flowchart LR
 - Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 27 câu từ CP3 (thuong 8 · kho 12 · tu_choi 7, trong đó 2 câu tấn công; 13 câu đầu giữ nguyên từ CP2) · metric: `eval/metric_spec.yaml` (4 metric: `cau_trong_ngan_hang`, `chuong_yeu_dung`, `xu_ly_kho_khong_doan`, `tu_choi_dung`)
 - Nguồn bộ câu thử: `nguoi_dung` 5 (B14–B18, nguyên văn câu 9 của khảo sát) · `data_that` 5 (B19–B23, số liệu ngân hàng thật) · `tu_viet` 17 → từ người dùng / data thật 10/27, đạt mốc ≥1/3 của `run.py check`. Chi tiết `eval/README.md` mục 2.
 - **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua (≥ 11/13), và 100% câu tu_choi qua (4/4), và 0 mã câu ngoài ngân hàng hoặc câu tự viết trong mọi đề nháp (metric `cau_trong_ngan_hang` 100%)". Ngưỡng từng metric nằm trong `eval/metric_spec.yaml`: `chuong_yeu_dung` ≥ 3/4 câu thuong · `xu_ly_kho_khong_doan` ≥ 4/5 câu kho.
-- Kết quả: lượt 1 22/27 (81%) · lượt 2 __/__ (__%) — run ID: `run-1@20261128-090856` / __ (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Kết quả: lượt 1 22/27 (81%) · lượt 2 25/27 (93%) — run ID: `run-1@20261128-090856` / `run-2@20261128-095729` (lượt 1: `tu_choi` 4/7 nên chưa đạt chuẩn; lượt 2: `tu_choi` 7/7, đạt chuẩn; cùng model gpt-5.4-mini) → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
-- Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
-- Chi phí / task thành công: __ (model __) · __ (model __)
-- Chi phí / tháng ở quy mô thật: thấp __ · cơ sở __ · cao __ → chi tiết `cost/cost-estimate.md`
-- So với impact / người / tháng (§2): đáng làm không, vì sao:
+- Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-1.csv` (50 phiên, seed 42, 0 phiên lỗi), tỉ lệ đạt 25/27 (93%) từ lượt 2
+- Chi phí / task thành công: $0.0012 (gpt-5.4-mini, model đã đo token) · $0.00010 (gpt-5-nano) · $0.0028 (gpt-6.2-sol); hai model sau chỉ nhân giá với token đo ở gpt-5.4-mini
+- Chi phí / tháng ở quy mô thật (gpt-5.4-mini): thấp $0.26 (100 người) · cơ sở $1.31 (500 người) · cao $5.24 (2.000 người); số người *(tự ước tính)* → chi tiết `cost/cost-estimate.md`
+- So với impact / người / tháng (§2): đáng làm về tiền model, vì chi phí cơ sở $0.0026 / người / tháng so với ≈ 23 phút tiết kiệm *(phút tự ước tính)*. Chưa tính hosting, giờ người duyệt, và luồng web dùng model nhiều token hơn bản CLI đã đo nên con số là cận dưới.
 
 ## §9. Rủi ro & an toàn
 - Dữ liệu: ngân hàng câu hỏi là dữ liệu thật của trung tâm dạy thêm do một thành viên nhóm quản lý, không kèm thông tin học sinh. Hồ sơ học sinh trong bản chạy thử là mã giả (HS01–HS04) và tự dựng; repo không chứa dữ liệu học sinh thật; không thu tên, liên hệ hay điểm thật. Không đưa dữ liệu cá nhân thật vào model gói miễn phí. Nếu sau này nhận PDF từ admin thì chỉ nhận đề có quyền dùng và không kèm thông tin học sinh.
@@ -185,7 +185,15 @@ flowchart LR
 - Ai có thể bị hại nếu AI sai, và nhóm chặn thế nào: học sinh ôn lệch chương hoặc ôn sai cấu trúc kỳ thi (hại vừa, sửa được). Chặn bằng số liệu làm căn cứ, bước preview, kiểm mã câu bằng code và thu hẹp phạm vi khi thiếu căn cứ. Admin có thể gán sai độ khó cho câu mới nếu tin gợi ý của embedding; chặn bằng việc admin duyệt từng câu trước khi vào ngân hàng.
 
 ## §10. Phân công & changelog
-- Phân công có tên (theo chặng, chia cặp — guide "Cách chia việc"): Nguyễn Minh Đức — PO, Tech Lead, DevOps, chốt chuẩn "đạt" và duyệt tài liệu · Đỗ Thị Thu Hằng — backend và frontend · Phùng Văn Thanh Cao và Vũ Quang Huy — AI Agent (công cụ, luồng agent, luồng admin nhập PDF). Phân công theo từng chặng sẽ ghi thêm ở CP3.
+- Phân công có tên (theo chặng, chia cặp — guide "Cách chia việc"): Nguyễn Minh Đức — PO, Tech Lead, DevOps, chốt chuẩn "đạt" và duyệt tài liệu · Đỗ Thị Thu Hằng — backend và frontend · Phùng Văn Thanh Cao và Vũ Quang Huy — AI Agent (công cụ, luồng agent, luồng admin nhập PDF).
+
+  Phân công theo từng chặng (căn cứ lịch sử commit và `docs/ai-usage.md`; dòng CP4 của Hằng, Cao, Huy là **đề xuất của đội trưởng, chờ từng người xác nhận**):
+
+  | Chặng | Nguyễn Minh Đức | Đỗ Thị Thu Hằng | Phùng Văn Thanh Cao | Vũ Quang Huy |
+  |---|---|---|---|---|
+  | CP1–CP2 | Canvas, giả thuyết khảo sát, `spec.md` §4–§7, bộ câu thử B01–B13, metric, data card, công cụ và luồng agent mẫu | Nền backend và frontend | API mẫu cấu trúc đề thi (#5), chat tạo đề ôn qua SSE (#4) | Nhập đề từ PDF (#3), cấu hình production (#13) |
+  | CP3 | Khảo sát 23 phiếu và `evidence/`, nối model thật, bộ câu thử B14–B27, lượt 1, bảng impact, §0, §3 | Admin ngân hàng câu hỏi và danh mục chương (#11), users realtime (#20) | Gộp mẫu đề với phân quyền học sinh, test đối chiếu với `codebase/agent.py` (#4) | Cá nhân hóa đề ôn từ lượt đã chấm (#41) |
+  | CP4 | Lượt 2, mô phỏng chi phí, `eval/report.md`, slide, tài liệu spec | *(đề xuất)* chạy demo web, kiểm hiển thị ảnh và bảng câu hỏi, reflection | *(đề xuất)* kiểm luồng chat tạo đề và mẫu đề trên môi trường demo, người chấm thứ hai nếu được nhóm chọn, reflection | *(đề xuất)* xác minh môi trường EC2 cho demo, cá nhân hóa, reflection |
 - Dùng AI vào việc gì (2–3 dòng; chi tiết `docs/ai-usage.md`): Claude Code hỗ trợ soạn bản đầu `spec.md` §4–§7, `eval/benchmark.csv`, `eval/metric_spec.yaml` và `data/DATA_CARD.md` cho CP2; nhóm đọc và duyệt trước khi commit. Câu thử do AI soạn ghi nguồn `tu_viet`, không phải lời người dùng thật.
 - Nhật ký thay đổi — **mọi thay đổi sau CP2 19:30 Thứ Sáu 27/11 phải có dòng ở đây**:
 
@@ -197,6 +205,11 @@ flowchart LR
 | 28/11/2026 | Thêm 14 câu thử B14–B27 (chỉ thêm, không sửa B01–B13): 27 câu, từ người dùng / data thật 10/27 | Đủ 20–30 câu cho CP3 và ≥1/3 câu từ khảo sát / data thật; bổ sung độ phủ chưa nêu chương, ngân hàng thiếu câu theo mức, ngoài phạm vi (`eval/README.md` mục 2). |
 | 28/11/2026 | Ghi cách quy đổi ngưỡng "đạt" sang 27 câu: ≥ 22/27 · tu_choi 7/7 · thuong ≥ 6/8 · kho ≥ 10/12 | Chuẩn §7 và `metric_spec.yaml` giữ nguyên chữ, chỉ giữ tỷ lệ % đã chốt ở CP2 (80%, 100%, 75%, 80%) và làm tròn lên cho bộ câu lớn hơn; chi tiết `eval/README.md` mục 3. |
 | 28/11/2026 | Điền bảng impact §2 (3 hướng, tính trên 100 học sinh) và đổi câu "còn thiếu xác nhận phiếu" ở §1 | Số từ khảo sát 23 phiếu đã xác nhận (câu 5, 6, 8); phút mỗi lần ghi *(tự ước tính)* vì chưa đo. |
+| 28/11/2026 | Lượt 2: thêm ba mẫu chặn trước AI (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input` của `codebase/agent.py` | Lượt 1 trượt B25–B27 (`tu_choi` 4/7). Lượt 2 trên cùng bộ 27 câu: 25/27, `tu_choi` 7/7; chi tiết `eval/report.md` mục 3. |
+| 28/11/2026 | Ghi kết quả người thứ hai chấm 5 output lượt 2: khớp 3/5, lệch B15 và B26 (`eval/second-grader-sheet.md`, `eval/README.md` mục 3, `eval/report.md` mục 4) | Chưa đạt mốc 4/5. Không sửa cột `pass` hay chuẩn "đạt" cho khớp; nếu B26 tính 0 thì `tu_choi` 6/7 ở lượt 2. |
+| 28/11/2026 | Cập nhật mô tả model của bản CLI ở §4 (đã nối model thật, token từ `usage`) | Câu cũ "chưa gọi model thật, token 0" không còn đúng sau lượt 1, lượt 2 và `simulate-1`. |
+| 28/11/2026 | Điền phân công theo từng chặng ở §10 | Bổ sung mục còn trống theo yêu cầu CP3–CP4; dòng CP4 của ba thành viên là đề xuất, chờ xác nhận. |
+| 28/11/2026 | Điền §8 chi phí từ `simulate-1` (50 phiên, 3 mức model, tỉ lệ đạt 25/27 của lượt 2) và `cost/personas.yaml` | Nhóm chưa có số học sinh thật nên 3 mốc người dùng ghi *(tự ước tính)*; số phiên / tháng lấy từ khảo sát câu 8; chi phí chỉ đo bản CLI, chưa đo luồng web. |
 | 28/11/2026 | Điền §0 (luồng hiện tại từ khảo sát) và §3 (Azota, Khan Academy) | Cần §0–§7 đủ nội dung cho CP3; §3 lấy từ tài liệu chính thức của hai sản phẩm, phần không kiểm được ghi "chưa kiểm". |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)

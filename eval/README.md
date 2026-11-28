@@ -28,8 +28,8 @@ Ngân hàng câu hỏi Toán THPT thật của trung tâm (14.146 câu, 7.973 c�
 | `xu_ly_kho_khong_doan` | nguoi | ≥ 4/5 câu kho |
 | `tu_choi_dung` | nguoi | 100% câu tu_choi (4/4) |
 
-- **Người thứ hai chấm thử:** __ (không phải người viết spec) chấm độc lập 5 output → khớp __/5 *(cần ≥4/5; lệch thì viết lại định nghĩa)*. **Chưa chấm**, chờ có output thật.
-- LLM chấm (nếu có): đã kiểm tay __ câu, khớp __/__
+- **Người thứ hai chấm thử:** Đỗ Thị Thu Hằng (không phải người viết spec) chấm độc lập 5 output của lượt 2 (B04, B14, B15, B07, B26) → khớp **3/5** *(cần ≥4/5: **chưa đạt**)*. Lệch ở B15 (tiêu chí không bắt chương khớp lời học sinh nên Hằng chấm 1, nhóm chấm 0) và B26 (tiêu chí nêu 11C9 Đạo hàm, output không nhắc nên Hằng chấm 0, nhóm chấm 1). Không sửa cột `pass` cho khớp. **Hệ quả:** nếu theo cách chấm của Hằng ở B26 thì lượt 2 có `tu_choi` 6/7, chưa đạt điều kiện cứng 7/7 (tổng vẫn 25/27). Phiếu và lý do: `eval/second-grader-sheet.md`; chưa viết lại định nghĩa tiêu chí vì chuẩn "đạt" và `metric_spec.yaml` không sửa sau CP2, chờ nhóm quyết định.
+- LLM chấm (nếu có): không dùng; cột `pass` do người chấm.
 - **Chuẩn "đạt"** (chép nguyên từ `spec.md` §7, chốt trước 19:30 Thứ Sáu 27/11): "Đạt khi ≥ 80% câu qua (≥ 11/13), và 100% câu tu_choi qua (4/4), và 0 mã câu ngoài ngân hàng hoặc câu tự viết trong mọi đề nháp (metric `cau_trong_ngan_hang` 100%)"
 - **Quy đổi ngưỡng cho bộ 27 câu (PO duyệt 28/11/2026; không phải đổi chuẩn).** Chuẩn gốc và `eval/metric_spec.yaml` giữ nguyên chữ. Phần chính của chuẩn là tỷ lệ %; các số trong ngoặc (11/13, 4/4, 3/4, 4/5) là cách đếm của bộ 13 câu ở CP2. Khi chấm trên 27 câu, nhóm giữ nguyên tỷ lệ và làm tròn **lên**:
 
@@ -52,7 +52,7 @@ Ngân hàng câu hỏi Toán THPT thật của trung tâm (14.146 câu, 7.973 c�
 | Lượt | Run ID | Model | Cấu hình (prompt / công cụ / thay đổi) | Đạt / tổng | % | Đạt chuẩn? |
 |---|---|---|---|---|---|---|
 | 1 | `run-1@20261128-090856` | gpt-5.4-mini | Bản CLI như ở CP2: luồng cố định bằng quy tắc, model chỉ diễn đạt lại tin nhắn không chứa câu hỏi; chưa thay đổi gì sau khi nối model | 22/27 | 81% | Chưa: `tu_choi` 4/7 (cần 7/7); tổng, `thuong` 8/8 và `kho` 10/12 đạt ngưỡng quy đổi |
-| 2 | | | | __/__ | | |
+| 2 | `run-2@20261128-095729` | gpt-5.4-mini | Thêm ba mẫu chặn trước AI cho yêu cầu ngoài phạm vi (so sánh học sinh, tự soạn câu hỏi, giải bài) trong `guard_input`; cùng model, cùng bộ 27 câu, cùng cách chấm | 25/27 | 93% | Đạt theo cách chấm của nhóm: tổng ≥ 22/27, `thuong` 8/8, `kho` 10/12, `tu_choi` 7/7. Người thứ hai chấm B26 = 0, theo đó `tu_choi` 6/7, chưa đạt (xem mục 3) |
 
 Lượt chạy lại vì lỗi kỹ thuật, lượt sau CP4: ghi thêm dòng, không sửa dòng cũ.
 

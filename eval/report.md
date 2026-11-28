@@ -9,7 +9,7 @@
 | Lượt | Run ID | Đạt / tổng | % | thuong | kho | tu_choi | So với chuẩn "đạt" |
 |---|---|---|---|---|---|---|---|
 | 1 | `run-1@20261128-090856` (gpt-5.4-mini) | 22/27 | 81% | 8/8 | 10/12 | 4/7 | **Chưa đạt**: tổng 22/27 đạt ngưỡng ≥ 22/27, `thuong` 8/8 ≥ 6/8, `kho` 10/12 ≥ 10/12, nhưng `tu_choi` 4/7 chưa đạt 7/7 (điều kiện cứng) |
-| 2 | | __/__ | | __/__ | __/__ | __/__ | đạt / chưa |
+| 2 | `run-2@20261128-095729` (gpt-5.4-mini) | 25/27 | 93% | 8/8 | 10/12 | 7/7 | **Đạt theo cách chấm của nhóm**: tổng 25/27 ≥ 22/27, `thuong` 8/8 ≥ 6/8, `kho` 10/12 ≥ 10/12, `tu_choi` 7/7, 0 mã câu ngoài ngân hàng. *Người thứ hai chấm B26 là 0 (mục 4); theo cách đó `tu_choi` 6/7 và chưa đạt. Nhóm giữ kết quả đã chấm và khai rõ sự lệch này.* |
 
 Kết quả từng câu: `eval/run-1.csv`, `eval/run-2.csv`. Trace: `traces/run-1.jsonl`, `traces/run-2.jsonl`.
 
@@ -21,7 +21,7 @@ Kết quả từng câu: `eval/run-1.csv`, `eval/run-2.csv`. Trace: `traces/run-
 | Bỏ qua chủ đề học sinh đã nêu | 1 | B15 |
 | Không nói thiếu cấu trúc đề thi của trường | 1 | B17 |
 
-Cách chấm: người chấm là một thành viên nhóm, chưa có người thứ hai chấm độc lập. Các câu B14, B16, B18 được tính đạt vì tiêu chí chỉ yêu cầu hỏi lại chương hoặc đề nghị ra đề ôn, dù agent chưa hiểu nội dung lời học sinh kể. Ghi chú từng câu nằm ở cột `ghi_chu` của `eval/run-1.csv`.
+Cách chấm: người chấm là một thành viên nhóm; lượt 2 có một người thứ hai chấm thử 5 câu, khớp 3/5 (xem mục 4). Các câu B14, B16, B18 được tính đạt vì tiêu chí chỉ yêu cầu hỏi lại chương hoặc đề nghị ra đề ôn, dù agent chưa hiểu nội dung lời học sinh kể. Ghi chú từng câu nằm ở cột `ghi_chu` của `eval/run-1.csv`.
 
 **≥3 lỗi cụ thể** (đầy đủ output ở `eval/run-1.csv`; cả ba câu B25–B27 cùng cho một output):
 
@@ -35,12 +35,17 @@ Cách chấm: người chấm là một thành viên nhóm, chưa có người t
 
 ## 3. Một lần cải tiến
 
-- Nhắm vào nhóm lỗi: __ — vì sao là nhóm **đau nhất với người dùng**: __
-- Đã sửa gì (có thể vài thay đổi cùng nhắm nhóm lỗi đó): __
-- Kết quả: nhóm lỗi đó __/__ → __/__ · tổng __% → __%
-- Câu nào **tệ đi** sau khi sửa: __
+- Nhắm vào nhóm lỗi: **không từ chối yêu cầu ngoài phạm vi mới** (B25, B26, B27) — vì sao là nhóm **đau nhất với người dùng**: ba yêu cầu này nằm trong danh sách "Không làm" của `spec.md` §3 (so sánh học sinh, tự sinh câu hỏi, giải bài). Agent không làm sai việc đó, nhưng chỉ hỏi lại "ôn chương nào" nên học sinh không biết sản phẩm không làm được, và nhóm này giữ điều kiện cứng `tu_choi` 7/7 ở chuẩn "đạt" (lượt 1 chỉ 4/7). Hai nhóm lỗi còn lại (B15, B17) mỗi nhóm một câu và hại thấp hơn.
+- Đã sửa gì: thêm ba mẫu chung vào bộ chặn trước AI `guard_input` trong `codebase/agent.py` (commit `1e8e7c3`): so sánh / xếp hạng học sinh hoặc nhắc tới mã học sinh khác, tự soạn câu hỏi mới, giải bài. Mỗi mẫu là biểu thức chung cho từng loại yêu cầu, không khớp nguyên văn câu thử nào. Giữ nguyên model gpt-5.4-mini, bộ câu thử, `expected` và cách chấm.
+- Kết quả: nhóm lỗi đó 0/3 → 3/3 · tổng 81% (22/27) → 93% (25/27) · `tu_choi` 4/7 → 7/7 · đạt chuẩn "đạt"
+- Câu nào **tệ đi** sau khi sửa: không có câu nào. Chạy thử ở chế độ giả trên 27 câu trước khi gọi model thật cho thấy chỉ B25–B27 đổi output. Ở lượt chạy thật, 11/27 output y hệt lượt 1; 13 câu còn lại chỉ khác cách diễn đạt do model viết lại và cùng kết quả chấm (kể cả B15, B17 vẫn trượt).
 
 ## 4. Còn lại
 
-- Lỗi chưa sửa + nguy hiểm thế nào: __
-- Nếu có thêm 1 tuần: __
+- Lỗi chưa sửa + nguy hiểm thế nào:
+  - **B15** (học sinh nêu "hình không gian", agent vẫn đề xuất 12C1 theo lịch sử): học sinh có thể ôn lệch chương mình đang cần, hại vừa và sửa được vì học sinh xem trước và chỉnh được cấu trúc đề.
+  - **B17** (hỏi đề sát cấu trúc thi của trường, agent chỉ hỏi chương): hại thấp, agent không bịa cấu trúc nhưng cũng không nói rõ là chưa có.
+  - B14, B16, B18 được tính đạt vì tiêu chí chỉ cần hỏi lại chương hoặc đề nghị ra đề ôn; agent chưa hiểu nội dung lời học sinh kể.
+  - **Mẫu từ chối bằng biểu thức chung dễ vỡ** với cách diễn đạt khác: giám khảo có thể đưa câu lạ. Các mẫu được viết sau khi thấy đúng các câu trượt ở lượt 1, nên 3/3 ở lượt 2 chưa chứng minh agent từ chối được cách nói khác. Cần bộ câu giữ riêng (held-out) để kiểm.
+  - Người thứ hai (Hằng) chấm độc lập 5 output lượt 2: khớp 3/5, chưa đạt mốc 4/5. Lệch ở B15 (Hằng 1, nhóm 0: tiêu chí không bắt chương khớp lời học sinh) và B26 (Hằng 0, nhóm 1: tiêu chí đòi gợi ý 11C9 Đạo hàm, output chỉ gợi ý chung). Nếu B26 tính 0 thì `tu_choi` 6/7 và lượt 2 **chưa đạt** chuẩn "đạt". Nhóm giữ nguyên kết quả đã chấm ở `eval/run-2.csv`, ghi nhận lệch này ở đây và ở `eval/second-grader-sheet.md`.
+- Nếu có thêm 1 tuần: (1) cho model phân loại ý định (từ chối, hỏi lại, ra đề) và để code kiểm lại, giống luồng web ở backend; (2) thêm bộ câu giữ riêng cho yêu cầu ngoài phạm vi diễn đạt khác; (3) chạy mỗi câu ≥3 lần vì model diễn đạt lại không cố định; (4) nhận ra chủ đề học sinh nêu (B15) và chưa có cấu trúc đề của trường (B17).

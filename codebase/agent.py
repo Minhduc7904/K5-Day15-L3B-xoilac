@@ -50,6 +50,11 @@ DUMP = re.compile(r"(in|hien|liet ke|xuat|gui|cho).{0,25}(toan bo|tat ca).{0,25}
 TAMPER = re.compile(r"\b(sua|chinh|nang|tang|thay doi|doi)\b.{0,15}\bdiem\b")
 CHEAT = re.compile(r"dap an.{0,40}(de kiem tra|bai kiem tra|de thi|de cua lop|de lop)|\bchep\b.{0,20}(dap an|bai)|dap an.{0,30}\bchep\b")
 OFF_TOPIC = re.compile(r"\b(ngu van|bai van|nghi luan|van hoc|tieng anh|vat ly|hoa hoc|sinh hoc|lich su|dia ly)\b")
+# Lượt 2 (nhóm lỗi "không từ chối yêu cầu ngoài phạm vi", spec.md §3): so sánh / xem dữ liệu học sinh khác,
+# tự sinh câu hỏi, giải bài. Mẫu chung cho từng loại yêu cầu, không khớp nguyên văn câu thử nào.
+COMPARE = re.compile(r"\b(so sanh|xep hang|xep thu hang)\b.{0,40}\b(hs\d+|ban|nguoi khac|hoc sinh khac|lop)\b|\bai (gioi|hon)\b")
+GENERATE = re.compile(r"\b(soan|viet|sang tac|bia|nghi ra|sinh ra)\b.{0,20}\bcau\b.{0,12}\bmoi\b|khong can lay (trong|tu) ngan hang")
+SOLVE = re.compile(r"\b(giai giup|giai ho|giai bai|giai chi tiet|giai thich bai|lam ho|tinh giup|chung minh giup)\b")
 EXAM = re.compile(r"(ky thi|thi tot nghiep|thi thpt|thi hoc ky|thi giua ky|thi cuoi ky|cau truc de|ma tran|de thi 20\d\d|theo cau truc)")
 WEAK = re.compile(r"(hay sai|yeu|chua vung|sai nhieu|kem)")
 CODE = re.compile(r"\b(1[0-2]c\d)\b")
@@ -63,6 +68,12 @@ def guard_input(t):
         return "Mình không thể sửa điểm hay dữ liệu làm bài, điểm không do mình quyết định. " + OFFER
     if CHEAT.search(t):
         return "Mình không đưa đáp án đề kiểm tra để chép. Nếu em muốn luyện, " + OFFER[0].lower() + OFFER[1:]
+    if COMPARE.search(t) or len(set(re.findall(r"\bhs\d+\b", t))) > 1:
+        return "Mình không so sánh hay xếp hạng học sinh, và không cho xem dữ liệu của bạn khác. " + OFFER
+    if GENERATE.search(t):
+        return "Mình không tự soạn câu hỏi mới: mọi câu trong đề đều lấy từ ngân hàng đã duyệt. " + OFFER
+    if SOLVE.search(t):
+        return "Mình không giải bài hay đưa lời giải ở đây: mình chỉ ra đề ôn từ ngân hàng. " + OFFER
     if OFF_TOPIC.search(t):
         return "Mình chỉ hỗ trợ ôn môn Toán THPT nên không làm được việc này. " + OFFER
     return None
