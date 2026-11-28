@@ -6,6 +6,8 @@ Issue #3 đưa câu hỏi từ đề Toán THPT vào kho chung sau khi admin ki�
 
 Backend dùng PostgreSQL, MinIO và schema nền từ migration `0002`. PDF cần có quyền sử dụng. Mistral trích xuất các trang và hình. OpenAI tách câu, đáp án và lời giải từ nội dung nguồn. Admin xét từng câu trước khi xuất bản.
 
+PDF tối đa 60 trang và 20 MiB. Với tệp trên 30 trang, OCR chạy theo lô tối đa 30 trang rồi khôi phục số trang gốc. Bước tách đề chạy theo lô 4 trang chính và đọc thêm trang liền kề để giữ ngữ cảnh tại ranh giới lô.
+
 ## Thành phần và trách nhiệm
 
 | Lớp | Trách nhiệm |
@@ -18,7 +20,7 @@ Backend dùng PostgreSQL, MinIO và schema nền từ migration `0002`. PDF cầ
 ## Luồng dữ liệu và tích hợp
 
 1. Lưu PDF gốc và tạo phiên `queued`. Tác vụ nền dùng session DB riêng, đặt trạng thái `processing` rồi cập nhật bước đang chạy.
-2. Lưu Markdown từng trang để đối chiếu. Lưu ảnh với quan hệ đến PDF gốc và gắn mã `media:ID` ổn định vào Markdown. Ảnh thiếu hoặc lỗi lưu được báo để admin kiểm tra.
+2. Lưu Markdown từng trang để đối chiếu. Lưu ảnh với quan hệ đến PDF gốc và gắn mã `media:ID` ổn định vào Markdown. Ảnh thiếu hoặc lỗi lưu được báo để admin kiểm tra. Bản nháp có ảnh trong thân câu, lựa chọn hoặc lời giải cần admin xác nhận đã xem ảnh trước khi duyệt.
 3. Tách câu và đáp án theo phần và số in trên đề. Giữ thứ tự, LaTeX, trang nguồn, ảnh và lời giải có trong PDF. Gắn cờ đáp án thiếu, mâu thuẫn hoặc ghép không duy nhất. Giá trị chưa rõ của mệnh đề là `null`.
 4. So sánh embedding của thân câu và các mệnh đề với một mẫu câu Toán đã xuất bản, có nhãn hợp lệ. Lưu mã câu gần và điểm tương đồng. Để trống nhãn thiếu căn cứ.
 5. Trả `ready_for_review` khi có bản nháp hoặc `failed` kèm bước lỗi. Admin sửa, duyệt hoặc bỏ từng câu. Khi duyệt, ghi câu và các liên kết vào kho chung với `visibility=PUBLISHED`. Bản đọc cho học sinh chỉ gồm nội dung, mệnh đề có thứ tự và ảnh được phép đọc.

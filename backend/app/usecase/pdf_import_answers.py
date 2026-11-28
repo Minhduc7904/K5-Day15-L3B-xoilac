@@ -164,10 +164,15 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
         flags = [] if state == "resolved" else [f"answer_{state}"]
         if solution is None:
             flags.append("solution_review")
-        if question.image_dependent:
+        question_fields = [question.content, *question.statements]
+        image_dependent = (
+            question.image_dependent or bool(media_ids(*question_fields))
+            or any(MISSING_MEDIA.search(field) for field in question_fields)
+        )
+        if image_dependent:
             flags.append("image_review")
         source_pages = set(question.pages) | set(solution_pages)
-        content_fields = [question.content, *question.statements, solution or ""]
+        content_fields = [*question_fields, solution or ""]
         source_ids = set().union(*(source_media[number] for number in source_pages))
         if media_ids(*content_fields) - source_ids:
             flags.append("image_source_mismatch")
@@ -187,7 +192,7 @@ def build_drafts(extraction: Extraction, pages: list[dict]) -> list[dict]:
             "correctAnswer": value if isinstance(value, str) else None, "solution": solution,
             "solutionPages": solution_pages,
             "answerState": state, "evidence": [item.model_dump() for item in source_excerpts],
-            "flags": flags, "imageDependent": question.image_dependent, "imageReviewed": False,
+            "flags": flags, "imageDependent": image_dependent, "imageReviewed": False,
             "chapterCodes": [], "difficulty": None, "suggestions": None,
         })
     placed = set().union(*(media_ids(

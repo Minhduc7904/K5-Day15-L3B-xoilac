@@ -63,7 +63,7 @@ export function ImportListPage() {
     <>
       <PageHeader
         title="Nhập đề PDF"
-        description="Tải đề PDF (tối đa 20 MiB), hệ thống OCR và tách câu thành bản nháp. Admin duyệt từng câu trước khi vào ngân hàng."
+        description="Tải đề PDF tối đa 60 trang và 20 MiB. Hệ thống OCR và tách câu thành bản nháp để admin duyệt."
         actions={
           <>
             <input ref={fileRef} type="file" accept="application/pdf" className="sr-only" aria-label="Chọn tệp PDF"
