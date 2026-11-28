@@ -21,7 +21,7 @@ from app.usecase.exam_chat import (
     ChatTurn, ExamChatUseCase, InvalidState, Requester, SessionNotFound,
     VersionConflict, draft_title, load_structure,
 )
-from app.usecase.exam_chat_intent import norm, read, refusal
+from app.usecase.exam_chat_intent import next_practice, norm, read, refusal
 from app.usecase.exam_personalization import (
     PracticeRequest, practice_chapters, recommendation_context, review_text,
     validate_recommendation, weak_priority,
@@ -194,11 +194,20 @@ class LiveExamChat(ExamChatUseCase):
         context, latest, previous_version, summary, cutoff = await self._context(
             session_id, requester, text, version, image_turn=bool(prepared),
         )
-        blocked = refusal(norm(text)) if text else None
+        normalized = norm(text)
+        blocked = refusal(normalized)
+        next_exam = next_practice(normalized) if not prepared else None
         if blocked:
             action, notice = None, blocked
         elif prepared:
             action, notice = await self._interpret_images(prepared, context)
+        elif next_exam:
+            if next_exam.asked_total is not None and not 1 <= next_exam.asked_total <= MAX_TOTAL:
+                action, notice = None, f"Mỗi đề cần từ 1 đến {MAX_TOTAL} câu."
+            else:
+                action = ChatAction(action="history", total=next_exam.edit.total,
+                                    difficulty_counts=next_exam.edit.difficulty_counts or {})
+                notice = ""
         else:
             try:
                 action, notice = await self.model.interpret(context), ""
@@ -262,12 +271,13 @@ class LiveExamChat(ExamChatUseCase):
             review += "\nKho chưa có câu phù hợp để củng cố " + ", ".join(unavailable) + "."
         await self.db.rollback()
         try:
-            recommendation = await self.model.recommend(
-                recommendation_context(history, request, catalog, options, priority),
+            model_input = recommendation_context(history, request, catalog, options, priority)
+            recommendation = await self.model.recommend(model_input)
+            structure, reasons = validate_recommendation(
+                recommendation, history, request, catalog, model_input["bank"], priority,
             )
-            structure, reasons = validate_recommendation(recommendation, history, request, catalog, options, priority)
-        except ExamChatModelError:
-            log.info("exam_chat recommendation unavailable")
+        except ExamChatModelError as exc:
+            log.info("exam_chat recommendation unavailable reason=%s", exc)
             return None, review + "\nAI đang bận. Em thử lại hoặc chọn một chương để ôn nhé."
         except PreviewRuleError as exc:
             log.info("exam_chat recommendation rejected")

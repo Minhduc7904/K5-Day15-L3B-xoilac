@@ -18,6 +18,8 @@ from tests.test_exam_attempts import ROOT, add_draft
 from tests.test_live_exam_chat import PROFILE, confirm, live
 from tests.test_study_dashboard import seed_dashboard_bank
 
+HISTORY_CHAT = "Dựa trên các lượt đã chấm, gợi ý bài em nên làm tiếp."
+
 
 async def set_grade(client):
     result = await client.put(PROFILE, json={
@@ -61,6 +63,22 @@ def recommend(monkeypatch):
     return mock
 
 
+async def test_recommendation_requests_strict_output_schema(monkeypatch):
+    model = ExamChatModel(get_settings())
+    expected = plan("12C11", "12C1", count=1)
+    call = AsyncMock(return_value={"content": expected.model_dump_json()})
+    monkeypatch.setattr(model, "_call", call)
+    cell = expected.groups[0].model_dump(exclude={"count"})
+    recommendation = await model.recommend({"bank": [cell], "total": 1})
+    assert recommendation.groups[0].evidence_ref == "12C1"
+    response_format = call.call_args.kwargs["response_format"]
+    assert response_format["type"] == "json_schema" and response_format["json_schema"]["strict"]
+    group = response_format["json_schema"]["schema"]["$defs"]["PracticeGroup"]
+    assert set(group["required"]) == {"chapter_code", "difficulty", "type", "count", "evidence_ref", "rationale"}
+    assert group["properties"]["chapter_code"]["enum"] == ["12C11"]
+    assert group["properties"]["count"]["maximum"] == 1
+
+
 async def test_history_personalizes_same_request_and_refreshes_after_grading(live, recommend):
     live.return_value = ChatAction(action="history", total=2)
     recommend.side_effect = [
@@ -74,7 +92,7 @@ async def test_history_personalizes_same_request_and_refreshes_after_grading(liv
         for _ in range(2):
             await grade(client, draft_id)
         sid = await new_session(client, None)
-        reply, first, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, first, _ = await say(client, sid, HISTORY_CHAT)
         assert "sai 6/6" in reply and first["structure"]["chapters"] == [{"code": "12C11", "count": 2}]
         model_input = recommend.call_args.args[0]
         assert model_input["evidence"]["12C1"]["latest"]["incorrect"] == 3
@@ -85,7 +103,7 @@ async def test_history_personalizes_same_request_and_refreshes_after_grading(liv
 
         for _ in range(3):
             await grade(client, draft_id, correct=True)
-        _, refreshed, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        _, refreshed, _ = await say(client, sid, HISTORY_CHAT)
         assert refreshed["version"] > first["version"]
         assert refreshed["structure"]["chapters"] == [{"code": "12C4", "count": 2}]
         assert recommend.call_args.args[0]["evidence"]["12C1"]["recent"]["error_rate"] == 0.40
@@ -97,7 +115,7 @@ async def test_history_personalizes_same_request_and_refreshes_after_grading(liv
             await grade(client, separate)
         assert (await client.post(f"{BASE}/sessions/{sid}/messages", json={"text": "Tạo đề ôn tiếp"})).status_code == 404
         second_sid = await new_session(client, None)
-        _, second, _ = await say(client, second_sid, "Tạo đề ôn tiếp")
+        _, second, _ = await say(client, second_sid, HISTORY_CHAT)
         assert second["structure"]["chapters"] == [{"code": "12C4", "count": 2}]
         assert recommend.call_args.args[0]["evidence"]["12C1"]["recent"]["attempted"] == 0
 
@@ -112,19 +130,19 @@ async def test_history_insufficient_conflicting_invalid_and_shortage(live, recom
         owner = await login_as(client, "history-edge@example.com")
         await set_grade(client)
         sid = await new_session(client, None)
-        reply, preview, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, preview, _ = await say(client, sid, HISTORY_CHAT)
         assert "chưa có lịch sử" in reply and not preview
         recommend.assert_not_awaited()
         attempt_id = await grade(client, await add_draft(client, owner), only_one=True)
-        reply, preview, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, preview, _ = await say(client, sid, HISTORY_CHAT)
         assert "sai 1/1" in reply and "ít dữ liệu" in reply and not preview
-        reply, preview, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, preview, _ = await say(client, sid, HISTORY_CHAT)
         assert "có thêm dữ liệu" in reply and preview
-        reply, preview, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, preview, _ = await say(client, sid, HISTORY_CHAT)
         assert "AI đang bận" in reply and not preview
 
         live.return_value = ChatAction(action="history", total=50, chapters=["12C1"])
-        reply, preview, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, preview, _ = await say(client, sid, HISTORY_CHAT)
         assert "Kho có 4/50" in reply and not preview and recommend.await_count == 3
 
         async with client.db() as session:
@@ -132,7 +150,7 @@ async def test_history_insufficient_conflicting_invalid_and_shortage(live, recom
             result = attempt.result
             attempt.result = {**result, "results": [*result["results"], {"code": "Q00801", "status": "correct"}]}
             await session.commit()
-        reply, preview, _ = await say(client, sid, "Tạo đề ôn tiếp")
+        reply, preview, _ = await say(client, sid, HISTORY_CHAT)
         assert "mâu thuẫn" in reply and not preview and recommend.await_count == 3
 
 
@@ -147,7 +165,7 @@ async def test_history_preview_edits_and_rechecks_bank_at_confirm(live, recommen
         for _ in range(2):
             await grade(client, draft_id)
         sid = await new_session(client, None)
-        _, first, draft = await say(client, sid, "Tạo đề ôn tiếp")
+        _, first, draft = await say(client, sid, HISTORY_CHAT)
         assert first["structure"]["rows"][0]["count"] == 3 and not draft
         _, edited, _ = await say(client, sid, "Còn hai câu")
         assert edited["structure"]["rows"][0]["count"] == 2
@@ -165,6 +183,29 @@ async def test_history_preview_edits_and_rechecks_bank_at_confirm(live, recommen
         built = (await confirm(client, sid, offer["preview"]["version"], count=2)).json()["draft"]
         assert {q["code"] for q in built["items"]} == {"Q00001", "Q00002"}
         no_answers(built)
+
+
+async def test_direct_history_request_uses_current_scope_after_preview(live, recommend):
+    recommend.side_effect = [plan("12C11", "12C1", count=1), plan("12C4", "12C4", count=1)]
+    async with chat_client(real_auth=True, seed_fn=seed_dashboard_bank) as client:
+        app.dependency_overrides.pop(get_student_history)
+        owner = await login_as(client, "history-direct@example.com")
+        await set_grade(client)
+        first = await add_draft(client, owner)
+        for _ in range(2):
+            await grade(client, first)
+        sid = await new_session(client, None)
+        _, original, _ = await say(client, sid, "Tạo đề ôn tiếp 1 câu thông hiểu")
+        assert original["structure"]["rows"][0]["chapter"] == "12C11"
+
+        await grade(client, first, correct=True)
+        second = await add_draft(client, owner, chapter="12C4")
+        for _ in range(2):
+            await grade(client, second)
+        _, updated, _ = await say(client, sid, "Làm đề ôn tiếp 1 câu thông hiểu nhé")
+        assert updated["structure"]["rows"][0]["chapter"] == "12C4"
+        live.assert_not_awaited()
+        assert recommend.call_args.args[0]["selected_chapters"] == []
 
 
 @pytest.mark.skipif(os.getenv("EXAMIND_CP3_LIVE") != "1", reason="opt-in provider validation")
@@ -187,6 +228,13 @@ async def test_history_with_configured_provider(monkeypatch, caplog):
         assert preview is not None, message
         assert preview["structure"]["chapters"] == [{"code": "12C11", "count": 1}]
         assert "sai 6/6" in message
+        edited = await client.patch(f"{BASE}/sessions/{first_chat}/preview", json={
+            "version": preview["version"], "edit": {"rows": [{**preview["structure"]["rows"][0], "count": 2}]},
+        })
+        assert edited.status_code == 200
+        draft = (await confirm(client, first_chat, edited.json()["version"])).json()["draft"]
+        assert len(draft["items"]) == 2
+        no_answers(draft)
         cookies = Cookies(client.cookies)
 
         second = await login_as(client, "provider-second@example.com")

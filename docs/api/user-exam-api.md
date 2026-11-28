@@ -39,6 +39,26 @@ Chỉ trạng thái `correct` tính đúng. `wrong` và `partial` tính sai. Câ
 
 Model nhận thống kê tổng hợp, phạm vi, ràng buộc và số câu đã duyệt theo ô. Kết quả là các nhóm chương, độ khó, dạng câu, số lượng, mã căn cứ và mục đích luyện. Server kiểm số liệu và ghép thử câu phân biệt trước khi gửi `preview`. Kho thiếu thì tin nhắn nêu phần thiếu để học sinh sửa. Nếu kho thay đổi sau khi xem trước, dùng cơ chế `offer` và xác nhận số câu rút gọn đang có. Bước dựng và định dạng sự kiện SSE dùng hợp đồng hiện có.
 
+#### Kiểm chứng CP3 #41
+
+Ca live ngày 28/11/2026 dùng hai tài khoản lớp 12 tự tạo và nộp bài qua API thật trong cơ sở dữ liệu kiểm thử.
+
+| Ca | Kết quả |
+| --- | --- |
+| Cùng yêu cầu “Tạo đề ôn tiếp 1 câu thông hiểu” | Tài khoản A nhận `12C11` vì sai 6/6 câu ở chương cha `12C1`. Tài khoản B nhận `12C4` vì sai 6/6 câu ở chương đó. |
+| Có lượt chấm mới trong phiên chat của A | Sau khi A làm đúng một lượt ở `12C1` và nộp hai lượt ở `12C4`, đề xuất chuyển sang `12C4`. |
+| Xem trước, chỉnh và xác nhận | A chỉnh từ một thành hai câu rồi xác nhận. Đề nháp chứa hai câu đã duyệt và ẩn dữ liệu đáp án. |
+
+Ba lời gọi đề xuất dùng `gpt-5.4-mini-2026-03-17`. API ghi lần lượt 830, 830 và 843 token vào, cùng 52 token ra mỗi lần. Các ca lịch sử rỗng, 1/1, chưa luyện, mâu thuẫn, kho thiếu, đổi phiên bản, chặn truy cập chéo và chỉnh qua chat chạy trong bộ test thường.
+
+Chạy lại ca live từ thư mục `backend/` bằng PowerShell với khóa model đã cấu hình.
+
+```powershell
+$env:EXAMIND_CP3_LIVE = '1'
+..\.venv\Scripts\python.exe -m pytest -q tests/test_personalization_chat.py -k configured_provider --log-cli-level=INFO
+$env:EXAMIND_CP3_LIVE = $null
+```
+
 ### Ảnh trong chat
 
 - `POST /exam-chat/sessions/{id}/messages/with-images` nhận multipart với trường lặp `images`, văn bản

@@ -11,10 +11,10 @@ from app.usecase.exam_preview_rules import (
 
 TYPE_NAMES = {"SINGLE_CHOICE": "trắc nghiệm", "TRUE_FALSE": "đúng/sai", "SHORT_ANSWER": "trả lời ngắn"}
 RATIONALES = {
-    "reinforce_basics": ("weak", "Củng cố kiến thức nền"),
-    "practice_application": ("weak", "Luyện vận dụng"),
-    "assess_coverage": ("under_practiced", "Luyện để có thêm dữ liệu"),
-    "balanced_review": ("adequate", "Ôn lại kiến thức"),
+    "reinforce_basics": "Củng cố kiến thức nền",
+    "practice_application": "Luyện vận dụng",
+    "assess_coverage": "Luyện để có thêm dữ liệu",
+    "balanced_review": "Ôn lại kiến thức",
 }
 CLOSE_GAP = 0.10
 INVALID = "Mình chưa ghép được cấu trúc khớp lịch sử và yêu cầu. Em thử lại hoặc chọn chương muốn ôn nhé."
@@ -42,7 +42,8 @@ class PracticeRequest:
                 or sum(difficulty_counts.values()) > total or set(types) - TYPE_NAMES.keys()
                 or action.type_counts and sum(action.type_counts.values()) != total):
             raise PreviewRuleError(["Em kiểm tra lại tổng số câu, dạng câu và mức độ muốn luyện nhé."])
-        difficulties = [key for key in DIFFICULTIES if difficulty_counts.get(key, 1) > 0
+        full_mix = sum(difficulty_counts.values()) == total
+        difficulties = [key for key in DIFFICULTIES if difficulty_counts.get(key, 0 if full_mix else 1) > 0
                         and (key != "VDC" or difficulty_counts.get(key, 0) > 0)]
         return cls(action, total, scope, difficulties, types)
 
@@ -100,8 +101,25 @@ def weak_priority(history, options, catalog):
     return [row.code for row in ranked[:1]]
 
 
+def rationale_for(status, difficulty):
+    if status == "weak":
+        return "reinforce_basics" if difficulty in {"NB", "TH"} else "practice_application"
+    return "balanced_review" if status == "adequate" else "assess_coverage"
+
+
 def recommendation_context(history, request, catalog, options, priority):
     cohorts = [{row.code: row for row in rows} for rows in (history.latest, history.earlier)]
+    evidence = {row.code: row for row in history.chapters}
+    bank = []
+    for cell in options:
+        chapter = cell["chapter_code"]
+        root = catalog[chapter]["parent_code"] or chapter
+        # A required weak chapter fills the last slot when the requested exam is that short.
+        if priority and not request.action.chapter_counts and request.total <= len(priority):
+            if root not in priority[:request.total]:
+                continue
+        bank.append({**cell, "evidence_ref": root,
+                     "rationale": rationale_for(evidence[root].classification, cell["difficulty"])})
 
     def counts(row):
         return {"attempted": row.total, "correct": row.correct, "incorrect": row.incorrect,
@@ -112,8 +130,7 @@ def recommendation_context(history, request, catalog, options, priority):
         "max_attempts": HISTORY_ATTEMPTS, "attempt_count": history.attempt_count,
         "min_answered": MIN_ANSWERED, "weak_error_rate": WEAK_ERROR_RATE, "incomplete": history.incomplete,
         "weak_priority": priority,
-        "bank": [{**cell, "evidence_ref": catalog[cell["chapter_code"]]["parent_code"] or cell["chapter_code"]}
-                 for cell in options],
+        "bank": bank,
         "evidence": {row.code: {"name": catalog[row.code]["name"], "status": row.classification,
                                 "recent": counts(row), "latest": counts(cohorts[0][row.code]),
                                 "earlier": counts(cohorts[1][row.code])} for row in history.chapters},
@@ -134,11 +151,8 @@ def validate_recommendation(
             raise PreviewRuleError(["Đề xuất có ô vượt số câu hiện có trong kho."])
         root = catalog[group.chapter_code]["parent_code"] or group.chapter_code
         row = evidence.get(root)
-        status, reason = RATIONALES[group.rationale]
-        statuses = {status, "unpracticed"} if group.rationale == "assess_coverage" else {status}
-        if (group.evidence_ref != root or row is None or row.classification not in statuses
-                or group.rationale == "reinforce_basics" and group.difficulty not in {"NB", "TH"}
-                or group.rationale == "practice_application" and group.difficulty not in {"VD", "VDC"}):
+        if (group.evidence_ref != root or row is None
+                or group.rationale != rationale_for(row.classification, group.difficulty)):
             raise PreviewRuleError([INVALID])
         root_counts[root] += group.count
         chapter_counts[group.chapter_code] += group.count
@@ -149,6 +163,7 @@ def validate_recommendation(
         if row.classification == "under_practiced":
             fact += ", còn ít dữ liệu"
         name = catalog[group.chapter_code]["name"]
+        reason = RATIONALES[group.rationale]
         reasons.append(f"- {name}, {group.count} câu {DIFF_NAME[group.difficulty]}: {reason.lower()} ({fact}).")
     action = request.action
     if (sum(type_counts.values()) != request.total
