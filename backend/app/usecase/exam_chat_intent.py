@@ -35,6 +35,16 @@ EXCLUDE = re.compile(r"(?:khong|bo|dung|tranh)\s+(?:lay\s+)?(?:cac\s+)?(?:cau\s+
 MIX = re.compile(r"(\d+)\s*(?:cau\s*)?" + DIFF_RE + r"\b")
 NEXT_PRACTICE = re.compile(r"(?:tao|ra|lam) de on tiep(?:\s+(\d+)\s+cau(?:\s+" + DIFF_RE
                            + r")?)?(?:\s+(?:nhe|cho em))?[.!?]*")
+# Ôn lại CÂU đã sai (khác "chương hay sai"): "ôn lại câu sai", "làm lại các câu đã sai", "câu sai nhiều lần".
+# Khoảng giữa không được chứa "chương" hay "hay sai" (đó là ôn chương yếu) để không nuốt câu kiểu "10 câu về chương em hay sai".
+_GAP = r"(?:(?!chuong|\bhay\b)[^.,;!?]){0,25}"
+WRONG_REVIEW = re.compile(r"\b(?:on|on tap|lam|luyen|ra de|tao de|de on)\b(?:\s+lai)?" + _GAP + r"\bcau\b" + _GAP
+                          + r"\bsai\b|\bcau\b" + _GAP + r"\bsai\b" + _GAP + r"\b(?:lam lai|on lai|luyen lai)\b"
+                          r"|\bcau sai nhieu lan\b")
+ALLOW_REPEAT = re.compile(r"(?:cho phep|duoc phep|chap nhan|co the)\s+(?:lap|trung|lam lai)|lam lai cau da lam"
+                          r"|khong can tranh\s+(?:lap|trung)|(?:lap|trung)\s+(?:cung\s+)?duoc")
+AVOID_REPEAT = re.compile(r"(?:khong|dung|tranh|ko)\s+(?:lay\s+)?(?:lap|trung|lam lai)"
+                          r"|khong\s+(?:lay\s+)?cau\s+(?:da|cu)\s+lam")
 GRADE = re.compile(r"\blop\s*(1[0-2])\b")
 YEAR = re.compile(r"\b(20\d\d)\b")
 
@@ -116,12 +126,18 @@ def parse_edit(t: str) -> PreviewEdit:
         del data["total"]          # số vượt giới hạn: usecase báo lại dựa trên Intent.asked_total
     if any(not 1 <= n <= MAX_TOTAL for n in data.get("chapter_counts", {}).values()):
         del data["chapter_counts"]
+    if ALLOW_REPEAT.search(t):
+        data["avoid_repeats"] = False
+    elif AVOID_REPEAT.search(t):
+        data["avoid_repeats"] = True
     return PreviewEdit(**data)
 
 
 @dataclass
 class Intent:
-    """Kết quả đọc một tin nhắn. kind: refuse · exam · confirm · edit · weak · unknown."""
+    """Kết quả đọc một tin nhắn. kind: refuse · exam · confirm · edit · weak · wrong · unknown.
+
+    weak = ôn theo chương yếu / ôn tiếp (mặc định tránh câu đã làm); wrong = ôn lại các câu đã sai."""
 
     kind: str
     text: str = ""
@@ -138,6 +154,14 @@ def next_practice(t: str) -> Intent | None:
     return Intent("weak", edit=parse_edit(t), asked_total=int(match[1]) if match[1] else None)
 
 
+def wrong_review(t: str) -> Intent | None:
+    """Nhận yêu cầu ôn lại các câu đã làm sai (t đã chuẩn hoá). Số câu và chương nếu học sinh nêu."""
+    if not WRONG_REVIEW.search(t):
+        return None
+    edit = parse_edit(t)
+    return Intent("wrong", edit=edit, asked_total=edit.total)
+
+
 def read(text: str) -> Intent:
     t = norm(text)
     msg = refusal(t)
@@ -146,6 +170,9 @@ def read(text: str) -> Intent:
     next_exam = next_practice(t)
     if next_exam:
         return next_exam
+    review = wrong_review(t)
+    if review:
+        return review
     raw_total = COUNT.search(t)
     edit = parse_edit(t)
     asked = int(raw_total.group(1)) if raw_total else None

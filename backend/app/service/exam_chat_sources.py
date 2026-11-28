@@ -65,25 +65,49 @@ class StudentHistory:
         return self.conflicting_items > 0 or self.conflict_ratio >= CONFLICT_RATIO
 
 
+@dataclass(frozen=True)
+class QuestionRecord:
+    """Kết quả của một học sinh trên một câu, gộp qua mọi lượt đã chấm.
+
+    `done`: số lần đã làm (đúng, sai hoặc đúng một phần; câu bỏ qua không tính là đã làm).
+    `wrong`: số lần sai hoặc chỉ đúng một phần. `last_wrong_at`: lần sai gần nhất, để xếp khi số lần sai bằng nhau."""
+
+    question_id: int
+    done: int = 0
+    wrong: int = 0
+    last_wrong_at: datetime | None = None
+
+
 class StudentHistorySource(Protocol):
     async def get(
         self, student_ref: str, *, grade: int | None = None, chapter_codes: Sequence[str] = (),
     ) -> StudentHistory | None: ...
+
+    async def questions(self, student_ref: str) -> dict[int, QuestionRecord]:
+        """Mã câu → kết quả của học sinh, từ các lượt đã chấm. Chưa có lượt nào thì trả {}."""
+        ...
 
 
 class NoHistory:
     async def get(self, student_ref: str, *, grade: int | None = None, chapter_codes: Sequence[str] = ()) -> StudentHistory | None:
         return None
 
+    async def questions(self, student_ref: str) -> dict[int, QuestionRecord]:
+        return {}
+
 
 class StaticHistory:
     """Lịch sử dựng sẵn trong bộ nhớ (test, demo). Không phải dữ liệu học sinh thật."""
 
-    def __init__(self, data: dict[str, StudentHistory]) -> None:
+    def __init__(self, data: dict[str, StudentHistory], records: dict[str, list[QuestionRecord]] | None = None) -> None:
         self._data = data
+        self._records = records or {}
 
     async def get(self, student_ref: str, *, grade: int | None = None, chapter_codes: Sequence[str] = ()) -> StudentHistory | None:
         return self._data.get(student_ref)
+
+    async def questions(self, student_ref: str) -> dict[int, QuestionRecord]:
+        return {record.question_id: record for record in self._records.get(student_ref, [])}
 
 
 class ExamTemplateSource(Protocol):

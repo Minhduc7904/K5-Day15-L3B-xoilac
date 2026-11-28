@@ -10,7 +10,7 @@ from datetime import date, datetime, time, timedelta
 
 from app.core.study_time import STUDY_TZ, study_date
 from app.repositories.question_bank_repository import grade_of
-from app.service.exam_chat_sources import ChapterResult, StudentHistory
+from app.service.exam_chat_sources import ChapterResult, QuestionRecord, StudentHistory
 
 DAYS = 84
 RECENT = 5
@@ -140,6 +140,36 @@ def attempt_review(
                 row.skipped += status == "skipped"
         history.incomplete += len(attempt.statuses.keys() - seen)
     return history
+
+
+def question_records(attempts: list[GradedAttempt]) -> dict[int, QuestionRecord]:
+    """Mã câu → số lần đã làm và số lần sai, gộp qua các lượt đã chấm (không cần catalog chương).
+
+    Câu bỏ qua không tính là đã làm. Câu có kết quả mâu thuẫn trong cùng lượt thì bỏ khỏi lượt đó, như `attempt_review`.
+    Đúng một phần (Đúng/Sai) tính là sai, giống cách tính chương yếu."""
+    done: dict[int, int] = defaultdict(int)
+    wrong: dict[int, int] = defaultdict(int)
+    last_wrong: dict[int, datetime] = {}
+    for attempt in attempts:
+        when = attempt.graded_at or attempt.finished_at
+        seen = set()
+        for item in attempt.items:
+            code = item.get("code")
+            qid = item.get("question_id")
+            if qid is None and isinstance(code, str) and code[1:].isdigit():
+                qid = int(code[1:])
+            if not code or qid is None or code in seen or code in attempt.conflicts:
+                continue
+            seen.add(code)
+            status = attempt.statuses.get(code)
+            if status not in {"correct", "wrong", "partial"}:
+                continue
+            done[qid] += 1
+            if status != "correct":
+                wrong[qid] += 1
+                if qid not in last_wrong or when > last_wrong[qid]:
+                    last_wrong[qid] = when
+    return {qid: QuestionRecord(qid, done[qid], wrong[qid], last_wrong.get(qid)) for qid in done}
 
 
 def streak(attempts: list[GradedAttempt], today: date) -> dict:

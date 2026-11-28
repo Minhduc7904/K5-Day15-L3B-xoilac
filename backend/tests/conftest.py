@@ -26,6 +26,13 @@ def new_password() -> str:
     return "T-" + secrets.token_urlsafe(16)
 
 
+@pytest.fixture(autouse=True)
+def stable_question_order(monkeypatch):
+    """Chọn câu thật là ngẫu nhiên. Test mặc định giữ thứ tự mã câu tăng dần để kết quả lặp lại được;
+    test về tính ngẫu nhiên tự thay `shuffle_candidates` (xem tests/test_question_selection.py)."""
+    monkeypatch.setattr("app.repositories.question_bank_repository.shuffle_candidates", lambda ids: list(ids))
+
+
 @pytest.fixture
 def make_password():
     """Fixture trả về hàm sinh mật khẩu: `pw = make_password()`."""

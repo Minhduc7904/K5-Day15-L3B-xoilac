@@ -46,6 +46,10 @@ type Structure = {
   rows: StructureRow[] | null;
   difficulty_weights: Partial<Record<Difficulty, number>>;
   type_point_weights?: PointWeights;
+  /** Ôn tiếp: không lấy lại câu đã làm ở các bài đã chấm. */
+  avoid_repeats?: boolean;
+  /** Ôn lại câu đã sai: chỉ lấy câu từng sai (sai nhiều lần trước), cố ý trùng câu cũ. Loại trừ avoid_repeats. */
+  review_wrong?: boolean;
 } | {
   kind: 'EXAM_TEMPLATE';
   template_name: string;

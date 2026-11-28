@@ -5,7 +5,7 @@ from app.models.exam_attempt import ExamAttempt
 from app.repositories.exam_attempts import ExamAttemptRepository
 from app.repositories.question_bank_repository import QuestionBankRepository
 from app.repositories.student_profiles import StudentProfileRepository
-from app.service.exam_chat_sources import HISTORY_ATTEMPTS, HISTORY_DAYS, StudentHistory
+from app.service.exam_chat_sources import HISTORY_ATTEMPTS, HISTORY_DAYS, QuestionRecord, StudentHistory
 from app.usecase import study_stats
 from app.usecase.study_stats import GradedAttempt
 
@@ -78,3 +78,9 @@ class AttemptHistory:
         history = study_stats.attempt_review(recent, catalog, grade, chapter_codes)
         history.latest_at = graded[0].finished_at
         return history
+
+    async def questions(self, student_ref: str) -> dict[int, QuestionRecord]:
+        """Kết quả từng câu trên mọi lượt đã chấm còn nạp được (không giới hạn 30 ngày: câu đã làm là đã làm)."""
+        if not (student_ref.startswith("U") and student_ref[1:].isdigit()):
+            return {}
+        return study_stats.question_records(await self.dashboard.graded(int(student_ref[1:]), by_grading_time=True))

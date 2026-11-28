@@ -51,6 +51,10 @@ class PreviewStructure(BaseModel):
     type_counts: dict[str, int] | None = None
     type_point_weights: PointWeights = Field(default_factory=lambda: dict(DEFAULT_POINT_WEIGHTS))
     rows: list[MatrixCell] | None = None
+    # Cờ chọn câu. avoid_repeats: không lấy câu học sinh đã làm ở các lượt đã chấm (mặc định của luồng "ôn tiếp").
+    # review_wrong: đề ôn lại câu đã sai, chỉ lấy câu học sinh từng sai, câu sai nhiều lần lấy trước. Hai cờ loại trừ nhau.
+    avoid_repeats: bool = False
+    review_wrong: bool = False
 
     @property
     def total(self) -> int:
@@ -74,6 +78,7 @@ class PreviewEdit(BaseModel):
     type_point_weights: PointWeights | None = None
     rows: list[MatrixCell] | None = Field(None, min_length=1, max_length=50)
     title: str | None = Field(None, max_length=120)
+    avoid_repeats: bool | None = None
 
     def is_empty(self) -> bool:
         return all(v is None for v in self.model_dump().values())
@@ -130,6 +135,8 @@ def check_structure(structure: PreviewStructure, known_chapters: set[str] | None
         errors.append("Không còn mức độ khó nào để chọn câu (đã loại hết).")
     if set(structure.type_point_weights) != set(DEFAULT_POINT_WEIGHTS):
         errors.append("Cần trọng số điểm cho cả ba loại câu chấm tự động.")
+    if structure.avoid_repeats and structure.review_wrong:
+        errors.append("Đề ôn lại câu sai cố ý lấy lại câu đã làm, nên không thể bật tránh trùng câu đã làm.")
     if structure.type_counts is not None and (
         any(k not in QUESTION_TYPES or v < 1 for k, v in structure.type_counts.items())
         or sum(structure.type_counts.values()) != structure.total
@@ -183,6 +190,8 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
         s.type_point_weights = edit.type_point_weights
     if edit.title is not None:
         s.title = edit.title.strip() or None
+    if edit.avoid_repeats is not None:
+        s.avoid_repeats = edit.avoid_repeats
     if edit.rows is not None:
         cells = [(row.chapter, row.difficulty, row.type) for row in edit.rows]
         if len(set(cells)) != len(cells):
@@ -204,7 +213,8 @@ def apply_edit(structure: PreviewStructure, edit: PreviewEdit) -> PreviewStructu
         s.difficulty_weights = diffs
         s.excluded_difficulties = []
         s.rows = edit.rows
-    elif any(v is not None for k, v in edit.model_dump().items() if k not in {"duration_minutes", "type_point_weights", "title"}):
+    elif any(v is not None for k, v in edit.model_dump().items()
+             if k not in {"duration_minutes", "type_point_weights", "title", "avoid_repeats"}):
         s.rows = None
         if edit.type_counts is not None:
             s.type_counts = edit.type_counts
@@ -233,4 +243,8 @@ def describe(structure: PreviewStructure, chapter_names: dict[str, str] | None =
         lines.append(f"- {label}: {c.count} câu ({mix})")
     if structure.excluded_difficulties:
         lines.append("Đã bỏ mức: %s." % ", ".join(DIFF_NAME[d] for d in structure.excluded_difficulties))
+    if structure.review_wrong:
+        lines.append("Chỉ lấy câu em từng làm sai, câu sai nhiều lần lấy trước (có thể trùng câu đã làm).")
+    elif structure.avoid_repeats:
+        lines.append("Không lấy lại câu em đã làm ở các bài đã chấm.")
     return "\n".join(lines)

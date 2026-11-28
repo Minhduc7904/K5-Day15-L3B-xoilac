@@ -40,6 +40,7 @@ from app.usecase.exam_preview_rules import (
     matrix_plan,
     new_structure,
 )
+from app.usecase.exam_review import NO_POLICY, PickPolicy, rank_wrong, wrong_reason, wrong_structure
 from app.usecase.exam_scoring import allocate_points
 from app.usecase.exam_template_plan import (
     EXAM_NAME,
@@ -283,6 +284,8 @@ class ExamChatUseCase:
             return ChatTurn(unknown, notes=["thu hẹp: chương không có trong ngân hàng"])
         if intent.kind == "weak":
             return await self._weak_branch(session, intent.edit)
+        if intent.kind == "wrong":
+            return await self._wrong_branch(session, intent.edit)
         return ChatTurn("Em muốn ôn chương nào, hay để mình chọn theo chương em hay sai? " + chat_intent.OFFER)
 
     # ---------- nhánh ôn theo mẫu kỳ thi ----------
@@ -421,7 +424,10 @@ class ExamChatUseCase:
         else:
             counts = {top[0].code: n}
         structure = new_structure({c: k for c, k in counts.items() if k > 0},
-                                  edit.model_copy(update={"total": None, "chapter_codes": None, "chapter_counts": None}))
+                                  edit.model_copy(update={"total": None, "chapter_codes": None, "chapter_counts": None,
+                                                          "avoid_repeats": None}))
+        # "Ôn tiếp" mặc định không lấy lại câu đã làm; chỉ bỏ khi học sinh nói rõ cho phép lặp.
+        structure = structure.model_copy(update={"avoid_repeats": edit.avoid_repeats is not False})
         reason = "Lý do: " + "; ".join(
             f"{c.code} đúng {c.correct}/{c.total} ({round(100 * c.rate)}%), sai {c.total - c.correct}/{c.total} câu"
             for c in top
@@ -435,6 +441,41 @@ class ExamChatUseCase:
         names = await self._bank.chapter_names()
         reply = "Đề xuất cấu trúc đề ôn (chưa tạo đề):\n" + describe(structure, names) + f"\n{reason}\n" + self._ask_confirm()
         return ChatTurn(reply, preview=preview, preview_changed=True)
+
+    async def _wrong_branch(self, session: ExamChatSession, edit: PreviewEdit) -> ChatTurn:
+        """Ôn lại câu đã sai (không phải ôn chương yếu): bỏ tránh trùng, ưu tiên câu sai nhiều lần."""
+        structure, reason = await self.wrong_proposal(session.student_ref, edit.total, edit.chapter_codes)
+        if structure is None:
+            return ChatTurn(reason, notes=["dừng: chưa có câu sai để ôn lại"])
+        preview = await self._repo.save_preview(
+            session.session_id,
+            {"structure": structure.model_dump(mode="json"), "status": "PROPOSED", "mode": "CHAPTER", "reason": reason},
+        )
+        names = await self._bank.chapter_names()
+        reply = ("Đề xuất đề ôn lại câu sai (chưa tạo đề):\n" + describe(structure, names) + f"\n{reason}\n"
+                 + self._ask_confirm())
+        return ChatTurn(reply, preview=preview, preview_changed=True)
+
+    async def wrong_proposal(
+        self, student_ref: str, total: int | None, chapters: list[str] | None,
+    ) -> tuple[PreviewStructure | None, str]:
+        """Cấu trúc đề ôn lại câu sai và lý do; không dựng được thì (None, lời giải thích)."""
+        ranked = rank_wrong((await self._history.questions(student_ref)).values())
+        cells = await self._bank.question_cells([r.question_id for r in ranked], chapters or None) if ranked else {}
+        structure, chosen, error = wrong_structure(ranked, cells, total)
+        if structure is None:
+            return None, error or ""
+        errors = await self._errors(structure)
+        if errors:
+            return None, "Mình chưa dựng được đề ôn lại câu sai: " + " ".join(errors)
+        return structure, wrong_reason(chosen, total)
+
+    async def _policy(self, structure: Structure, student_ref: str, records: dict | None = None) -> PickPolicy:
+        """Ràng buộc chọn câu theo cờ của cấu trúc. Đề theo mẫu kỳ thi và đề không bật cờ thì không ràng buộc."""
+        if not isinstance(structure, PreviewStructure) or not (structure.avoid_repeats or structure.review_wrong):
+            return NO_POLICY
+        return PickPolicy.for_structure(structure, records if records is not None
+                                        else await self._history.questions(student_ref))
 
     async def _unknown_chapter(self, text: str, intent) -> str | None:
         """Học sinh gọi tên một chương mà danh mục không có (vd "Số phức"): nói rõ, không bịa câu."""
@@ -485,7 +526,9 @@ class ExamChatUseCase:
         if isinstance(structure, TemplatePreviewStructure):
             chosen, meta, shortages = await self._pick_template(structure)
         else:
-            chosen, meta, shortages = await self._pick_chapters(structure)
+            owner = await self._repo.get_session(sid)
+            policy = await self._policy(structure, owner.student_ref) if owner else NO_POLICY
+            chosen, meta, shortages = await self._pick_chapters(structure, policy)
         loaded = await self._bank.load_items(chosen)
         items = []
         for qid in chosen:
@@ -497,8 +540,7 @@ class ExamChatUseCase:
             items.append({"order": len(items) + 1, **q, **{k: v for k, v in info.items() if k != "chapter"}})
         if not items:
             preview = await self._repo.save_preview(sid, {"status": "EDITED"})
-            return preview, None, ("Ngân hàng chưa có câu nào phù hợp cấu trúc này, nên mình không tạo đề và không bịa "
-                                   "câu. Em thử đổi chương hoặc độ khó nhé.")
+            return preview, None, self._empty_reply(structure)
         items = allocate_points(items, structure.model_dump(mode="json"))
         draft = await self._repo.add_draft({
             "session_id": sid,
@@ -512,30 +554,45 @@ class ExamChatUseCase:
         preview = await self._repo.save_preview(sid, {"status": "BUILT"})
         return preview, draft, self._draft_text(draft, structure)
 
-    async def _pick_chapters(self, structure: PreviewStructure):
+    @staticmethod
+    def _empty_reply(structure: Structure) -> str:
+        if getattr(structure, "review_wrong", False):
+            return ("Mình không còn câu em từng sai nào khớp cấu trúc này nên không tạo đề. "
+                    "Em đổi chương hoặc làm thêm bài để có câu ôn lại nhé.")
+        if getattr(structure, "avoid_repeats", False):
+            return ("Em đã làm hết các câu phù hợp cấu trúc này nên mình không tạo đề và không lặp câu cũ. "
+                    "Em đổi chương hoặc độ khó, hoặc nhắn \"cho phép làm lại câu đã làm\" nhé.")
+        return ("Ngân hàng chưa có câu nào phù hợp cấu trúc này, nên mình không tạo đề và không bịa "
+                "câu. Em thử đổi chương hoặc độ khó nhé.")
+
+    async def _pick_chapters(self, structure: PreviewStructure, policy: PickPolicy = NO_POLICY):
         slots: list[_Slot] = []
         scope = [item.code for item in structure.chapters]
         allowed = [d for d in DIFFICULTY_ORDER if d in structure.effective_weights()] or None
+
+        def taken() -> list[int]:
+            return [*policy.avoid, *(i for slot in slots for i in slot.ids)]
+
         if structure.rows or structure.type_counts:
             for cell in matrix_plan(structure):
                 result = await self._bank.pick_for_section(
                     question_type=cell.type, n=cell.count, chapter_codes=[cell.chapter],
-                    difficulty=cell.difficulty, exclude=[i for slot in slots for i in slot.ids],
+                    difficulty=cell.difficulty, exclude=taken(), **policy.picks(),
                 )
                 slots.append(_Slot(
                     result.question_ids, cell.count, {"chapter": cell.chapter},
                     dict(question_type=cell.type, chapters=[cell.chapter], difficulty=cell.difficulty,
-                         grade=grade_of(cell.chapter), scope=scope, allowed=allowed),
+                         grade=grade_of(cell.chapter), scope=scope, allowed=allowed, policy=policy),
                     {"chapter": cell.chapter, "difficulty": cell.difficulty, "question_type": cell.type},
                 ))
             return await self._settle(slots)
         for code, mix in difficulty_plan(structure).items():
             for diff, k in mix.items():
-                res = await self._bank.pick(code, diff, k, exclude=[i for slot in slots for i in slot.ids])
+                res = await self._bank.pick(code, diff, k, exclude=taken(), **policy.picks())
                 slots.append(_Slot(
                     res.question_ids, k, {"chapter": code},
                     dict(question_type=None, chapters=[code], difficulty=diff, grade=grade_of(code), scope=scope,
-                         allowed=allowed),
+                         allowed=allowed, policy=policy),
                     {"chapter": code, "difficulty": diff},
                 ))
         return await self._settle(slots)
@@ -560,7 +617,10 @@ class ExamChatUseCase:
         return await self._settle(slots)
 
     async def _settle(self, slots: list["_Slot"]):
-        """Bù ô thiếu bằng câu thay thế, giữ nguyên thứ tự ô. Chỉ còn báo thiếu khi kho hết câu cùng loại."""
+        """Bù ô thiếu bằng câu thay thế, giữ nguyên thứ tự ô. Chỉ còn báo thiếu khi kho hết câu cùng loại.
+
+        Câu bù theo cùng `policy` của ô (trong `slot.fill`): không lấy câu đã làm khi tránh trùng, chỉ lấy trong các
+        câu đã sai khi ôn lại câu sai."""
         for slot in slots:
             missing = slot.wanted - len(slot.ids)
             if missing > 0:
@@ -582,7 +642,7 @@ class ExamChatUseCase:
     async def _fill_gap(
         self, *, exclude: list[int], n: int, question_type: str | None, chapters: list[str] | None,
         difficulty: str | None, grade: int | None, scope: list[str] | None = None, prefer_subchapters: bool = False,
-        allowed: list[str] | None = None,
+        allowed: list[str] | None = None, policy: PickPolicy = NO_POLICY,
     ) -> list[tuple[int, bool]]:
         """Bù n câu cho ô thiếu theo thứ tự ưu tiên, luôn giữ đúng loại câu: cùng chương (mức khó gần nhất trước),
         rồi cùng mức khó ở chương khác (chương trong phạm vi đề trước), cuối cùng bất kỳ câu cùng loại trong khối.
@@ -594,8 +654,8 @@ class ExamChatUseCase:
             if need <= 0:
                 return
             found = await self._bank.pick_for_section(
-                question_type=question_type, n=need, exclude=[*exclude, *(qid for qid, _ in taken)],
-                prefer_subchapters=prefer_subchapters, **where,
+                question_type=question_type, n=need, exclude=[*policy.avoid, *exclude, *(qid for qid, _ in taken)],
+                prefer_subchapters=prefer_subchapters, **policy.picks(), **where,
             )
             taken.extend((qid, same_chapter) for qid in found.question_ids)
 
@@ -630,7 +690,10 @@ class ExamChatUseCase:
                 lines.append(f"   - {s['content']}")
         want = structure.total
         if len(draft.items) < want or draft.shortages:
-            lines += ["", f"Lưu ý: ngân hàng không đủ câu như yêu cầu. Mình chỉ đưa {len(draft.items)}/{want} câu có thật, "
+            why = ("ngân hàng không đủ câu như yêu cầu"
+                   + (" (đã loại các câu em làm rồi)" if getattr(structure, "avoid_repeats", False) else "")
+                   if not getattr(structure, "review_wrong", False) else "em chưa sai đủ số câu như yêu cầu")
+            lines += ["", f"Lưu ý: {why}. Mình chỉ đưa {len(draft.items)}/{want} câu có thật, "
                           f"thiếu {want - len(draft.items)} câu, không tự bịa thêm. "
                           + "; ".join(ExamChatUseCase._shortage_text(s) for s in draft.shortages)]
         return "\n".join(lines)

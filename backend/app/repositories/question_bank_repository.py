@@ -7,8 +7,9 @@ Các bảng nội dung chưa có model ORM chung, nên ở đây khai báo bản
 migration 0021). Mọi truy vấn chọn câu cho đề mới dùng chung `available_questions()`; đổi định nghĩa ở một chỗ.
 Đọc lại câu đã nằm trong đề (load_items, load_grading_keys) không lọc archived để đề và lịch sử cũ vẫn đọc được.
 """
+import random
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import (
@@ -89,6 +90,13 @@ def available_questions():
     return and_(questions.c.visibility == APPROVED_VISIBILITY, questions.c.archived_at.is_(None))
 
 
+def shuffle_candidates(ids: list[int]) -> list[int]:
+    """Xáo ngẫu nhiên các câu cùng mức ưu tiên. Điểm duy nhất sinh ngẫu nhiên khi chọn câu, để test thay được."""
+    ids = list(ids)
+    random.SystemRandom().shuffle(ids)
+    return ids
+
+
 _GRADE_PREFIX = re.compile(r"^(\d{1,2})C")
 
 
@@ -159,10 +167,26 @@ class QuestionBankRepository:
             stmt = stmt.where(questions.c.question_id.not_in(list(exclude)))
         return stmt.distinct()
 
-    async def _pick(self, n: int, *, prefer_subchapters: bool = False, **filters) -> PickResult:
-        pool = self._pool(**filters).subquery()
-        available = (await self._session.execute(select(func.count()).select_from(pool))).scalar_one()
-        query = select(pool.c.question_id)
+    async def _pick(
+        self,
+        n: int,
+        *,
+        prefer_subchapters: bool = False,
+        only: Collection[int] | None = None,
+        priority: Mapping[int, float] | None = None,
+        **filters,
+    ) -> PickResult:
+        """Chọn tối đa n câu thoả `filters`, thứ tự ưu tiên rồi ngẫu nhiên trong cùng mức ưu tiên:
+
+        1. `priority` (điểm cao lấy trước, vd số lần học sinh làm sai), nếu có;
+        2. câu gắn chương con trước câu chỉ gắn chương cha, nếu `prefer_subchapters`;
+        3. ngẫu nhiên (`shuffle_candidates`), nên cùng cấu trúc và cùng kho vẫn có thể ra bộ câu khác nhau.
+
+        `exclude` (câu đã chọn trong đề, câu học sinh đã làm) và `only` (chỉ lấy trong tập này) lọc ở Python để danh sách
+        dài không chạm giới hạn số tham số của SQL. `available` là số câu còn lại sau khi lọc."""
+        exclude = set(filters.pop("exclude", ()))
+        pool = self._pool(exclude=(), **filters).subquery()
+        columns = [pool.c.question_id]
         if prefer_subchapters:
             parent = chapters.alias("preferred_parent")
             linked = (select(1).select_from(questions_chapters
@@ -173,21 +197,33 @@ class QuestionBankRepository:
             if filters["chapter_codes"]:
                 codes = list(filters["chapter_codes"])
                 linked = linked.where(or_(chapters.c.code.in_(codes), parent.c.code.in_(codes)))
-            query = query.order_by(linked.correlate(pool).exists().desc())
-        ids = (await self._session.execute(query.order_by(pool.c.question_id).limit(n))).scalars()
-        return PickResult(question_ids=list(ids), available=available)
+            columns.append(linked.correlate(pool).exists())
+        rows = (await self._session.execute(select(*columns).order_by(pool.c.question_id))).all()
+        allowed = None if only is None else set(only)
+        rows = [row for row in rows if row[0] not in exclude and (allowed is None or row[0] in allowed)]
+        tiers: dict[tuple[float, bool], list[int]] = {}
+        for row in rows:
+            key = (-(priority or {}).get(row[0], 0), not (prefer_subchapters and row[1]))
+            tiers.setdefault(key, []).append(row[0])
+        ordered = [qid for key in sorted(tiers) for qid in shuffle_candidates(tiers[key])]
+        return PickResult(question_ids=ordered[:n], available=len(rows))
 
-    async def pick(self, chapter_code: str, difficulty: str, n: int, exclude: Sequence[int] = ()) -> PickResult:
-        """Chọn tối đa n câu đã duyệt thuộc chương (hoặc chương con) với độ khó cho trước, thứ tự ổn định."""
+    async def pick(
+        self, chapter_code: str, difficulty: str, n: int, exclude: Sequence[int] = (),
+        *, only: Collection[int] | None = None, priority: Mapping[int, float] | None = None,
+    ) -> PickResult:
+        """Chọn tối đa n câu đã duyệt thuộc chương (hoặc chương con) với độ khó cho trước, ngẫu nhiên trong cùng ưu tiên."""
         return await self._pick(n, chapter_codes=[chapter_code], difficulty=difficulty, question_type=None,
-                                grade=None, exclude=exclude)
+                                grade=None, exclude=exclude, only=only, priority=priority)
 
     async def practice_capacity(
         self, chapter_codes: Sequence[str], difficulties: Sequence[str], types: Sequence[str],
+        exclude: Collection[int] = (),
     ) -> tuple[list[dict], int]:
-        """Đếm theo ô của ma trận và đếm số câu phân biệt trên toàn phạm vi."""
+        """Đếm theo ô của ma trận và đếm số câu phân biệt trên toàn phạm vi, không tính các câu trong `exclude`."""
         if not chapter_codes:
             return [], 0
+        skipped = set(exclude)
         approved = self._pool(chapter_codes=chapter_codes, difficulty=None, question_type=None,
                               grade=None, exclude=()).subquery()
         parent = chapters.alias("practice_parent")
@@ -204,6 +240,8 @@ class QuestionBankRepository:
         scope = set(chapter_codes)
         ids = set()
         for code, parent_code, difficulty, kind, question_id in (await self._session.execute(query)).all():
+            if question_id in skipped:
+                continue
             for match in {code, parent_code} & scope:
                 cells.setdefault((match, difficulty, kind), set()).add(question_id)
             ids.add(question_id)
@@ -211,6 +249,35 @@ class QuestionBankRepository:
             {"chapter_code": code, "difficulty": difficulty, "type": kind, "available": len(available)}
             for (code, difficulty, kind), available in sorted(cells.items())
         ], len(ids)
+
+    async def question_cells(
+        self, question_ids: Sequence[int], chapter_codes: Sequence[str] | None = None,
+    ) -> dict[int, tuple[str, str, str]]:
+        """Mã câu khả dụng (đã duyệt, chưa lưu trữ, trong phạm vi chương nếu có) → (chương, mức khó, loại câu).
+
+        Chương là mã chương con nếu câu gắn chương con, không thì mã chương cha. Dùng để dựng ô ma trận cho đề ôn lại câu
+        sai. Câu không khả dụng hoặc ngoài phạm vi không có trong kết quả."""
+        cells: dict[int, tuple[str, str, str]] = {}
+        for start in range(0, len(question_ids), 500):
+            wanted = list(question_ids[start:start + 500])
+            pool = self._pool(chapter_codes=chapter_codes, difficulty=None, question_type=None, grade=None,
+                              exclude=()).where(questions.c.question_id.in_(wanted)).subquery()
+            rows = await self._session.execute(
+                select(questions.c.question_id, questions.c.difficulty, questions.c.type, chapters.c.code,
+                       chapters.c.parent_chapter_id)
+                .join(pool, pool.c.question_id == questions.c.question_id)
+                .join(questions_chapters, questions_chapters.c.question_id == questions.c.question_id)
+                .join(chapters, chapters.c.chapter_id == questions_chapters.c.chapter_id)
+                .where(chapters.c.code.is_not(None))
+                .order_by(questions.c.question_id, chapters.c.chapter_id)
+            )
+            leaf: dict[int, str] = {}
+            for qid, difficulty, kind, code, parent_id in rows.all():
+                if qid not in cells or (parent_id is not None and not leaf.get(qid)):
+                    cells[qid] = (code, difficulty, kind)
+                    if parent_id is not None:
+                        leaf[qid] = code
+        return cells
 
     async def pick_for_section(
         self,
@@ -223,14 +290,18 @@ class QuestionBankRepository:
         exclude: Sequence[int] = (),
         prefer_subchapters: bool = False,
         difficulties: Sequence[str] | None = None,
+        only: Collection[int] | None = None,
+        priority: Mapping[int, float] | None = None,
     ) -> PickResult:
         """Chọn câu cho một phần của mẫu kỳ thi: đúng loại câu, trong các chương cho phép, đúng mức độ khó.
 
         Mẫu không giới hạn chương thì lọc theo khối (questions.grade) nếu mẫu có khối. `difficulties` giới hạn thêm
-        trong tập mức khó cho phép khi không chọn một mức cụ thể (dùng để bù câu thiếu)."""
+        trong tập mức khó cho phép khi không chọn một mức cụ thể (dùng để bù câu thiếu). `only` giới hạn trong một
+        tập câu và `priority` đẩy câu điểm cao lên trước (dùng cho đề ôn lại câu đã sai)."""
         return await self._pick(n, chapter_codes=chapter_codes, difficulty=difficulty, question_type=question_type,
                                 grade=None if chapter_codes else grade, exclude=exclude,
-                                prefer_subchapters=prefer_subchapters, difficulties=difficulties)
+                                prefer_subchapters=prefer_subchapters, difficulties=difficulties,
+                                only=only, priority=priority)
 
     async def load_items(self, question_ids: Sequence[int]) -> dict[int, dict]:
         """Nội dung câu và lựa chọn để hiển thị. KHÔNG đọc đáp án, lời giải hay cờ đúng/sai."""

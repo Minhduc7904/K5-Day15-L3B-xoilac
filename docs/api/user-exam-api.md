@@ -51,6 +51,15 @@ Chỉ trạng thái `correct` tính đúng. `wrong` và `partial` tính sai. Câ
 
 Model nhận thống kê tổng hợp, phạm vi, ràng buộc và số câu đã duyệt theo ô. Kết quả là các nhóm chương, độ khó, dạng câu, số lượng, mã căn cứ và mục đích luyện. Server kiểm số liệu và ghép thử câu phân biệt trước khi gửi `preview`. Kho thiếu thì tin nhắn nêu phần thiếu để học sinh sửa. Nếu kho thay đổi sau khi xem trước, dùng cơ chế `offer` và xác nhận số câu rút gọn đang có. Bước dựng và định dạng sự kiện SSE dùng hợp đồng hiện có.
 
+#### Cờ tránh trùng câu đã làm (`avoid_repeats`)
+
+“Tạo đề ôn tiếp” mặc định **không lấy lại câu học sinh đã làm**: cấu trúc xem trước có `structure.avoid_repeats = true`. Câu đã làm là câu có kết quả `correct`, `wrong` hoặc `partial` trong mọi lượt đã chấm còn nạp được của tài khoản (không giới hạn 30 ngày như phần thống kê chương yếu). Câu bỏ qua và câu có kết quả trái nhau trong cùng lượt không tính là đã làm.
+
+- Server loại các câu này khi đếm sức chứa của kho, khi ghép ma trận, khi bù ô thiếu và khi đổi câu. Dựng đề đọc lại lịch sử ở thời điểm xác nhận nên lượt vừa chấm xong vẫn được loại.
+- Kho không còn đủ câu chưa làm thì tin nhắn nêu `x/y câu chưa làm` và gợi ý giảm số câu, đổi chương, cho phép làm lại hoặc ôn lại câu sai. Không tự lấy câu đã làm thay vào.
+- Học sinh nói rõ muốn làm lại (ví dụ “cho phép làm lại câu đã làm”) thì agent đặt `avoid_repeats = false`. Cờ cũng chỉnh được qua `PATCH .../preview` bằng `edit.avoid_repeats`, và mô tả cấu trúc có dòng nhắc cờ đang bật.
+- Luồng ôn theo chương hoặc theo mẫu kỳ thi giữ `avoid_repeats = false` (như trước) trừ khi học sinh yêu cầu tránh lặp. Mẫu kỳ thi bỏ qua cờ này.
+
 #### Kiểm chứng CP3 #41
 
 Ca live ngày 28/11/2026 dùng hai tài khoản lớp 12 tự tạo và nộp bài qua API thật trong cơ sở dữ liệu kiểm thử.
@@ -70,6 +79,23 @@ $env:EXAMIND_CP3_LIVE = '1'
 ..\.venv\Scripts\python.exe -m pytest -q tests/test_personalization_chat.py -k configured_provider --log-cli-level=INFO
 $env:EXAMIND_CP3_LIVE = $null
 ```
+
+### Ôn lại câu đã sai
+
+Luồng riêng, **không phải** ôn chương yếu: học sinh nhắn “Ôn lại câu sai”, “Làm lại các câu em đã sai 5 câu” hoặc “Ôn lại câu sai chương 12C4”. Agent dùng công cụ `review_wrong` (chỉ nhận `total` và `chapters`); luồng không qua model cho các mẫu câu này vẫn nhận diện được bằng quy tắc, nên model lỗi không chặn luồng.
+
+- Cấu trúc xem trước có `structure.review_wrong = true` và `avoid_repeats = false`. Hai cờ loại trừ nhau, bật cả hai bị từ chối khi kiểm cấu trúc.
+- **Cố ý trùng câu cũ.** Chỉ lấy câu học sinh từng làm sai (`wrong` hoặc `partial`), câu sai nhiều lần xếp trước, cùng số lần sai thì ngẫu nhiên. Câu làm đúng hết lần nào cũng không vào đề.
+- Đề xuất lấy tối đa `total` câu (mặc định 10, tối đa 50) và dựng ma trận theo chương, mức khó, dạng câu của chính các câu đó. Có ít câu sai hơn số yêu cầu thì đề ngắn lại và tin nhắn nói rõ. Không bù bằng câu chưa từng sai. Ô thiếu khi dựng chỉ được bù bằng câu sai khác cùng dạng.
+- Chưa có câu sai nào, hoặc các câu sai không còn trong kho hay ngoài chương đã chọn, thì không tạo `preview` và tin nhắn giải thích.
+- Chỉ tính câu chấm tự động còn khả dụng (đã duyệt, chưa lưu trữ). Đổi câu trong đề này cũng chỉ lấy câu sai khác.
+- Hỏi “chương em hay sai” vẫn là ôn chương yếu (`history`).
+
+### Cách chọn câu từ kho
+
+Trong cùng một ô của ma trận, server xếp ứng viên theo thứ tự: điểm ưu tiên (ôn lại câu sai: số lần sai, cao trước) → câu gắn chương con trước câu chỉ gắn chương cha (đề theo mẫu và đổi câu) → **ngẫu nhiên**. Nhờ đó cùng cấu trúc và cùng kho vẫn có thể ra bộ câu khác nhau giữa các lần dựng. Mỗi câu chỉ xuất hiện một lần trong một đề. Yêu cầu đổi câu tìm câu thay thế ngoài bộ hiện tại; thiếu câu phù hợp thì vị trí đó giữ câu cũ.
+
+Vì ID câu đổi giữa các lần dựng, `preview.offer` (đề rút gọn khi kho thiếu) được so theo `requested`, `count` và `shortages`, không theo ID câu. Học sinh xác nhận đúng số đã báo thì đề được dựng với số câu đó, dù bộ câu có thể khác lần thử trước. Điểm ngẫu nhiên duy nhất là `shuffle_candidates` trong `backend/app/repositories/question_bank_repository.py`; test giữ thứ tự ổn định bằng fixture `stable_question_order`.
 
 ### Ảnh trong chat
 

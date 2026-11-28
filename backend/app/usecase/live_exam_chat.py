@@ -21,7 +21,8 @@ from app.usecase.exam_chat import (
     ChatTurn, ExamChatUseCase, InvalidState, Requester, SessionNotFound,
     VersionConflict, draft_title, load_structure,
 )
-from app.usecase.exam_chat_intent import next_practice, norm, read, refusal
+from app.usecase.exam_chat_intent import COUNT, next_practice, norm, read, refusal, wrong_review
+from app.usecase.exam_review import NO_POLICY, PickPolicy
 from app.usecase.exam_personalization import (
     PracticeRequest, practice_chapters, recommendation_context, review_text,
     validate_recommendation, weak_priority,
@@ -213,16 +214,26 @@ class LiveExamChat(ExamChatUseCase):
         normalized = norm(text)
         blocked = refusal(normalized)
         next_exam = next_practice(normalized) if not prepared else None
+        review = wrong_review(normalized) if not prepared and not next_exam else None
         if blocked:
             action, notice = None, blocked
         elif prepared:
             action, notice = await self._interpret_images(prepared, context)
+        elif review:
+            raw = COUNT.search(normalized)
+            if raw and not 1 <= int(raw[1]) <= MAX_TOTAL:
+                action, notice = None, f"Mỗi đề cần từ 1 đến {MAX_TOTAL} câu."
+            else:
+                action = ChatAction(action="review_wrong", total=review.edit.total,
+                                    chapters=review.edit.chapter_codes or [])
+                notice = ""
         elif next_exam:
             if next_exam.asked_total is not None and not 1 <= next_exam.asked_total <= MAX_TOTAL:
                 action, notice = None, f"Mỗi đề cần từ 1 đến {MAX_TOTAL} câu."
             else:
                 action = ChatAction(action="history", total=next_exam.edit.total,
-                                    difficulty_counts=next_exam.edit.difficulty_counts or {})
+                                    difficulty_counts=next_exam.edit.difficulty_counts or {},
+                                    avoid_repeats=next_exam.edit.avoid_repeats)
                 notice = ""
         else:
             try:
@@ -232,9 +243,10 @@ class LiveExamChat(ExamChatUseCase):
                     raise
                 action, notice = None, "AI đang bận. Em thử lại hoặc chọn một chương để ôn nhé."
         proposal = None
-        if action and action.action == "history":
+        if action and action.action in {"history", "review_wrong"}:
             try:
-                proposal = await self._recommend(requester, action, context)
+                proposal = await (self._recommend(requester, action, context) if action.action == "history"
+                                  else self._review_wrong(requester, action, context))
             except PreviewRuleError as exc:
                 proposal = (None, " ".join(exc.errors))
         log.info("exam_chat action=%s image_count=%d model_latency_ms=%d",
@@ -247,7 +259,9 @@ class LiveExamChat(ExamChatUseCase):
         try:
             if proposal:
                 structure, reply = proposal
-                turn = (await self._stage(session_id, structure, current, reason="Theo lịch sử làm bài đã chấm.")
+                reason = ("Ôn lại các câu đã làm sai." if structure and structure.review_wrong
+                          else "Theo lịch sử làm bài đã chấm.")
+                turn = (await self._stage(session_id, structure, current, reason=reason)
                         if structure else ChatTurn(reply))
                 if structure:
                     turn.reply = reply + "\n" + turn.reply
@@ -273,12 +287,19 @@ class LiveExamChat(ExamChatUseCase):
         review = review_text(history, catalog)
         if history is None or history.conflicting or not any(row.total for row in history.chapters):
             return None, review + "\nEm muốn chọn chương nào hoặc làm một bài ngắn để có thêm dữ liệu?"
+        # "Ôn tiếp" mặc định không lặp câu đã làm; chỉ bỏ khi học sinh nói rõ cho phép lặp (avoid_repeats=False).
+        avoid = action.avoid_repeats is not False
+        records = await self._history.questions(requester.student_ref) if avoid else {}
+        done = frozenset(qid for qid, record in records.items() if record.done > 0)
         options, available = await self._bank.practice_capacity(
-            practice_chapters(history, request, catalog), request.difficulties, request.types,
+            practice_chapters(history, request, catalog), request.difficulties, request.types, exclude=done,
         )
         if available < request.total:
-            return None, (review + f"\nKho có {available}/{request.total} câu phù hợp phạm vi và mức đã chọn. "
-                          f"Còn thiếu {request.total - available} câu. Em giảm số câu hoặc đổi chương, mức độ nhé.")
+            fresh = " chưa làm" if done else ""
+            hint = (" Em giảm số câu, đổi chương hoặc mức độ, nhắn \"cho phép làm lại câu đã làm\", "
+                    "hoặc nhắn \"ôn lại câu sai\" nhé." if done else " Em giảm số câu hoặc đổi chương, mức độ nhé.")
+            return None, (review + f"\nKho có {available}/{request.total} câu{fresh} phù hợp phạm vi và mức đã chọn. "
+                          f"Còn thiếu {request.total - available} câu." + hint)
         priority = weak_priority(history, options, catalog)
         unavailable = [catalog[row.code]["name"] for row in history.chapters if row.classification == "weak"
                        and not any((catalog[cell["chapter_code"]]["parent_code"] or cell["chapter_code"]) == row.code
@@ -298,13 +319,25 @@ class LiveExamChat(ExamChatUseCase):
         except PreviewRuleError as exc:
             log.info("exam_chat recommendation rejected")
             return None, review + "\n" + " ".join(exc.errors) + " Em có thể đổi số câu hoặc mức độ rồi thử lại."
-        chosen, _, shortages = await self._pick_chapters(structure)
+        structure = structure.model_copy(update={"avoid_repeats": avoid})
+        chosen, _, shortages = await self._pick_chapters(structure, PickPolicy.for_structure(structure, records))
         if shortages or len(chosen) != structure.total:
             details = "\n".join(self._shortage_text(shortage) for shortage in shortages)
             return None, (review + f"\nMa trận chỉ ghép được {len(chosen)}/{structure.total} câu phân biệt. "
                           "Em giảm số câu hoặc đổi mức độ nhé.\n" + details).rstrip()
-        log.info("exam_chat recommendation accepted groups=%d question_count=%d", len(reasons), structure.total)
+        log.info("exam_chat recommendation accepted groups=%d question_count=%d avoided=%d",
+                 len(reasons), structure.total, len(done))
+        if done:
+            reasons.append(f"Mình bỏ {len(done)} câu em đã làm để đề mới không lặp lại.")
         return structure, "\n".join([review, *reasons])
+
+    async def _review_wrong(self, requester: Requester, action: ChatAction, context):
+        """Đề ôn lại câu đã sai (không phải chương yếu): bỏ tránh trùng, câu sai nhiều lần lấy trước."""
+        if set(action.chapters) - context["catalog"].keys():
+            return None, "Em chọn chương có trong danh mục nhé."
+        if action.total is not None and not 1 <= action.total <= MAX_TOTAL:
+            return None, f"Mỗi đề cần từ 1 đến {MAX_TOTAL} câu."
+        return await self.wrong_proposal(requester.student_ref, action.total, action.chapters)
 
     async def _commit_turn(self, sid, session, text, turn, images):
         attachments = []
@@ -424,7 +457,7 @@ class LiveExamChat(ExamChatUseCase):
         return PreviewEdit(chapter_codes=(action.chapters or None) if include_chapters else None, total=action.total,
                            chapter_counts=action.chapter_counts or None,
                            difficulty_counts=action.difficulty_counts or None, type_counts=action.type_counts or None,
-                           duration_minutes=action.duration_minutes)
+                           duration_minutes=action.duration_minutes, avoid_repeats=action.avoid_repeats)
 
     async def confirm(self, session_id, expected_version, requester=None, *, accepted_count=None):
         session = await self._lock(session_id, requester)
@@ -448,8 +481,9 @@ class LiveExamChat(ExamChatUseCase):
             raise PreviewRuleError(["Mỗi đề tối đa 50 câu."])
         previous = await self._repo.latest_draft(sid)
         operation = preview.operation or {}
+        policy = await self._policy(structure, requester.student_ref)
         if operation and previous:
-            items, shortages = await self._replacement(previous, structure, operation)
+            items, shortages = await self._replacement(previous, structure, operation, policy)
             if not items or (shortages and all(a["question_id"] == b["question_id"]
                                               for a, b in zip(items, previous.items))):
                 return ChatTurn("Kho chưa có câu thay thế phù hợp. Mình giữ nguyên đề hiện tại.",
@@ -458,7 +492,7 @@ class LiveExamChat(ExamChatUseCase):
         else:
             if isinstance(structure, PreviewStructure):
                 ensure_valid(structure, set(await self._bank.chapter_names()))
-                chosen, meta, shortages = await self._pick_chapters(structure)
+                chosen, meta, shortages = await self._pick_chapters(structure, policy)
             else:
                 chosen, meta, shortages = await self._pick_template(structure, prefer_subchapters=True)
             loaded = await self._bank.load_items(chosen)
@@ -476,10 +510,13 @@ class LiveExamChat(ExamChatUseCase):
                             preview=preview, preview_changed=True)
         offer = {"requested": requested, "count": len(items), "shortages": shortages,
                  "ids": [item["question_id"] for item in items]}
+        # Câu được chọn ngẫu nhiên nên mỗi lần dựng ra bộ ID khác: so lời đề nghị theo số câu và ô thiếu, không so ID.
+        same_offer = bool(preview.offer) and {k: v for k, v in preview.offer.items() if k != "ids"} == {
+            k: v for k, v in offer.items() if k != "ids"}
         if (len(items) < requested or operation and shortages) and (
-            preview.offer != offer or accepted_count != len(items)
+            not same_offer or accepted_count != len(items)
         ):
-            if preview.offer != offer:
+            if not same_offer:
                 preview = await self._repo.save_preview(sid, {"offer": offer}, commit=False)
             message = (f"Kho chỉ có {len(items)}/{requested} câu phù hợp." if len(items) < requested else
                        f"Kho chỉ đổi được {len(operation.get('positions') or items) - len(shortages)} câu; "
@@ -507,7 +544,7 @@ class LiveExamChat(ExamChatUseCase):
         return ChatTurn(f"Đã lưu đề {len(items)} câu. " + ("Lần tạo này đã trừ 100 credit." if not previous else
                         "Chỉnh đề miễn phí."), preview=preview, preview_changed=True, draft=draft)
 
-    async def _replacement(self, draft, structure, operation):
+    async def _replacement(self, draft, structure, operation, policy: PickPolicy = NO_POLICY):
         items = [dict(item) for item in draft.items]
         positions = set(operation["positions"] or range(1, len(items) + 1))
         used = [item["question_id"] for item in items]
@@ -520,7 +557,8 @@ class LiveExamChat(ExamChatUseCase):
             difficulty = item["difficulty"] if not section or section.difficulty_distribution else None
             result = await self._bank.pick_for_section(
                 question_type=item["type"], n=1, chapter_codes=scope, difficulty=difficulty,
-                grade=getattr(structure, "grade", None), exclude=used, prefer_subchapters=True,
+                grade=getattr(structure, "grade", None), exclude=[*policy.avoid, *used], prefer_subchapters=True,
+                **policy.picks(),
             )
             loaded = await self._bank.load_items(result.question_ids)
             if not loaded:
